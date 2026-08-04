@@ -1,0 +1,7 @@
+# Dependências do pipeline CCT (instalar com: python -m pip install -r requirements.txt)
+pdfplumber>=0.11
+openpyxl>=3.1
+pyyaml>=6.0
+jsonschema>=4.0
+# desenvolvimento/testes (opcional em produção)
+pytest>=8.0

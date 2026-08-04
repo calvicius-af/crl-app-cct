@@ -1,0 +1,39 @@
+# ── Dados e resultados ───────────────────────────────────────────────
+# 670 MB de PDFs do BTE e exports do MaxQDA; 170 MB de saídas.
+# Tudo reproduzível ou obtível na origem — ver docs/dados/README.md.
+data/
+results/
+
+# Exceção: os exemplos completos SÃO versionados (ver examples/README.md)
+!examples/
+
+# Código de terceiros (licenças próprias) e versões antigas do projeto
+vendor/
+archive/
+
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# ── Ficheiros de projetos QDA (grandes e regeneráveis) ──────────────
+# Exceto os que estão em examples/, incluídos explicitamente a seguir.
+*.qdpx
+*.mqda
+!examples/**/*.qdpx
+
+# ── Ambiente e sistema ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.env
+*.local
+
+# Configuração de máquina do Claude Code (settings.json é partilhável)
+.claude/settings.local.json

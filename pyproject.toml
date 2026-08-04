@@ -1,0 +1,31 @@
+[project]
+name = "appcct"
+version = "0.5.0"
+description = "Pré-codificação de convenções coletivas de trabalho para o MaxQDA (REFI-QDA)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "António Fula", email = "antonio.fula@gmail.com" }]
+keywords = ["negociação coletiva", "REFI-QDA", "MaxQDA", "análise qualitativa"]
+dependencies = [
+    "pdfplumber>=0.11",
+    "openpyxl>=3.1",
+    "pyyaml>=6.0",
+    "jsonschema>=4.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+appcct = "cct.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["cct"]
+
+# A configuração do pytest continua em pytest.ini, para que
+# `python -m pytest` funcione sem instalar o pacote.
