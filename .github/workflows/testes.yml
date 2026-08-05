@@ -33,6 +33,10 @@ jobs:
         # como skipped; ver CONTRIBUTING.md.
         run: python -m pytest -q -rs
 
+      - name: Verificar anonimização dos exemplos
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        run: python scripts/anonimizar_exemplos.py --check
+
       - name: Verificar que não entraram dados no repositório
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         run: |

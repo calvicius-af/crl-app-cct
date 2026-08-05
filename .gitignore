@@ -29,6 +29,11 @@ dist/
 *.mqda
 !examples/**/*.qdpx
 
+# PDFs originais dos exemplos: podem ser obtidos localmente para repetir a
+# extração, mas não são redistribuídos na edição pública (ADR-0013).
+examples/**/entrada/*.pdf
+examples/**/entrada/versoes/**/*.pdf
+
 # ── Ambiente e sistema ──────────────────────────────────────────────
 .DS_Store
 Thumbs.db

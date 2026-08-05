@@ -10,9 +10,8 @@ centenas de convenções por ano, alguma coisa passe despercebida — e poupar �
 trabalho mecânico de localizar, no meio de centenas de páginas, as cláusulas que
 interessam a cada tema.
 
-**Ver a funcionar em dois minutos:** [`examples/`](examples/README.md) tem dois casos
-reais completos — o PDF que entra, o texto que sai, e o projeto MaxQDA que se gera a
-partir dele.
+**Ver a funcionar em dois minutos:** [`examples/`](examples/README.md) tem artefactos de
+dois casos reais — texto extraído, projeto MaxQDA e instruções para obter os PDFs de origem.
 
 ## O que faz, em quatro passos
 
