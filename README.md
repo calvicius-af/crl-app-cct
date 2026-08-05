@@ -122,8 +122,10 @@ porquê antes de mexer:
 
 A aplicação corre inteiramente na máquina local. Não faz pedidos de rede, com uma única
 exceção opcional: se a camada semântica for ativada, fala com um modelo de linguagem em
-`127.0.0.1` (LM Studio) — dentro da própria máquina, nunca para o exterior. Essa camada
-está desligada por omissão ([ADR-0006](docs/adr/0006-semantica-llm-local-desligada-por-omissao.md)).
+`localhost` (por exemplo, LM Studio) — dentro da própria máquina, nunca para o exterior.
+O código recusa URLs que não sejam de loopback. Essa camada está desligada por omissão
+([ADR-0006](docs/adr/0006-semantica-llm-local-desligada-por-omissao.md),
+[ADR-0012](docs/adr/0012-modelos-locais-obrigatorios.md)).
 
 ## Licença e citação
 

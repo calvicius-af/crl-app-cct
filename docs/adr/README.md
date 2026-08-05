@@ -43,6 +43,7 @@ seguir*.
 | [0009](0009-layout-do-repositorio.md) | Layout do repositório: pacote na raiz, dados fora do Git | Aceite |
 | [0010](0010-escolha-do-par-na-diacronia.md) | Escolha do par de versões na comparação diacrónica | Aceite |
 | [0011](0011-fluxo-spec-driven.md) | Adoção de um fluxo *spec-driven* para as próximas funcionalidades | Proposto |
+| [0012](0012-modelos-locais-obrigatorios.md) | Modelos locais obrigatórios; remover backend externo Claude CLI | Aceite |
 
 Os dez primeiros foram escritos **retroativamente**, em agosto de 2026, a partir do
 histórico do desenvolvimento (fases 0 a 5, entre janeiro e julho de 2026). Registam

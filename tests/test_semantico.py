@@ -5,8 +5,10 @@ O LLM só vê cláusulas sem anotação lexical; responde JSON com
 """
 import json
 
+import pytest
+
 from cct.extractor import estruturar
-from cct.semantico import codificar_semantico, _montar_lotes
+from cct.semantico import _montar_lotes, _validar_url_local, backend_lmstudio, codificar_semantico
 
 EXEMPLO = """Preâmbulo.
 Cláusula 1.ª - Cadastro
@@ -106,3 +108,14 @@ def test_codigo_fora_do_codebook_rejeitado(tmp_path):
     anot = codificar_semantico(doc, texto, CODEBOOK, backend=lambda p: resposta,
                                nos_ja_anotados=set(), cache_dir=tmp_path)
     assert anot["anotacoes"] == []
+
+
+@pytest.mark.parametrize("url", ["http://127.0.0.1:1234", "http://localhost:1234",
+                                  "http://[::1]:1234"])
+def test_backend_so_aceita_urls_loopback(url):
+    assert _validar_url_local(url) == url
+
+
+def test_backend_recusa_destino_remoto_antes_de_ligar():
+    with pytest.raises(ValueError, match="destinos remotos"):
+        backend_lmstudio("teste", modelo="local", base_url="https://api.exemplo.pt")

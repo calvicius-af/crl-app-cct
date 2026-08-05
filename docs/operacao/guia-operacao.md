@@ -146,5 +146,6 @@ problemas — o resto do lote NÃO é afetado. Corrige só esses e volta a corre
 - Numeração por extenso ("Cláusula primeira") não é reconhecida.
 - Blocos de título com várias linhas no início dos documentos podem ficar
   com quebras imperfeitas.
-- A camada semântica (LM Studio + gemma) é opcional e as suas sugestões
-  vão sempre para REVER.
+- A camada semântica (modelo local, por exemplo LM Studio + gemma) é opcional e as suas
+  sugestões vão sempre para REVER. Aceita apenas servidores em `localhost`/loopback;
+  serviços externos não são suportados.

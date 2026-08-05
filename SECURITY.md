@@ -7,8 +7,10 @@ portas, não escuta ligações, não envia telemetria.
 
 A única exceção é opcional e local: se a camada semântica for ativada (`--semantica`), a
 aplicação fala com um servidor de modelo de linguagem em `http://127.0.0.1:1234`
-(LM Studio), na própria máquina. Está desligada por omissão —
-[ADR-0006](docs/adr/0006-semantica-llm-local-desligada-por-omissao.md).
+(por exemplo, LM Studio), na própria máquina. Está desligada por omissão. O backend aceita
+somente `localhost`, `127.0.0.1` ou `::1`; uma URL remota falha antes de qualquer pedido de
+rede. Não existe backend para serviços externos — ver
+[ADR-0012](docs/adr/0012-modelos-locais-obrigatorios.md).
 
 Não há credenciais, chaves nem segredos: não há nada a que autenticar-se.
 
