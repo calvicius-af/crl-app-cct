@@ -27,7 +27,43 @@
   e <strong>os modelos</strong>. As duas resolvem-se de maneiras diferentes.</p>
 </div>
 
-<h2>1. As duas metades</h2>
+<div class="retrospetiva">
+  <div class="passo feito"><span class="num">Lição 1</span>Instalaste o Docling e converteste um PDF, num computador com internet.</div>
+  <span class="seta">→</span>
+  <div class="passo feito"><span class="num">Lição 2</span>Aprendeste a ler a estrutura do resultado em Python, no mesmo computador.</div>
+  <span class="seta">→</span>
+  <div class="passo aqui"><span class="num">Lição 3 — aqui</span>Preparas tudo o que as lições 1 e 2 fizeram para correr <strong>sem internet nenhuma</strong>, no computador do CRL.</div>
+</div>
+
+<p>Nota importante antes de começares: esta lição não ensina nada de novo sobre o Docling
+em si — as lições 1 e 2 continuam a ser o que fazes com ele. Esta lição resolve só um
+problema: <strong>o mesmo comando que funcionou em casa, falha no CRL</strong>, porque o
+CRL não tem acesso à internet e o Docling, por omissão, vai à internet buscar coisas.</p>
+
+<h2>1. Dois computadores, duas regras</h2>
+
+<p>Para não te perderes a meio: há sempre <strong>dois</strong> computadores nesta
+história, e cada um faz uma coisa diferente.</p>
+
+<div class="lado-a-lado">
+  <div class="caixa">
+    <span class="rotulo">💻 O teu computador, com internet</span>
+    <p>Onde fizeste as lições 1 e 2. Aqui <strong>preparas</strong> tudo: instalas o
+    Docling, descarregas os modelos, testas que a convenção sai bem. É o único computador
+    que precisa de rede em todo este processo.</p>
+  </div>
+  <div class="caixa">
+    <span class="rotulo">🏢 O computador do CRL, sem internet</span>
+    <p>Onde a aplicação vai correr a sério. Não instala nada da internet — recebe apenas o
+    que <strong>levaste de casa</strong> (numa pen, por exemplo): o pacote já descarregado,
+    e os modelos já descarregados.</p>
+  </div>
+</div>
+
+<p>Toda esta lição é sobre <strong>o que preparar em casa</strong> e <strong>como entregar
+isso ao CRL</strong> para que ele nunca precise de tocar na internet.</p>
+
+<h2>2. As duas metades a preparar em casa</h2>
 
 <div class="tabela-envolvente">
 <table>
@@ -41,7 +77,9 @@
 bem na máquina de desenvolvimento, e a primeira conversão na máquina do CRL falha com um
 erro de rede — porque só nesse momento é que o Docling vai buscar os pesos.</p>
 
-<h2>2. Na máquina com rede: puxar os modelos</h2>
+<h2>3. Na máquina com rede: puxar os modelos</h2>
+
+<p><span class="pill pill-texto">💻 corre no computador de casa</span></p>
 
 <pre><code>.venv-docling/bin/docling-tools models download --output-dir ./modelos-docling</code></pre>
 
@@ -70,7 +108,9 @@ download_models(
     progress=True,
 )</code></pre>
 
-<h2>3. Na máquina do CRL: apontar para eles</h2>
+<h2>4. Na máquina do CRL: apontar para eles</h2>
+
+<p><span class="pill pill-secao">🏢 corre no computador do CRL</span></p>
 
 <p>Três maneiras, a mesma coisa. Escolhe uma e sê consistente:</p>
 
@@ -118,7 +158,9 @@ export DOCLING_ARTIFACTS_PATH=/opt/modelos-docling</code></pre>
   </ol>
 </div>
 
-<h2>4. E o pacote?</h2>
+<h2>5. E o pacote?</h2>
+
+<p><span class="pill pill-texto">💻 preparar em casa</span> <span class="seta" style="display:inline">→</span> <span class="pill pill-secao">🏢 instalar no CRL</span></p>
 
 <pre><code><span class="cmt"># máquina com rede — mesma versão de Python e mesmo sistema operativo do destino</span>
 pip download docling -d ./wheels-docling
@@ -131,7 +173,7 @@ integrar o Docling no AppCCT, isto muda a natureza da instalação da aplicaçã
 quatro dependências e uns 30 MB. Não é um pormenor de empacotamento: é um argumento a pesar
 na decisão técnica, e pertence à nota que vais escrever no fim.</p>
 
-<h2>5. Verifica que percebeste</h2>
+<h2>6. Verifica que percebeste</h2>
 
 <div class="quiz" data-certa="2">
   <p class="pergunta">Instalaste o Docling na máquina do CRL a partir de <em>wheels</em> copiados. A instalação correu bem e a primeira conversão falha com erro de rede. Porquê?</p>
@@ -159,7 +201,7 @@ na decisão técnica, e pertence à nota que vais escrever no fim.</p>
      data-errada="Não. Nenhuma inspecção estática apanha o caso perigoso: se a cache local ainda tiver os modelos, a conversão passa mesmo com a configuração errada. Só desligar a rede e apagar as caches distingue as duas situações."></p>
 </div>
 
-<h2>6. O teu ganho</h2>
+<h2>7. O teu ganho</h2>
 
 <div class="caixa ganho">
   <span class="rotulo">Guarda isto</span>

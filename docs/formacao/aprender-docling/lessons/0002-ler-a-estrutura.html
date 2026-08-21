@@ -27,6 +27,14 @@
   ver a mesma informação, obtida de outra maneira.</p>
 </div>
 
+<div class="retrospetiva">
+  <div class="passo feito"><span class="num">Lição 1</span>Converteste um PDF do BTE e viste o resultado em Markdown/JSON.</div>
+  <span class="seta">→</span>
+  <div class="passo aqui"><span class="num">Lição 2 — aqui</span>Percorres esse resultado em Python, sem regex.</div>
+  <span class="seta">→</span>
+  <div class="passo"><span class="num">Lição 3</span>Fazes tudo isto correr sem internet, no CRL.</div>
+</div>
+
 <h2>1. Uma pequena convenção, vista de duas maneiras</h2>
 
 <p>Esquece "campos" e "<code>DoclingDocument</code>" por um bocado. Olha só para este
@@ -229,6 +237,7 @@ pacote instalado — não são o que a documentação diz, são o que o código 
   <tr><td><code>table_structure_options.mode</code></td><td><code>ACCURATE</code></td><td>Deixa. <code>FAST</code> só para explorar</td></tr>
   <tr><td><code>table_structure_options.do_cell_matching</code></td><td><code>True</code></td><td>Se as colunas da tabela salarial saírem fundidas, experimenta <code>False</code></td></tr>
   <tr><td><code>artifacts_path</code></td><td><code>None</code></td><td>Obrigatório no CRL — <a href="0003-modelos-offline.html">lição 03</a></td></tr>
+  <tr><td><code>heading_hierarchy_options.enabled</code></td><td><code>False</code></td><td>Por omissão <strong>todos</strong> os cabeçalhos ficam no <code>level</code> 1 — sem hierarquia nenhuma. Ver a caixa abaixo.</td></tr>
 </table>
 </div>
 
@@ -248,6 +257,47 @@ delimita-as com sentinelas e devolve-as como texto. Aqui saem estruturadas:</p>
   <code>TableItem</code> ou como <strong>três</strong>? Não encontrei fonte que responda, e
   para o teu corpus isto decide muita coisa. Corre e conta. Seja qual for a resposta, é
   registo de aprendizagem — e talvez uma discussão a abrir no repositório do Docling.</p>
+</div>
+
+<h3>Níveis de hierarquia — e a distância até ao AKN4EU</h3>
+
+<p>Se procuras algo parecido com o <a href="../../../research/akn4eu-guia-exaustivo.md">AKN4EU</a>
+— níveis explícitos, um dentro do outro — repara na linha nova da tabela acima:
+<strong>por omissão, todos os cabeçalhos do Docling ficam no mesmo nível</strong>. É por
+isso que não vias essa diferença no Markdown: capítulo e cláusula saem os dois como
+<code>##</code>, sem distinção de profundidade. Não é um limite do formato — é uma opção
+desligada por omissão, chamada <code>heading_hierarchy_options</code>.</p>
+
+<div class="caixa">
+  <span class="rotulo">Verificado no código-fonte — o que essa opção faz, e o que não faz</span>
+  <p>Ligada (<code>PdfPipelineOptions(heading_hierarchy_options=HeadingHierarchyOptions(enabled=True))</code>),
+  esta opção tenta atribuir um nível a cada cabeçalho, por esta ordem de confiança:</p>
+  <ol>
+    <li><strong>Marcadores do PDF</strong> (um índice/sumário embutido) — as convenções do BTE não costumam ter.</li>
+    <li><strong>Numeração jurídica</strong> — mas o Docling reconhece as palavras-chave em <em>inglês</em> (<code>chapter</code>, <code>article</code>, <code>section</code>, <code>clause</code>…). "CAPÍTULO" e "Cláusula", em português, <strong>não</strong> são reconhecidos por esta via. Confirmei isto a ler o código-fonte, linha a linha — não é suposição.</li>
+    <li><strong>Estilo visual</strong> (tamanho de letra, negrito, maiúsculas) — esta via <em>não</em> depende de língua nenhuma. Se no PDF original "CAPÍTULO I" tem letra maior que "Cláusula 1.ª", esta via distingue os dois níveis correctamente. É o caminho mais promissor para as convenções.</li>
+  </ol>
+  <p>E mesmo que isto funcione bem, o resultado é só um número — <code>level=1</code>,
+  <code>level=2</code> — não sabe que <code>level=1</code> "é" um capítulo AKN4EU e
+  <code>level=2</code> "é" uma cláusula. Essa tradução continua a ser código teu, só que
+  muito mais simples do que hoje: aplicas o teu <code>RE_CLAUSULA</code> ao <em>título já
+  isolado</em> pelo Docling, em vez de o teres de encontrar primeiro dentro de um rio de
+  texto. E confirmei também que <strong>o Docling não tem exportador nenhum para AKN4EU</strong>
+  — os formatos de saída são Markdown, HTML, JSON, YAML, doctags e texto simples.</p>
+</div>
+
+<div class="caixa aviso">
+  <span class="rotulo">Sobre precisares de um "linting" a seguir</span>
+  <p>Sim — e isso não é sinal de o Docling estar mal, é o comportamento esperado de
+  qualquer extractor por modelo. Confirmaste tu mesmo: as tabelas saem muito bem, a
+  estrutura preserva-se em grande parte, mas alguns pormenores escapam. A resposta correcta
+  não é "arranjar um Docling mais preciso" — é o que o AppCCT já faz hoje: uma camada de
+  validação a seguir à extração, que confirma invariantes conhecidos (numeração de
+  cláusulas sem saltos, capítulos em sequência de romanos, contagem de caracteres sem
+  perdas). Olha para <code>docs/validacao/</code> no repositório — é literalmente essa
+  camada, já construída para o extractor actual; trocar de extractor não elimina essa
+  necessidade, e o teu vocabulário para a construir é o mesmo (post-it, morada) mais o
+  gabarito humano que já tens.</p>
 </div>
 
 <h2>4. Verifica que percebeste</h2>

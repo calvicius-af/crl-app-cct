@@ -494,6 +494,59 @@ tr:hover td { background: var(--papel-caixa); }
 }
 .morada dd { margin: 0; }
 
+/* retrospetiva — onde estás na sequência das lições */
+.retrospetiva {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin: 0 0 2.4rem;
+}
+.retrospetiva .passo {
+  flex: 1 1 9rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--regua-forte);
+  border-radius: 8px;
+  background: var(--papel-caixa);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+.retrospetiva .passo .num {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  color: var(--tinta-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+.retrospetiva .passo.feito { opacity: 0.7; }
+.retrospetiva .passo.feito .num::before { content: "✓ "; }
+.retrospetiva .passo.aqui {
+  border-color: var(--destaque);
+  background: var(--destaque-fundo);
+  box-shadow: var(--sombra-suave);
+  font-weight: 600;
+}
+.retrospetiva .seta {
+  align-self: center;
+  color: var(--tinta-fraca);
+  font-size: 1.1rem;
+  flex: 0 0 auto;
+}
+
+/* duas colunas lado a lado — comparações (ex.: casa vs. CRL) */
+.lado-a-lado {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.7rem 0;
+}
+.lado-a-lado > .caixa { margin: 0; }
+@media (max-width: 34rem) {
+  .lado-a-lado { grid-template-columns: 1fr; }
+}
+
 @media print {
   .barra { display: none; }
   body { max-width: none; font-size: 10.5pt; padding: 0; }

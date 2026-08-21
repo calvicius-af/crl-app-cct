@@ -48,6 +48,27 @@ Importante para a honestidade das lições:
   `modelscope.cn`, não de `huggingface.co`** — um segundo host que a lição 03 e o cartão
   de referência não mencionavam. Corrigido nas duas páginas. É a primeira vez que uma
   afirmação desta oficina deixa de ser hipótese e passa a facto confirmado por execução.
+- **Actualização de 2026-08-21 — níveis de hierarquia e AKN4EU.** O formando perguntou
+  porque é que o Markdown não mostra níveis distintos entre capítulo e cláusula, e se o
+  Docling se aproxima do AKN4EU. Verificado por leitura do código-fonte
+  (`docling/models/stages/heading_hierarchy/heading_hierarchy_model.py`):
+  - `PdfPipelineOptions.heading_hierarchy_options.enabled` é `False` por omissão — **todos**
+    os `SECTION_HEADER` ficam em `level=1`. Isto explica o sintoma exactamente.
+  - Ligada, a opção tenta 3 sinais em ordem: marcadores do PDF (raros no BTE), numeração
+    jurídica (mas os regex de palavra-chave são só em inglês — `chapter`, `article`,
+    `clause`… — "CAPÍTULO"/"Cláusula" em português **não** disparam esta via), e estilo
+    visual (tamanho/negrito — este sim, independente de língua, e o caminho mais provável
+    de funcionar nas convenções).
+  - Confirmado por `grep` no pacote inteiro: **não existe exportador para AKN4EU/Akoma
+    Ntoso**. A tradução `level` numérico → `AKN4EU chapter/clause` continua a ser código a
+    escrever — mais simples do que hoje, porque aplica-se a um título já isolado, não a
+    texto corrido.
+  - Sobre a necessidade de *linting* pós-extração que o formando levantou: confirmado como
+    expectativa correcta, não sintoma de falha do Docling — é o mesmo papel que
+    `docs/validacao/` já cumpre para o extractor actual.
+  - **Não testado em execução** (precisaria de converter um PDF real com a opção ligada,
+    o que este ambiente não permite — ver nota acima sobre rede). Registado como hipótese
+    fundamentada em código-fonte, não como facto confirmado por execução.
 
 ## Dívidas e próximos passos
 
