@@ -9,6 +9,11 @@
 </head>
 <body>
 
+<nav class="barra">
+  <span class="marca"><a href="../README.md">Aprender Docling</a> › Lição 01 de 3</span>
+  <span class="passos"><span class="aqui"></span><span></span><span></span><span></span></span>
+</nav>
+
 <p class="chapeu">Aprender Docling · Lição 01</p>
 <h1>A primeira conversão</h1>
 <p class="subtitulo">Um PDF do BTE entra; um documento com estrutura sai. Vinte minutos.</p>
@@ -66,11 +71,34 @@ exportá-lo para Markdown (legível) ou para JSON (completo, sem perdas).</p>
 <p>Escolhe um PDF do BTE que já conheças bem — o do exemplo ACIP/FESAHT serve, e conheces
 o resultado que o extractor actual dá. A linha de comandos chega:</p>
 
-<pre><code>.venv-docling/bin/docling 25_PR_003_BTE_02_ACIP_FESAHT.pdf \
+<pre><code>.venv-docling/bin/docling CAMINHO/PARA/O/TEU.pdf \
     --to md --to json --output ./saida-docling/</code></pre>
 
+<div class="caixa aviso">
+  <span class="rotulo">"does not exist" — antes de tudo, onde está o terminal?</span>
+  <p>O <code>docling</code> não procura o PDF em pasta nenhuma especial: o primeiro
+  argumento é um <strong>caminho de ficheiro</strong>, lido a partir da pasta onde o
+  terminal está nesse momento. Se escreveres só o nome do ficheiro
+  (<code>docling convencao.pdf</code>), isso significa <em>"o ficheiro chamado
+  <code>convencao.pdf</code> na pasta actual"</em> — e se a pasta actual for outra, ou o
+  nome não bater certo (maiúsculas, espaços, <code>3_BTE_2_…</code> em vez de
+  <code>25_PR_003_BTE_02_…</code>), dá exactamente este erro.</p>
+  <p>Três passos para sair disto, por ordem:</p>
+  <ol>
+    <li><code>pwd</code> — mostra onde o terminal está agora.</li>
+    <li><code>ls</code> — mostra o que há nessa pasta. O PDF aparece na lista? Se não,
+    o terminal está na pasta errada ou o PDF está noutro lado.</li>
+    <li>Em vez de adivinhar o caminho, <strong>arrasta o ficheiro do Finder para dentro da
+    janela do Terminal</strong>, depois do comando — o macOS escreve o caminho completo e
+    correcto por ti, com aspas incluídas se houver espaços no nome.</li>
+  </ol>
+  <p>Fica com o hábito de confirmar sempre com <code>ls</code> antes de correr o
+  <code>docling</code> a sério — é mais rápido do que decifrar o erro depois.</p>
+</div>
+
 <p>Da primeira vez demora: descarrega os modelos e converte página a página, em CPU.
-Ficas com <code>25_PR_003_BTE_02_ACIP_FESAHT.md</code> e <code>.json</code>.</p>
+Ficas com um <code>.md</code> e um <code>.json</code> de nome igual ao PDF, dentro de
+<code>saida-docling/</code>.</p>
 
 <p>Três flags que vais querer já:</p>
 
