@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 02 — Ler a estrutura, não o texto</title>
+<link rel="stylesheet" href="../assets/estilo.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+
+<p class="chapeu">Aprender Docling · Lição 02</p>
+<h1>Ler a estrutura, não o texto</h1>
+<p class="subtitulo">Listar as cláusulas de uma convenção sem escrever uma única expressão regular.</p>
+
+<div class="caixa mission">
+  <span class="rotulo">Porque é que isto interessa</span>
+  <p>Esta é a lição que a missão pede. O <code>cct/extractor.py</code> tem
+  <code>RE_CAPITULO</code>, <code>RE_SECCAO</code>, <code>RE_ANEXO</code>,
+  <code>RE_CLAUSULA</code>, <code>RE_ARTIGO</code> e mais meia dúzia de regras para
+  <em>deduzir</em> a hierarquia a partir de texto plano. O Docling entrega-a já feita. Vais
+  ver a mesma informação, obtida de outra maneira.</p>
+</div>
+
+<h2>1. O documento é uma árvore, não uma string</h2>
+
+<p>O <code>DoclingDocument</code> tem duas famílias de campos:</p>
+
+<div class="tabela-envolvente">
+<table>
+  <tr><th>Campo</th><th>O que guarda</th></tr>
+  <tr><td><code>texts</code>, <code>tables</code>, <code>pictures</code></td><td>Os itens de conteúdo — listas planas de tudo o que existe no documento</td></tr>
+  <tr><td><code>body</code>, <code>groups</code></td><td>A árvore: quem é filho de quem, e em que ordem se lê</td></tr>
+  <tr><td><code>furniture</code></td><td>O que não é conteúdo: cabeçalhos e rodapés de página</td></tr>
+  <tr><td><code>pages</code></td><td>As páginas de origem</td></tr>
+</table>
+</div>
+
+<p>Repara no <code>furniture</code>. O teu extractor tem um <code>RE_RODAPE_BTE</code> para
+apagar as linhas <code>BTE 2 | 2025</code>. O Docling separa o mobiliário do conteúdo por
+construção — não é uma regra tua, é uma decisão do modelo de layout.</p>
+
+<h3>Cada item tem rótulo e proveniência</h3>
+
+<p>Todo o item de conteúdo traz um <code>label</code> — um valor de
+<code>DocItemLabel</code> — e uma lista <code>prov</code> com a sua proveniência. Os
+rótulos que te interessam nas convenções:</p>
+
+<div class="tabela-envolvente">
+<table>
+  <tr><th><code>DocItemLabel</code></th><th>O que costuma ser numa convenção</th></tr>
+  <tr><td><code>TITLE</code></td><td>O título do contrato coletivo</td></tr>
+  <tr><td><code>SECTION_HEADER</code></td><td><code>CAPÍTULO I</code>, <code>Cláusula 1.ª</code>, <code>ANEXO II</code></td></tr>
+  <tr><td><code>TEXT</code></td><td>O corpo dos números da cláusula</td></tr>
+  <tr><td><code>LIST_ITEM</code></td><td>As alíneas — <code>a)</code>, <code>b)</code>, <code>c)</code></td></tr>
+  <tr><td><code>TABLE</code></td><td>A tabela salarial do anexo</td></tr>
+  <tr><td><code>PAGE_FOOTER</code></td><td><code>BTE 2 | 2025</code> — vai para a <code>furniture</code></td></tr>
+</table>
+</div>
+
+<p>E a proveniência de cada item tem três campos: <code>page_no</code>,
+<code>bbox</code> (a caixa na página) e <code>charspan</code>. Guarda o
+<code>charspan</code>: o teu <code>doc.json</code> vive de <code>char_start</code> e
+<code>char_end</code>, e é por aqui que a rastreabilidade sobrevive a uma eventual
+troca de extrator. <strong>Confirma empiricamente a que texto é que esse intervalo se
+refere</strong> antes de construir alguma coisa em cima dele — é a experiência número um
+da tua lista.</p>
+
+<h2>2. O código</h2>
+
+<p>O script completo está em
+<a href="../exemplos/listar_clausulas.py"><code>exemplos/listar_clausulas.py</code></a>.
+O coração são estas linhas:</p>
+
+<pre><code>from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling_core.types.doc import DocItemLabel
+
+opcoes = PdfPipelineOptions(do_ocr=False, do_table_structure=True)
+conversor = DocumentConverter(
+    format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opcoes)}
+)
+doc = conversor.convert("convencao.pdf").document
+
+<span class="cmt"># a ordem de leitura é a ordem em que iterate_items devolve os itens</span>
+for item, nivel in doc.iterate_items():
+    if getattr(item, "label", None) is DocItemLabel.SECTION_HEADER:
+        pagina = item.prov[0].page_no if item.prov else "?"
+        print(f"p.{pagina}  {'  ' * nivel}§ {item.text}")</code></pre>
+
+<div class="caixa aviso">
+  <span class="rotulo">A armadilha da configuração</span>
+  <p>As chaves de <code>format_options</code> têm de ser membros do <em>enum</em>
+  <code>InputFormat</code>, com o <code>FormatOption</code> correspondente por valor.
+  Escrever <code>{"pdf": PdfPipelineOptions(...)}</code> não dá erro de tipo — rebenta
+  em execução com <code>AttributeError: 'PdfPipelineOptions' object has no attribute
+  'backend'</code>. Duas camadas: <code>PdfFormatOption</code> por fora,
+  <code>PdfPipelineOptions</code> por dentro.</p>
+</div>
+
+<h3>Os valores por omissão, verificados</h3>
+
+<p>Estes são os valores de <code>PdfPipelineOptions()</code> na versão 2.121.0, lidos do
+pacote instalado — não são o que a documentação diz, são o que o código faz:</p>
+
+<div class="tabela-envolvente">
+<table>
+  <tr><th>Opção</th><th>Por omissão</th><th>Para as convenções</th></tr>
+  <tr><td><code>do_ocr</code></td><td><code>True</code></td><td>Põe <code>False</code>: os PDFs do BTE são digitais</td></tr>
+  <tr><td><code>do_table_structure</code></td><td><code>True</code></td><td>Deixa: são as tabelas salariais</td></tr>
+  <tr><td><code>table_structure_options.mode</code></td><td><code>ACCURATE</code></td><td>Deixa. <code>FAST</code> só para explorar</td></tr>
+  <tr><td><code>table_structure_options.do_cell_matching</code></td><td><code>True</code></td><td>Se as colunas da tabela salarial saírem fundidas, experimenta <code>False</code></td></tr>
+  <tr><td><code>artifacts_path</code></td><td><code>None</code></td><td>Obrigatório no CRL — <a href="0003-modelos-offline.html">lição 03</a></td></tr>
+</table>
+</div>
+
+<h2>3. As tabelas, que é onde está o dinheiro</h2>
+
+<p>Literalmente. As tabelas salariais são o conteúdo que o teu extractor hoje trata pior —
+delimita-as com sentinelas e devolve-as como texto. Aqui saem estruturadas:</p>
+
+<pre><code>for tabela in doc.tables:
+    df = tabela.export_to_dataframe(doc=doc)   <span class="cmt"># pandas.DataFrame</span>
+    print(tabela.data.num_rows, "x", tabela.data.num_cols)
+    df.to_csv("tabela.csv", index=False)</code></pre>
+
+<div class="caixa">
+  <span class="rotulo">Pergunta em aberto — experiência para fazeres</span>
+  <p>Uma tabela salarial que atravessa três páginas sai como <strong>um</strong>
+  <code>TableItem</code> ou como <strong>três</strong>? Não encontrei fonte que responda, e
+  para o teu corpus isto decide muita coisa. Corre e conta. Seja qual for a resposta, é
+  registo de aprendizagem — e talvez uma discussão a abrir no repositório do Docling.</p>
+</div>
+
+<h2>4. Verifica que percebeste</h2>
+
+<div class="quiz" data-certa="0">
+  <p class="pergunta">Onde é que o Docling arruma a linha <code>BTE 2 | 2025</code> que aparece no fundo de cada página?</p>
+  <div class="opcoes">
+    <button>Na árvore <code>furniture</code>, separada do conteúdo do documento</button>
+    <button>Na lista <code>texts</code>, como qualquer outro parágrafo do corpo</button>
+    <button>No campo <code>pages</code>, junto aos metadados de cada página</button>
+    <button>Em lado nenhum: o pipeline descarta rodapés antes de montar</button>
+  </div>
+  <p class="feedback"
+     data-certa="Certo. É a distinção corpo/mobiliário. O que hoje te custa um RE_RODAPE_BTE vem resolvido por construção — e não se perde, fica noutra árvore."
+     data-errada="Não. O Docling separa o corpo do mobiliário: rodapés e cabeçalhos de página vão para a árvore furniture. Não são descartados nem misturados com o corpo — ficam noutro ramo."></p>
+</div>
+
+<div class="quiz" data-certa="3">
+  <p class="pergunta">Queres saber de que página do PDF veio uma cláusula. Onde procuras?</p>
+  <div class="opcoes">
+    <button>Em <code>item.meta</code>, que guarda os metadados do item</button>
+    <button>Em <code>item.source</code>, que aponta para o ficheiro de origem</button>
+    <button>Em <code>doc.pages</code>, procurando o item em cada página</button>
+    <button>Em <code>item.prov[0].page_no</code>, a proveniência do item</button>
+  </div>
+  <p class="feedback"
+     data-certa="Certo. Cada DocItem tem uma lista prov de ProvenanceItem, e cada um traz page_no, bbox e charspan. É a ligação de volta ao PDF."
+     data-errada="Não. A informação de origem chama-se proveniência e vive em item.prov — uma lista de ProvenanceItem com page_no, bbox e charspan. É lista porque um item pode atravessar mais do que uma região."></p>
+</div>
+
+<h2>5. O teu ganho</h2>
+
+<div class="caixa ganho">
+  <span class="rotulo">Guarda isto</span>
+  <p>Listaste a hierarquia de uma convenção sem uma regex, e sabes onde ir buscar a página
+  e o intervalo de caracteres de cada item. Compara a tua listagem com a saída do
+  <code>cct/extractor.py</code> no mesmo PDF: <strong>onde é que os dois discordam?</strong>
+  Essa lista de discordâncias é a matéria-prima da decisão técnica que fecha a missão.</p>
+</div>
+
+<h2>Fonte primária a ler</h2>
+
+<p>A referência que a própria equipa do Docling escreveu para agentes, e que é a melhor
+que existe para o SDK: <code>references/python-sdk.md</code>, dentro do pacote instalado.
+Encontra-lo assim:</p>
+
+<pre><code>.venv-docling/bin/python -c "import importlib.util, pathlib; \
+print(pathlib.Path(importlib.util.find_spec('docling').origin).parent / '.agents/skills/docling')"</code></pre>
+
+<div class="rodape">
+  <p><strong>Continuar:</strong></p>
+  <ul>
+    <li><a href="0003-modelos-offline.html">Lição 03 — Modelos offline, para as máquinas do CRL</a></li>
+    <li><a href="0001-primeira-conversao.html">Lição 01 — A primeira conversão</a></li>
+    <li><a href="../reference/cartao-docling.html">Cartão de referência</a></li>
+  </ul>
+  <p>Se a tua listagem sair diferente do que esta lição prevê — cláusulas que não viram
+  <code>SECTION_HEADER</code>, colunas trocadas, tabelas partidas — traz o output. É esse o
+  material da lição seguinte.</p>
+</div>
+
+</body>
+</html>

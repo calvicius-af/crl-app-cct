@@ -1,0 +1,166 @@
+/* Folha de estilo partilhada das lições "Aprender Docling".
+   Todas as lições ligam a este ficheiro — muda-se aqui, muda em todas.
+   Pensada para ler no ecrã e para imprimir sem desperdício. */
+
+:root {
+  --tinta: #1a1a18;
+  --tinta-suave: #55524c;
+  --papel: #fdfcf9;
+  --papel-caixa: #f4f1ea;
+  --regua: #ddd8cc;
+  --destaque: #7a3b12;
+  --verde: #2f5d3a;
+  --vermelho: #8c2f21;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --serifa: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0 auto;
+  padding: 3rem 1.5rem 6rem;
+  max-width: 43rem;
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--serifa);
+  font-size: 1.0625rem;
+  line-height: 1.62;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- cabeçalho da lição ---------- */
+
+.chapeu {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+  margin-bottom: 0.4rem;
+}
+
+h1 {
+  font-size: 2rem;
+  line-height: 1.15;
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+
+.subtitulo {
+  font-size: 1.15rem;
+  color: var(--tinta-suave);
+  font-style: italic;
+  margin: 0 0 2rem;
+}
+
+h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 2.6rem 0 0.7rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--regua);
+}
+
+h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 1.8rem 0 0.5rem;
+}
+
+p { margin: 0 0 1rem; }
+
+a { color: var(--destaque); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+/* ---------- caixas ---------- */
+
+.caixa {
+  background: var(--papel-caixa);
+  border-left: 3px solid var(--regua);
+  padding: 1rem 1.2rem;
+  margin: 1.5rem 0;
+  font-size: 0.97rem;
+}
+.caixa > :last-child { margin-bottom: 0; }
+.caixa .rotulo {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+  display: block;
+  margin-bottom: 0.45rem;
+}
+.caixa.mission { border-left-color: var(--destaque); }
+.caixa.aviso   { border-left-color: var(--vermelho); }
+.caixa.ganho   { border-left-color: var(--verde); }
+
+/* ---------- código ---------- */
+
+pre, code { font-family: var(--mono); }
+code { font-size: 0.87em; background: var(--papel-caixa); padding: 0.1em 0.32em; border-radius: 2px; }
+pre {
+  background: #24221e;
+  color: #eee8dc;
+  padding: 1rem 1.1rem;
+  border-radius: 3px;
+  overflow-x: auto;
+  font-size: 0.83rem;
+  line-height: 1.55;
+  margin: 1.2rem 0;
+}
+pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+pre .cmt { color: #9c9484; font-style: italic; }
+
+/* ---------- tabelas ---------- */
+
+table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: 0.92rem; }
+th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--regua); vertical-align: top; }
+th { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tinta-suave); }
+.tabela-envolvente { overflow-x: auto; }
+
+/* ---------- quiz (componente de recuperação) ---------- */
+
+.quiz { margin: 1.6rem 0; }
+.quiz .pergunta { font-weight: 600; margin-bottom: 0.7rem; }
+.quiz .opcoes { display: flex; flex-direction: column; gap: 0.45rem; }
+.quiz button {
+  font-family: inherit;
+  font-size: 0.97rem;
+  text-align: left;
+  padding: 0.6rem 0.8rem;
+  background: var(--papel-caixa);
+  color: var(--tinta);
+  border: 1px solid var(--regua);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.quiz button:hover:not([disabled]) { border-color: var(--tinta-suave); }
+.quiz button.certa   { border-color: var(--verde);    background: #e7efe6; }
+.quiz button.errada  { border-color: var(--vermelho); background: #f4e5e2; }
+.quiz .feedback {
+  margin-top: 0.75rem;
+  font-size: 0.94rem;
+  border-left: 3px solid var(--regua);
+  padding-left: 0.8rem;
+  display: none;
+}
+.quiz .feedback.visivel { display: block; }
+
+/* ---------- rodapé e navegação ---------- */
+
+.rodape {
+  margin-top: 3.5rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--regua);
+  font-size: 0.9rem;
+  color: var(--tinta-suave);
+}
+.rodape ul { padding-left: 1.1rem; }
+
+@media print {
+  body { max-width: none; font-size: 10.5pt; padding: 0; }
+  pre { background: #f2f0eb; color: #000; border: 1px solid #ccc; }
+  .quiz button { border: 1px solid #999; }
+  a { color: inherit; }
+}
