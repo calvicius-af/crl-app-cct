@@ -69,6 +69,20 @@ Importante para a honestidade das lições:
   - **Não testado em execução** (precisaria de converter um PDF real com a opção ligada,
     o que este ambiente não permite — ver nota acima sobre rede). Registado como hipótese
     fundamentada em código-fonte, não como facto confirmado por execução.
+- **Actualização de 2026-08-21 — avaliação do `docling-hierarchical-pdf`.** O formando
+  pediu inspeção do pacote de terceiros. Resultado em
+  [`avaliacao-docling-hierarchical-pdf.md`](avaliacao-docling-hierarchical-pdf.md).
+  Medido correndo os módulos reais do pacote (não por leitura): os seus *parsers* de
+  numeração não reconhecem nenhum cabeçalho estrutural português (exigem a numeração no
+  início do texto, e as convenções põem lá a palavra); sem isso o pacote cai na via do
+  estilo visual, que dá hierarquia correcta com tamanhos de letra distintos e lista
+  **completamente plana** com tamanhos iguais. Uma adaptação de ~25 linhas nos *parsers*
+  resolve, testada nos dois cenários. O achado que interessa mesmo: o valor do pacote para
+  o AppCCT **não** é a inferência de níveis (as regex já fazem melhor) mas a
+  **reestruturação da árvore** — aninhar o corpo dentro da cláusula — que o Docling
+  explicitamente não faz e que é a peça em falta para chegar perto do AKN4EU.
+  Compatibilidade com docling 2.121 verificada ao nível da API; **não** testada em
+  execução, pela mesma limitação de rede.
 
 ## Dívidas e próximos passos
 
@@ -82,3 +96,6 @@ Importante para a honestidade das lições:
       ou fica como ferramenta de análise fora do pipeline. Depende da lição 04.
 - [ ] Confirmar se as tabelas salariais que atravessam páginas ficam partidas em vários
       `TableItem` — não se encontrou fonte que responda; é experiência a fazer.
+- [ ] Provar a adaptação do `docling-hierarchical-pdf` num PDF real do BTE, e medir se
+      `CAPÍTULO` e `Cláusula` têm mesmo tamanho de letra no corpus — ver a
+      [avaliação](avaliacao-docling-hierarchical-pdf.md), secção "Por verificar".

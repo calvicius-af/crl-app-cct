@@ -32,6 +32,12 @@ conhecimento paramétrico do modelo. A versão de referência é **Docling 2.121
 - [`docling-project/docling-core`](https://github.com/docling-project/docling-core)
   Os tipos Pydantic (`DocItemLabel`, `ProvenanceItem`, `TableItem`).
   **Usar para:** saber que campos existem mesmo num item, em vez de adivinhar.
+- [`krrome/docling-hierarchical-pdf`](https://github.com/krrome/docling-hierarchical-pdf)
+  Pós-processador de terceiros (MIT) que reordena a árvore do `DoclingDocument`, aninhando
+  o corpo dentro do cabeçalho a que pertence — coisa que o Docling explicitamente não faz.
+  **Usar para:** o motor de reestruturação. Os seus *parsers* de numeração não reconhecem
+  cabeçalhos portugueses; ver a
+  [avaliação completa, com medições](avaliacao-docling-hierarchical-pdf.md).
 
 ## Wisdom (Communities)
 
