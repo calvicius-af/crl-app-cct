@@ -96,6 +96,28 @@ export DOCLING_ARTIFACTS_PATH=/opt/modelos-docling</code></pre>
   lição.</p>
 </div>
 
+<div class="caixa">
+  <span class="rotulo">Confirmado num CCT real — segundo host a autorizar</span>
+  <p>Correr a lição 1 sem <code>--no-ocr</code> mostrou uma coisa que esta lição não tinha:
+  o Hugging Face não é o único sítio a que o Docling vai. Sem <code>--no-ocr</code>, o
+  motor de OCR (<strong>RapidOCR</strong>, com o motor <code>torch</code>) descarrega os
+  seus próprios pesos — <code>PP-OCRv6_det_small</code>, <code>ppocrv6_dict.txt</code>, uns
+  30&nbsp;MB no total — de <strong><code>modelscope.cn</code></strong>, um espelho chinês,
+  não do Hugging Face. Só depois é que o modelo de layout carregou, esse sim vindo do
+  Hugging Face (daí o aviso do <code>HF_TOKEN</code> no terminal).</p>
+  <p>Duas consequências práticas:</p>
+  <ol>
+    <li>Se a lista de exceções do <em>firewall</em> do CRL só tiver
+    <code>huggingface.co</code>, não chega — falta <code>modelscope.cn</code>. Resolve-se
+    à primeira: <strong>usa sempre <code>--no-ocr</code></strong> nos PDFs do BTE (são
+    digitais, não precisam de OCR nenhum) e o problema desaparece por completo.</li>
+    <li>Se um dia precisares mesmo de OCR num PDF digitalizado, o pré-fetch tem de incluir
+    os modelos do RapidOCR também: <code>with_rapidocr=True</code> em
+    <code>download_models()</code>, ou <code>docling-tools models download</code> sem o
+    excluir (é o comportamento por omissão do comando).</li>
+  </ol>
+</div>
+
 <h2>4. E o pacote?</h2>
 
 <pre><code><span class="cmt"># máquina com rede — mesma versão de Python e mesmo sistema operativo do destino</span>

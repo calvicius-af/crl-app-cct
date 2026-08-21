@@ -137,6 +137,16 @@ export DOCLING_ARTIFACTS_PATH=/opt/modelos-docling</code></pre>
 <p>Sem <code>--output-dir</code>, a cache fica em <code>~/.cache/docling/models</code>.
 Prova a configuração com a rede desligada e as caches apagadas.</p>
 
+<div class="caixa aviso">
+  <span class="rotulo">Dois hosts, não um — confirmado por execução real</span>
+  <p><strong>Sem <code>--no-ocr</code></strong>, o Docling não fala só com
+  <code>huggingface.co</code> (modelo de layout/tabelas). O motor de OCR por omissão
+  (RapidOCR) descarrega os seus pesos de <strong><code>modelscope.cn</code></strong>. Se o
+  <em>firewall</em> do CRL só autorizar o primeiro, a conversão falha a meio. A saída mais
+  simples: usa sempre <code>--no-ocr</code> nos PDFs do BTE — são digitais, não precisam de
+  OCR, e o segundo host deixa de entrar em jogo.</p>
+</div>
+
 <h2>Diagnóstico rápido</h2>
 
 <div class="tabela-envolvente">
@@ -149,6 +159,7 @@ Prova a configuração com a rede desligada e as caches apagadas.</p>
   <tr><td>Duas colunas na ordem errada</td><td>Ordem de leitura</td><td><code>--debug-visualize-layout</code> para ver o que o modelo decidiu</td></tr>
   <tr><td><code>AttributeError: … no attribute 'backend'</code></td><td>Chave string em <code>format_options</code></td><td><code>InputFormat.PDF</code> + <code>PdfFormatOption</code></td></tr>
   <tr><td><code>ProxyError</code> / erro de rede na 1.ª conversão</td><td>Modelos por descarregar</td><td><code>artifacts_path</code> — <a href="../lessons/0003-modelos-offline.html">lição 03</a></td></tr>
+  <tr><td>Descarrega de <code>modelscope.cn</code> sem se pedir</td><td><code>do_ocr</code> ficou <code>True</code> (é a omissão)</td><td><code>--no-ocr</code> — os PDFs do BTE são digitais</td></tr>
 </table>
 </div>
 

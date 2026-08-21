@@ -41,6 +41,13 @@ Importante para a honestidade das lições:
   concreto do BTE são hipóteses a testar.
 - O ambiente virtual limpo com `docling` mediu **5,5 GB** — esse número foi medido, não
   estimado.
+- **Actualização de 2026-08-21 — primeira execução real, feita pelo formando.** Correu a
+  lição 1 num PDF real do BTE (`3_BTE_2_ACIP_FESAHT.pdf`), em macOS, com Python 3.14, sem
+  `--no-ocr`. Conversão bem-sucedida em 78,4 s. Confirmou-se algo que as lições ainda não
+  cobriam: **o motor de OCR por omissão (RapidOCR) descarrega os seus pesos de
+  `modelscope.cn`, não de `huggingface.co`** — um segundo host que a lição 03 e o cartão
+  de referência não mencionavam. Corrigido nas duas páginas. É a primeira vez que uma
+  afirmação desta oficina deixa de ser hipótese e passa a facto confirmado por execução.
 
 ## Dívidas e próximos passos
 
