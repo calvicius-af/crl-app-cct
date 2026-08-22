@@ -5,7 +5,6 @@ type: software
 authors:
   - family-names: Fula
     given-names: António
-    affiliation: "Centro de Relações Laborais (CRL)"
 abstract: >-
   Aplicação local que extrai o texto estruturado de convenções coletivas
   publicadas no Boletim do Trabalho e Emprego, pré-codifica cláusulas por tema
@@ -19,6 +18,6 @@ keywords:
   - REFI-QDA
   - MaxQDA
   - reprodutibilidade
-license: MIT
+license: Unlicense
 version: "0.5.0"
 date-released: "2026-08-05"

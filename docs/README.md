@@ -29,4 +29,4 @@ Por onde começar, consoante o que precisas:
 - **research/** — estudos preparatórios; contexto, não especificação do que existe.
 - **formacao/** — material didático produzido a partir deste projeto.
 
-A documentação está sob CC BY 4.0 (ver [LICENSE](../LICENSE)).
+A documentação está dedicada ao domínio público (ver [LICENSE](../LICENSE)).
