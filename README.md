@@ -128,6 +128,8 @@ O código recusa URLs que não sejam de loopback. Essa camada está desligada po
 
 ## Licença e citação
 
-Código sob [MIT](LICENSE); documentação sob CC BY 4.0. A titularidade e a licença carecem
-de confirmação institucional do CRL antes de qualquer publicação em acesso aberto.
-Para citar, ver [CITATION.cff](CITATION.cff).
+Trabalho pessoal de António Fula, oferecido para uso do CRL sem lhe atribuir a
+titularidade. Dedicado ao domínio público — ver [LICENSE](LICENSE): pode ser usado,
+copiado, modificado e distribuído por qualquer pessoa ou entidade, para qualquer fim,
+sem restrições e sem necessidade de atribuição. Citação disponível, mas opcional, em
+[CITATION.cff](CITATION.cff).
