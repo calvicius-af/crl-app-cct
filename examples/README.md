@@ -1,8 +1,22 @@
 # Exemplos completos: do PDF do BTE ao projeto MaxQDA
 
 Esta pasta responde a uma pergunta simples — **o que entra e o que sai desta aplicação?** —
-com dois casos reais, completos e reproduzíveis. É a única parte de dados/resultados que
-está versionada no repositório: tudo o resto (`data/`, `results/`) fica fora do Git.
+com dois casos reais. É a única parte de dados/resultados que está versionada no
+repositório: tudo o resto (`data/`, `results/`) fica fora do Git.
+
+## Privacidade dos exemplos publicados
+
+Os PDFs de entrada e das versões anteriores **não são versionados**: são cópias dos
+documentos oficiais/originais e podem conter nomes de signatários. Para repetir a extração,
+obtêm-se os PDFs na origem oficial indicada abaixo ou através do arquivo autorizado do CRL.
+
+Os textos, QDPX e ficheiros Excel aqui publicados preservam o comportamento demonstrativo,
+mas os nomes dos signatários foram substituídos por marcadores como `[SIGNATÁRIO 01]`. O
+comprimento de cada substituição é igual ao do nome original, pelo que os offsets do
+`.doc.json` e do QDPX permanecem válidos. Esta anonimização é **deliberada** e não indica
+erro de extração, comparação ou exportação. O procedimento verificável está em
+`scripts/anonimizar_exemplos.py --check` e é decidido pelo
+[ADR-0013](../docs/adr/0013-anonimizacao-dos-exemplos-publicados.md).
 
 Cada exemplo tem a mesma organização:
 
@@ -29,8 +43,8 @@ perante estrutura complexa.
 
 | | Ficheiro | Tamanho | O que é |
 |---|---|---|---|
-| **Entrada** | `entrada/25_PR_003_BTE_02_ACIP_FESAHT.pdf` | 1,2 MB | PDF tal como publicado |
-| | `entrada/versoes/ACIP_FESAHT/ACIP_FESAHT_2009.pdf` | 0,5 MB | versão anterior (2009), para a diacronia |
+| **Entrada** | `entrada/25_PR_003_BTE_02_ACIP_FESAHT.pdf` | — | PDF original, não versionado; obter na origem oficial |
+| | `entrada/versoes/ACIP_FESAHT/ACIP_FESAHT_2009.pdf` | — | versão anterior, não versionada; arquivo autorizado do CRL |
 | **Saída** | `saida/25_PR_003_BTE_02_ACIP_FESAHT.txt` | 117 KB | 113 106 caracteres de texto limpo |
 | | `saida/25_PR_003_BTE_02_ACIP_FESAHT.doc.json` | 130 KB | 577 nós, dos quais **91 cláusulas** |
 | | `saida/projeto.qdpx` | 37 KB | 24 segmentos codificados, 22 códigos |
@@ -78,8 +92,8 @@ diacrónica a funcionar quando os números das cláusulas mudam.
 
 | | Ficheiro | Tamanho | O que é |
 |---|---|---|---|
-| **Entrada** | `entrada/25_PR_112_BTE_19_TINITA_SITEMAQ.pdf` | 1,2 MB | PDF de 2025 |
-| | `entrada/versoes/TINITA_SITEMAQ/2020_TINITA_SITEMAQ.pdf` | 0,8 MB | versão de 2020 |
+| **Entrada** | `entrada/25_PR_112_BTE_19_TINITA_SITEMAQ.pdf` | — | PDF original, não versionado; obter na origem oficial |
+| | `entrada/versoes/TINITA_SITEMAQ/2020_TINITA_SITEMAQ.pdf` | — | versão anterior, não versionada; arquivo autorizado do CRL |
 | **Saída** | `saida/25_PR_112_BTE_19_TINITA_SITEMAQ.txt` | 42 KB | 41 428 caracteres |
 | | `saida/25_PR_112_BTE_19_TINITA_SITEMAQ.doc.json` | 30 KB | 139 nós, **34 cláusulas** |
 | | `saida/projeto.qdpx` | 14 KB | 6 segmentos codificados |
@@ -162,11 +176,12 @@ de validação.
 
 ## Proveniência dos ficheiros de entrada
 
-Os dois PDFs são documentos públicos, publicados no *Boletim do Trabalho e Emprego* pelo
-Gabinete de Estratégia e Planeamento (GEP/MTSSS) e descarregáveis em
+Os PDFs são documentos publicados no *Boletim do Trabalho e Emprego* pelo Gabinete de
+Estratégia e Planeamento (GEP/MTSSS), descarregáveis em
 `https://bte.gep.msess.gov.pt/completos/<ano>/bte<n>_<ano>.pdf`. Foram recolhidos em abril
 de 2026, já separados por convenção. As versões anteriores (2009 e 2020) vêm do arquivo de
-textos consolidados do CRL. Ver [docs/dados/README.md](../docs/dados/README.md).
+textos consolidados do CRL. Não são redistribuídos neste repositório; ver
+[docs/dados/README.md](../docs/dados/README.md).
 
 `metricas_calibracao.json` é o resultado da avaliação da baseline lexical contra o gabarito
 manual do tema 4.8 (89 convenções de 2025, 788 segmentos codificados por peritas). É ele que

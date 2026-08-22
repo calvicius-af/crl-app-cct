@@ -2,15 +2,17 @@
 
 Aplica-se APENAS às cláusulas sem anotação lexical — a cascata do plano:
 lexical (barato) → contexto → LLM (só no resto). O backend é injetável:
-qualquer callable prompt→resposta (mock nos testes; CLI do Claude na
-execução real). Respostas em JSON são validadas contra o codebook e
-cacheadas em disco por hash do prompt.
+um backend injetável para testes. Na execução real, o único backend
+suportado é um servidor OpenAI-compatível na própria máquina (por exemplo,
+LM Studio). Respostas em JSON são validadas contra o codebook e cacheadas em
+disco por hash do prompt.
 """
 import hashlib
+import ipaddress
 import json
 import re
-import subprocess
 from pathlib import Path
+from urllib.parse import urlparse
 
 MAX_CHARS_LOTE = 12000
 CONFIANCA_MINIMA = 0.5
@@ -150,6 +152,29 @@ def codificar_semantico(doc: dict, texto: str, codebook: dict, backend,
     }
 
 
+def _validar_url_local(base_url: str) -> str:
+    """Devolve uma URL de loopback válida ou recusa qualquer destino remoto.
+
+    Não se resolve ``localhost`` por DNS: só são aceites o nome literal e
+    endereços IP de loopback, para que o texto das convenções nunca saia da
+    estação por configuração acidental.
+    """
+    url = urlparse(base_url)
+    if url.scheme not in {"http", "https"} or not url.hostname:
+        raise ValueError("URL do modelo local inválida; usar http://127.0.0.1:<porta>")
+    if url.hostname.lower() == "localhost":
+        return base_url.rstrip("/")
+    try:
+        if ipaddress.ip_address(url.hostname).is_loopback:
+            return base_url.rstrip("/")
+    except ValueError:
+        pass
+    raise ValueError(
+        "O backend semântico só aceita modelos locais em localhost, "
+        "127.0.0.1 ou ::1; destinos remotos não são permitidos."
+    )
+
+
 def backend_lmstudio(prompt: str, modelo: str,
                      base_url: str = "http://127.0.0.1:1234",
                      temperatura: float = 0.0,
@@ -158,6 +183,7 @@ def backend_lmstudio(prompt: str, modelo: str,
     """Backend local: servidor OpenAI-compatível do LM Studio."""
     import urllib.request
 
+    base_url = _validar_url_local(base_url)
     corpo = json.dumps({
         "model": modelo,
         "messages": [{"role": "user", "content": prompt}],
@@ -165,7 +191,7 @@ def backend_lmstudio(prompt: str, modelo: str,
         "max_tokens": max_tokens,
     }).encode("utf-8")
     pedido = urllib.request.Request(
-        f"{base_url.rstrip('/')}/v1/chat/completions",
+        f"{base_url}/v1/chat/completions",
         data=corpo, headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(pedido, timeout=timeout) as resp:
@@ -174,31 +200,3 @@ def backend_lmstudio(prompt: str, modelo: str,
         detalhe = e.read().decode("utf-8", errors="replace")[:300]
         raise RuntimeError(f"LM Studio HTTP {e.code}: {detalhe}") from e
     return dados["choices"][0]["message"]["content"]
-
-
-def backend_claude_cli(prompt: str, modelo: str = "haiku") -> str:
-    """Backend real: CLI do Claude Code em modo não-interativo.
-
-    Requer sessão autenticada (`claude` já usado nesse terminal). Se o
-    modelo pedido não estiver disponível no plano, tenta sem --model.
-    """
-    import os
-    # variáveis ANTHROPIC_* herdadas (ex.: API key antiga no .zshrc) têm
-    # prioridade sobre a sessão iniciada e causam 401 — usar só o login da CLI
-    ambiente = {k: v for k, v in os.environ.items()
-                if not k.startswith("ANTHROPIC_")}
-
-    def correr(args):
-        return subprocess.run(["claude", "-p", prompt, "--output-format", "text",
-                               *args], capture_output=True, text=True,
-                              timeout=300, env=ambiente)
-
-    r = correr(["--model", modelo] if modelo else [])
-    if r.returncode != 0 and modelo:
-        r = correr([])  # fallback: modelo por omissão da sessão
-    if r.returncode != 0:
-        detalhe = (r.stderr or "").strip() or (r.stdout or "").strip()
-        raise RuntimeError(
-            f"claude CLI falhou (rc={r.returncode}): {detalhe[:400] or 'sem output'}. "
-            "Confirma que 'claude' funciona nesse terminal (corre: claude -p 'ok').")
-    return r.stdout

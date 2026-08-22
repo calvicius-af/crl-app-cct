@@ -6,7 +6,9 @@ pertencem ao CRL. Versioná-los tornaria o repositório inutilizável e não acr
 nada à reprodutibilidade — ver [ADR-0009](../adr/0009-layout-do-repositorio.md).
 
 Quem só quer ver o sistema a funcionar não precisa de nada disto: a pasta
-[`examples/`](../../examples/README.md) tem dois casos completos, esses sim versionados.
+[`examples/`](../../examples/README.md) tem artefactos anonimizados de dois casos reais.
+Os PDFs de origem não são redistribuídos; obtêm-se na fonte oficial ou através do arquivo
+autorizado do CRL.
 
 ## Estrutura esperada
 

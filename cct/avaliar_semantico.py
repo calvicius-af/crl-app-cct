@@ -1,11 +1,9 @@
-"""Fase 4: mede o ganho da camada semântica sobre a baseline lexical.
+"""Fase 4: mede o ganho da camada semântica local sobre a baseline lexical.
 
-Corre lexical + semântica (LLM via CLI do Claude) nas convenções do gabarito
-e compara as métricas com e sem a camada semântica. As chamadas ao LLM são
-cacheadas em data/interim/cache_llm_<backend>_<modelo> — reexecuções não repetem custos.
-
-NOTA: requer sessão autenticada do Claude Code no terminal (correr `claude`
-uma vez para confirmar). Custo controlado por --max-lotes por documento.
+Corre lexical + semântica num LLM local OpenAI-compatível (por exemplo, LM
+Studio) nas convenções do gabarito e compara as métricas com e sem a camada
+semântica. As chamadas são cacheadas em data/interim/cache_llm_<modelo>.
+Custo controlado por --max-lotes por documento.
 
 Uso:
   .venv/bin/python -m cct.avaliar_semantico \
@@ -21,7 +19,7 @@ import yaml
 
 from .extractor import extrair_pdf
 from .lexical import codificar
-from .semantico import codificar_semantico, backend_claude_cli, backend_lmstudio
+from .semantico import codificar_semantico, backend_lmstudio
 from .gabarito import carregar_gabarito
 from .harness import avaliar, relatorio
 
@@ -33,13 +31,12 @@ def main():
     p.add_argument("--codebook", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--max-lotes", type=int, default=4,
-                   help="máx. de chamadas LLM por documento (controlo de custo)")
+                   help="máx. de chamadas ao modelo local por documento")
     p.add_argument("--apenas-fn", action="store_true",
                    help="só documentos onde a baseline lexical falhou algum código")
-    p.add_argument("--modelo", default="haiku")
-    p.add_argument("--backend", choices=["claude", "lmstudio"], default="claude")
+    p.add_argument("--modelo", default="google/gemma-4-e2b")
     p.add_argument("--base-url", default="http://127.0.0.1:1234",
-                   help="URL do servidor local (backend lmstudio)")
+                   help="URL do servidor local (só localhost/loopback)")
     args = p.parse_args()
 
     out = Path(args.out)
@@ -77,18 +74,15 @@ def main():
             continue
 
         anotados = {a["no_id"] for a in lex["anotacoes"]}
-        if args.backend == "lmstudio":
-            backend = lambda pr: backend_lmstudio(pr, modelo=args.modelo,
-                                                  base_url=args.base_url)
-        else:
-            backend = lambda pr: backend_claude_cli(pr, modelo=args.modelo)
+        backend = lambda pr: backend_lmstudio(pr, modelo=args.modelo,
+                                               base_url=args.base_url)
         sem = codificar_semantico(
             doc, texto, codebook,
             backend=backend,
             nos_ja_anotados=anotados,
-            cache_dir=Path("data/interim") / f"cache_llm_{args.backend}_{args.modelo}".replace("/", "_"),
+            cache_dir=Path("data/interim") / f"cache_llm_{args.modelo}".replace("/", "_"),
             max_lotes=args.max_lotes,
-            max_chars=6000 if args.backend == "lmstudio" else 12000)
+            max_chars=6000)
         registar(previstos_tot, sem)
         aviso = f" ({len(sem['falhas'])} lotes falhados)" if sem.get("falhas") else ""
         print(f"[{i}/{len(docs)}] {nome}: +{len(sem['anotacoes'])} anotações LLM{aviso}")

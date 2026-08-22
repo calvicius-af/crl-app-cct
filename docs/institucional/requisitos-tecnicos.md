@@ -55,10 +55,13 @@ na estação).
   99 testes automáticos (`python -m pytest`).
 
 ## 5. Componente opcional — camada semântica local
-Se ativada, a aplicação comunica com um servidor LLM **local**
-(LM Studio, `http://127.0.0.1:1234`) na própria estação. É uma opção
-desligada por omissão; a aplicação funciona integralmente sem ela.
-Se o Instituto preferir, pode ser excluída do plano de implementação.
+Se ativada, a aplicação comunica com um servidor LLM **local** (por exemplo,
+LM Studio, `http://127.0.0.1:1234`) na própria estação. É uma opção desligada por
+omissão; a aplicação funciona integralmente sem ela. O código aceita apenas endereços de
+loopback (`localhost`, `127.0.0.1` ou `::1`) e não contém backend para serviços externos.
+Uma eventual integração interna do Instituto de Informática requer uma decisão de arquitetura
+e implementação próprias. Se o Instituto preferir, a camada pode ser excluída do plano de
+implementação.
 
 ## 6. Plano de teste sugerido (estação padrão Windows)
 1. Instalar Python 3.11+ 64 bits (instalador oficial, opção tcl/tk).
