@@ -64,5 +64,33 @@ Proposta de resolução, por ponto:
       e comparações existentes; exigiria revalidar o harness completo.
    A via (a) é a recomendada.
 
+### Hipótese para tabelas verdadeiras no MaxQDA (2026-08-24)
+
+A norma REFI-QDA suporta uma representação rica por fonte: o
+`TextSource` aceita `richTextPath="internal://{guid}.docx"` a par do
+`plainTextPath` (XSD linhas 175-176 de
+`vendor/refi-qda/XSD file of the REFI-QDA Project.xsd`; os exemplos da
+especificação completa, págs. 29-54, são projetos reais MAXQDA/ATLAS.ti
+com DOCX embebido). O caminho seria:
+
+1. `qdpx.py` gera, além do TXT, um DOCX por convenção com tabelas
+   verdadeiras (openpyxl não serve; python-docx ou XML WordprocessingML
+   direto — o docling dá as células estruturadas via `doc.tables`);
+2. o TXT continua a ser a âncora das seleções (`PlainTextSelection`
+   usa offsets do plainTextPath, que continuam válidos);
+3. **risco a testar primeiro**: como o MaxQDA reconcilia os offsets do
+   plain text com o DOCX na importação — se recalcular posições a partir
+   do DOCX (células de tabela linearizam de forma diferente), as
+   codificações depois de uma tabela podem deslizar. Prova mínima antes
+   de investir: um QDPX de 1 documento com uma tabela e um segmento
+   codificado DEPOIS da tabela; importar e verificar se a âncora cai no
+   sítio certo.
+
+Se o teste falhar, alternativa máxima: `PDFSource` com o PDF original
+(o MaxQDA mostra o layout perfeito), mas as seleções passam a
+retângulos por página (`PDFSelection`) — o docling fornece as bbox de
+cada item, porém obrigaria a repensar o harness e as anotações, hoje
+todos por offsets de caracteres. Só a considerar se o DOCX não resultar.
+
 Relacionada com a limitação já conhecida das tabelas partidas na mudança
 de página (merge por continuação sem cabeçalho, AguasNorte G-M).
