@@ -71,6 +71,10 @@ def main():
     p.add_argument("--pasta-versoes",
                    help="pasta com subpastas de versões anteriores (estrutura "
                         "data/raw/textos_consolidados) — promove novidades do consolidado")
+    p.add_argument("--extrator", choices=("pdfplumber", "docling"),
+                   default="pdfplumber",
+                   help="docling recupera tabelas de anexos e layouts difíceis "
+                        "(mais lento; requer 'pip install docling')")
     p.add_argument("--semantica", action="store_true",
                    help="ativa a camada LLM (LM Studio) nas cláusulas não resolvidas")
     p.add_argument("--modelo", default="google/gemma-4-e2b")
@@ -99,6 +103,11 @@ def main():
     if not pdfs:
         raise SystemExit(f"Sem PDFs em {args.pdfs}")
 
+    extrair = extrair_pdf
+    if args.extrator == "docling":
+        from .extractor_docling import extrair_pdf_docling
+        extrair = extrair_pdf_docling
+
     itens, problemas = [], []
     for i, pdf in enumerate(pdfs, 1):
         try:
@@ -106,8 +115,8 @@ def main():
             if variaveis:
                 from .variaveis import procurar
                 v = procurar(variaveis, pdf.stem)
-            doc, texto = extrair_pdf(pdf, doc_id=pdf.stem,
-                                     subtipo=(v or {}).get("subtipo", "desconhecido"))
+            doc, texto = extrair(pdf, doc_id=pdf.stem,
+                                 subtipo=(v or {}).get("subtipo", "desconhecido"))
             validar_doc(doc)
             anot = codificar(doc, texto, codebook)
             if args.semantica:

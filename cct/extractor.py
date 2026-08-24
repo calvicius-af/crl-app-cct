@@ -17,7 +17,8 @@ from pathlib import Path
 RE_CAPITULO = re.compile(r"^(?:CAP[IÍ]TULO|T[IÍ]TULO)\s+([IVXLCD]+|\d+)\b(.*)$")
 RE_SECCAO = re.compile(r"^SEC[ÇC][AÃ]O\s+([IVXLCD]+|\d+)\b(.*)$", re.IGNORECASE)
 RE_ANEXO = re.compile(r"^ANEXO\s+([IVXLCD]+|\d+)?\b(.*)$")
-RE_CLAUSULA = re.compile(r"^Cl[aá]usula\s+(\d+\.?[ªº]?|[a-zçã]+)\s*(.*)$", re.IGNORECASE)
+RE_CLAUSULA = re.compile(
+    r"^Cl[aá]usula\s+(\d+\.?[ªº]?(?:-[A-Z])?|[a-zçã]+)\s*(.*)$", re.IGNORECASE)
 RE_ARTIGO = re.compile(r"^Artigo\s+(\d+\.?[ºª]?|[a-zçã]+)\s*(.*)$", re.IGNORECASE)
 
 _RE_HEADINGS = [

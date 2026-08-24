@@ -101,6 +101,15 @@ ou: `python -m cct.app`. Preencher os campos e carregar em "Correr".
 Só `--pdfs`, `--codebook` e `--out` são obrigatórios; o resto melhora o
 resultado mas pode faltar.
 
+**`--extrator docling`** (opcional): usa o docling em vez do pdfplumber na
+extração. Recupera tabelas de anexos (tabelas salariais, perfis de função)
+e layouts difíceis que o extrator clássico perde, ao custo de ser mais
+lento (~1-1,7 s/página) e de exigir instalação à parte:
+`.venv/bin/python -m pip install docling docling-hierarchical-pdf`
+(≈4 GB com PyTorch; em Mac Apple Silicon o Python tem de ser arm64 —
+`python3 -c "import platform; print(platform.machine())"` deve dizer
+`arm64`). A primeira corrida descarrega os modelos de layout.
+
 ### Comparar duas versões de uma convenção (avulso)
 ```
 .venv/bin/python -m cct.comparar --pasta data/raw/textos_consolidados/ACIP_FESAHT \
