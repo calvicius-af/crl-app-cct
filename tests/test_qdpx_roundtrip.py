@@ -46,33 +46,41 @@ def test_xml_valido_e_namespace(qdpx_path):
     assert len(raiz.findall(".//q:Users/q:User", NS)) >= 1
 
 
-def test_texto_fonte_identico(qdpx_path):
+def test_texto_fonte_preserva_o_conteudo(qdpx_path):
+    # a exportação separa cláusulas e tabelas com linhas em branco para
+    # leitura no MaxQDA (ISSUE-0003); tirando essas, o texto é o mesmo
     _doc, texto = adaptar_v2(FIXTURE.read_text(encoding="utf-8"))[0]
     with zipfile.ZipFile(qdpx_path) as zf:
         fonte = next(n for n in zf.namelist() if n.startswith("Sources/"))
         conteudo = zf.read(fonte).decode("utf-8")
     assert not conteudo.startswith("﻿")
     assert "\r" not in conteudo
-    assert conteudo == texto
+    assert [l for l in conteudo.split("\n") if l] == \
+           [l for l in texto.split("\n") if l]
 
 
 def test_offsets_das_selecoes_batem_com_o_texto(qdpx_path):
+    # o gate real: cada seleção tem de recortar no texto exportado
+    # exatamente o trecho que a anotação marcou no texto interno
     doc, texto = adaptar_v2(FIXTURE.read_text(encoding="utf-8"))[0]
     anot = codificar(doc, texto, CODEBOOK)
-    esperadas = {(a["char_start"], a["char_end"]) for a in anot["anotacoes"]}
+    esperados = sorted(texto[a["char_start"]:a["char_end"]]
+                       for a in anot["anotacoes"])
 
     with zipfile.ZipFile(qdpx_path) as zf:
         raiz = ET.fromstring(zf.read("project.qde").decode("utf-8"))
+        fonte = next(n for n in zf.namelist() if n.startswith("Sources/"))
+        exportado = zf.read(fonte).decode("utf-8")
 
     selecoes = raiz.findall(".//q:TextSource/q:PlainTextSelection", NS)
     assert len(selecoes) == len(anot["anotacoes"]) > 0
-    obtidas = set()
+    obtidos = []
     for sel in selecoes:
         ini, fim = int(sel.get("startPosition")), int(sel.get("endPosition"))
-        obtidas.add((ini, fim))
-        assert 0 <= ini < fim <= len(texto)
+        assert 0 <= ini < fim <= len(exportado)
         assert sel.find("q:Coding/q:CodeRef", NS) is not None
-    assert obtidas == esperadas
+        obtidos.append(exportado[ini:fim])
+    assert sorted(obtidos) == esperados
 
 
 def test_codigos_referenciados_existem_no_codebook(qdpx_path):

@@ -4,84 +4,113 @@ Substitui apenas a camada de extração de texto (pdfplumber); a
 estruturação hierárquica é a mesma do extrator clássico (estruturar),
 pelo que o doc.json e o texto final têm o formato habitual do pipeline.
 
-O docling resolve os problemas assinalados no QA de MaxQDA de 2026-08:
-tabelas de anexos recuperadas (TableFormer), cláusulas com cabeçalho
-próprio, tabela salarial separada das assinaturas. O pós-processador
-docling-hierarchical-pdf (opcional) afina os níveis dos cabeçalhos antes
-da exportação para Markdown.
+O texto é montado a partir dos itens do DoclingDocument (não do
+Markdown): os cabeçalhos chegam como texto simples — sem os `#` que o
+Markdown acrescenta e que sobreviviam à limpeza quando o nível passava
+de 6 — e as tabelas são lidas da grelha estruturada, o que permite
+emitir uma célula por span em vez das repetições que o Markdown cria
+para cada coluna abrangida por um colspan (ISSUE-0003, pontos 1 e 2).
 
 Custo: ~1-1,7 s/página em CPU e download único dos modelos na primeira
 corrida — o extrator clássico continua a ser a via rápida.
 """
-import html
 import re
 from pathlib import Path
 
 from .extractor import MARCA_TABELA_FIM, MARCA_TABELA_INI, estruturar
 
-# mobiliário do BTE que o docling ainda deixa passar no corpo do texto
+# mobiliário do BTE que aparece no corpo da página
 RE_BTE_CABECALHO = re.compile(r"^Boletim do Trabalho e Emprego\b")
 RE_BTE_DATA = re.compile(r"^\d{1,2}\s+(?:de\s+)?[a-zç]+\s+(?:de\s+)?\d{4}$")
-RE_IMAGEM = re.compile(r"^<!--\s*image\s*-->$")
-RE_HEADING_MD = re.compile(r"^#{1,6}\s+")
-RE_SEPARADOR_TABELA = re.compile(r"^\|[\s:|-]+\|$")
 # hífen de translineação que sobrou com espaço: "profis -sional"
 RE_HIFEN_SOLTO = re.compile(r"([a-zà-ú]) -([a-zà-ú])")
-# item de lista markdown cujo conteúdo já traz marcador próprio ("- 1- …", "- a) …")
-RE_LISTA_COM_MARCADOR = re.compile(r"^-\s+(?=\d+\s*[-–—.)]|[a-zà-ú]\)|[ivxl]+\))")
+# item de lista que já traz marcador próprio no texto ("1- …", "a) …")
+RE_MARCADOR_PROPRIO = re.compile(r"^(?:\d+\s*[-–—.)]|[a-zà-ú]\)|[ivxl]+\))")
 
 _conversor = None
 
 
-def _linha_tabela(linha: str) -> bool:
-    return linha.startswith("|") and linha.endswith("|") and linha.count("|") >= 2
+def limpar_texto_item(texto: str) -> str | None:
+    """Normaliza o texto de um item; devolve None se for para descartar.
 
-
-def _celulas(linha: str) -> str:
-    return " | ".join(c.strip() for c in linha[1:-1].split("|"))
-
-
-def markdown_para_texto(md: str) -> str:
-    """Converte o Markdown do docling no texto plano que estruturar espera.
-
-    Remove mobiliário do BTE e placeholders de imagem, dissolve os
-    cabeçalhos markdown (a hierarquia é reconstruída por estruturar),
-    repara a translineação residual e reescreve as tabelas no formato
-    'célula | célula' entre sentinelas, como o extrator clássico.
+    Descarta mobiliário do BTE (cabeçalho corrido, data da edição,
+    número de página solto) e repara a translineação que o docling deixa
+    com espaço antes do hífen.
     """
-    md = html.unescape(md)
-    md = re.sub(r"\\([_*\[\]#`~])", r"\1", md)  # escapes do markdown
+    texto = (texto or "").replace("\n", " ").replace("\t", " ")
+    texto = re.sub(r"\s{2,}", " ", texto).strip()
+    if not texto:
+        return None
+    if (RE_BTE_CABECALHO.match(texto) or RE_BTE_DATA.match(texto)
+            or re.fullmatch(r"\d+", texto)):
+        return None
+    return RE_HIFEN_SOLTO.sub(r"\1\2", texto)
 
-    saida: list[str] = []
-    em_tabela = False
-    for linha in md.split("\n"):
-        linha = linha.replace("\t", " ").rstrip()
-        limpa = linha.strip()
-        if (RE_IMAGEM.match(limpa) or RE_BTE_CABECALHO.match(limpa)
-                or RE_BTE_DATA.match(limpa) or re.fullmatch(r"\d+", limpa)):
-            continue
-        if _linha_tabela(limpa):
-            if RE_SEPARADOR_TABELA.match(limpa):
-                continue
-            if not em_tabela:
-                saida.append(MARCA_TABELA_INI)
-                em_tabela = True
-            saida.append(_celulas(limpa))
-            continue
-        if em_tabela:
-            saida.append(MARCA_TABELA_FIM)
-            em_tabela = False
-        linha = RE_HEADING_MD.sub("", linha)
-        linha = RE_LISTA_COM_MARCADOR.sub("", linha)
-        linha = RE_HIFEN_SOLTO.sub(r"\1\2", linha)
-        saida.append(linha)
-    if em_tabela:
-        saida.append(MARCA_TABELA_FIM)
 
-    texto = "\n".join(saida)
-    texto = re.sub(r"[ \t]+\n", "\n", texto)
-    texto = re.sub(r"\n{3,}", "\n\n", texto)
-    return texto.strip() + "\n"
+def celulas_sem_colspan(linha) -> list[str]:
+    """Uma célula por span, a partir de uma linha da grelha do docling.
+
+    A grelha repete a mesma célula em cada coluna que um colspan abrange
+    ("Competência | Competência | Competência"); só a primeira conta,
+    identificada por start_col_offset_idx. Células genuinamente repetidas
+    em colunas distintas (ex.: "n.a." numa tabela salarial) mantêm-se.
+    """
+    saida = []
+    for indice, celula in enumerate(linha):
+        if celula is None:
+            saida.append("")
+            continue
+        if getattr(celula, "start_col_offset_idx", indice) != indice:
+            continue  # continuação de um colspan já emitido
+        texto = (getattr(celula, "text", "") or "").replace("\n", " ").strip()
+        saida.append(re.sub(r"\s{2,}", " ", texto))
+    return saida
+
+
+def _linhas_de_tabela(tabela) -> list[str]:
+    """Tabela do docling → linhas 'célula | célula' (formato do pipeline)."""
+    try:
+        grelha = tabela.data.grid
+    except AttributeError:
+        return []
+    linhas = []
+    for linha in grelha:
+        celulas = celulas_sem_colspan(linha)
+        if any(celulas):
+            linhas.append(" | ".join(celulas))
+    return linhas
+
+
+def documento_para_texto(documento) -> str:
+    """DoclingDocument → texto plano que o estruturar consome.
+
+    Percorre os itens pela ordem de leitura: imagens ficam de fora, as
+    tabelas saem entre sentinelas MARCA_TABELA_* e o resto sai como
+    texto limpo, sem sintaxe de Markdown pelo meio.
+    """
+    from docling_core.types.doc.document import (
+        ListItem, PictureItem, TableItem, TextItem)
+
+    linhas: list[str] = []
+    for item, _nivel in documento.iterate_items():
+        if isinstance(item, PictureItem):
+            continue
+        if isinstance(item, TableItem):
+            corpo = _linhas_de_tabela(item)
+            if corpo:
+                linhas.append(MARCA_TABELA_INI)
+                linhas.extend(corpo)
+                linhas.append(MARCA_TABELA_FIM)
+            continue
+        if not isinstance(item, TextItem):
+            continue
+        texto = limpar_texto_item(item.text)
+        if texto is None:
+            continue
+        if isinstance(item, ListItem) and not RE_MARCADOR_PROPRIO.match(texto):
+            texto = f"- {texto}"
+        linhas.append(texto)
+    return "\n".join(linhas) + "\n"
 
 
 def _obter_conversor():
@@ -111,8 +140,7 @@ def extrair_pdf_docling(pdf_path: Path, paginas: tuple[int, int] | None = None,
     """Extrai uma convenção com docling (mesma assinatura de extrair_pdf)."""
     pdf_path = Path(pdf_path)
     resultado = _converter(pdf_path, paginas)
-    md = resultado.document.export_to_markdown()
-    texto = markdown_para_texto(md)
+    texto = documento_para_texto(resultado.document)
     if not texto.strip():
         raise ValueError(f"Sem texto extraível em {pdf_path} — PDF digitalizado?")
     return estruturar(texto, doc_id or pdf_path.stem, subtipo=subtipo)

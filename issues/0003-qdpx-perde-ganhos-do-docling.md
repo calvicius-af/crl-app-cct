@@ -1,6 +1,7 @@
 # ISSUE-0003: o QDPX perde os ganhos de legibilidade do extrator docling
 
-- **Estado:** Aberta
+- **Estado:** Em curso — pontos 1-3 implementados em 2026-08-25, a
+  aguardar confirmação na importação para MaxQDA
 - **Data:** 2026-08-24
 - **Onde dói:** `cct/extractor_docling.py`, `cct/extractor.py` (estruturar), `cct/qdpx.py`
 
@@ -40,9 +41,31 @@ separar cláusulas/artigos e tabelas do texto corrido.
 # importar projeto.qdpx no MaxQDA e abrir o TRATOLIXO nos perfis de função
 ```
 
+## Resolução aplicada (2026-08-25)
+
+1 e 2 resolvidos na origem: `extractor_docling.py` deixou de raspar o
+Markdown e passa a montar o texto a partir dos itens do
+DoclingDocument (`documento_para_texto`). Os cabeçalhos chegam como
+texto simples — não há `#` nenhum para limpar, seja qual for o nível — e
+as tabelas são lidas da grelha estruturada, emitindo **uma célula por
+span** (`celulas_sem_colspan`, que usa `start_col_offset_idx`). O teste
+`test_mantem_valores_repetidos_em_colunas_distintas` guarda o caso
+contrário: o nível M do AguasNorte é "n.a." em todas as colunas e são
+células distintas, que têm de sobreviver.
+
+3 resolvido na exportação, como previsto: `qdpx.py` ganhou
+`pontos_de_espacamento` + `espacar` + `_remapear` (parâmetro
+`espacado=True`). O modelo interno e os seus offsets ficam intactos.
+Os dois testes de gate da Fase 0 foram reescritos para verificar o
+invariante que importa — cada seleção recorta no texto exportado o mesmo
+trecho que a anotação marcou — em vez da identidade literal do texto.
+
+Falta: confirmar na importação para MaxQDA (QDPX em
+`results/2025_4_08_docling_v2/`).
+
 ## Notas
 
-Proposta de resolução, por ponto:
+Proposta original, por ponto (mantida para registo):
 
 1. Trocar `RE_HEADING_MD` para `^#+\s+` (qualquer profundidade) em
    `extractor_docling.py`. Correção de uma linha + teste.
