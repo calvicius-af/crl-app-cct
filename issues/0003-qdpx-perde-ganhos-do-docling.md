@@ -86,7 +86,18 @@ com DOCX embebido). O caminho seria:
    codificado DEPOIS da tabela; importar e verificar se a âncora cai no
    sítio certo.
 
-Se o teste falhar, alternativa máxima: `PDFSource` com o PDF original
+**RESULTADO DA PROVA (2026-08-25): a via DOCX está morta.** O QDPX de
+`scripts/prova_richtext_qdpx.py` foi importado no MaxQDA e o documento
+apareceu como texto plano (`Níveis | Escalão 1 | Escalão 2`) — o MaxQDA
+ignora o `richTextPath` na importação REFI-QDA e usa só o
+`plainTextPath`. As codificações ancoraram (marcas na margem), o que
+confirma que o TXT continua a ser a única representação que conta.
+Consequência: a legibilidade tem de ser conquistada DENTRO do texto
+plano — pontos 1-3 desta issue (regex `#+`, colapso de células de
+colspan, linha em branco na exportação) passam a ser o teto do que é
+possível com TextSource.
+
+Se o teste falhar (falhou), alternativa máxima: `PDFSource` com o PDF original
 (o MaxQDA mostra o layout perfeito), mas as seleções passam a
 retângulos por página (`PDFSelection`) — o docling fornece as bbox de
 cada item, porém obrigaria a repensar o harness e as anotações, hoje
