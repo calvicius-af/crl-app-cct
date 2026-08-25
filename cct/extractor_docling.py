@@ -24,8 +24,10 @@ RE_BTE_CABECALHO = re.compile(r"^Boletim do Trabalho e Emprego\b")
 RE_BTE_DATA = re.compile(r"^\d{1,2}\s+(?:de\s+)?[a-zç]+\s+(?:de\s+)?\d{4}$")
 # hífen de translineação que sobrou com espaço: "profis -sional"
 RE_HIFEN_SOLTO = re.compile(r"([a-zà-ú]) -([a-zà-ú])")
-# item de lista que já traz marcador próprio no texto ("1- …", "a) …")
-RE_MARCADOR_PROPRIO = re.compile(r"^(?:\d+\s*[-–—.)]|[a-zà-ú]\)|[ivxl]+\))")
+# item de lista que já traz marcador próprio no texto ("1- …", "a) …",
+# "-Executar …" — este último dava "- -Executar" com a bala do docling)
+RE_MARCADOR_PROPRIO = re.compile(
+    r"^(?:\d+\s*[-–—.)]|[a-zà-ú]\)|[ivxl]+\)|[-–—•·])")
 
 _conversor = None
 
@@ -81,18 +83,88 @@ def _linhas_de_tabela(tabela) -> list[str]:
     return linhas
 
 
+def _distancia_ao_topo(bbox, altura_pagina: float) -> float:
+    """Topo do item medido a partir do topo da página (origem indiferente)."""
+    try:
+        from docling_core.types.doc.base import CoordOrigin
+        if bbox.coord_origin == CoordOrigin.BOTTOMLEFT:
+            return altura_pagina - bbox.t
+    except Exception:
+        pass
+    return bbox.t
+
+
+def _duas_colunas(caixas, largura: float) -> bool:
+    """Página em duas colunas? (BTE antigos; os de 2025 são coluna única)"""
+    if len(caixas) < 8:
+        return False
+    meio, tol = largura / 2, largura * 0.02
+    atravessam = sum(1 for b in caixas if b.l < meio - tol and b.r > meio + tol)
+    esquerda = sum(1 for b in caixas if b.r <= meio + tol)
+    direita = sum(1 for b in caixas if b.l >= meio - tol)
+    return (atravessam / len(caixas) < 0.05
+            and esquerda / len(caixas) > 0.25 and direita / len(caixas) > 0.25)
+
+
+def ordenar_por_leitura(itens: list) -> list:
+    """Ordena (item, pagina, bbox) pela ordem de leitura da página.
+
+    O docling emite por vezes blocos fora de sítio — na LAGOSemFORMA o
+    conteúdo da cláusula 9.ª aparecia antes do próprio cabeçalho, e a
+    cláusula ficava vazia. A geometria é fiável, por isso é ela que manda:
+    página, coluna (quando existem duas) e distância ao topo. Itens sem
+    geometria herdam a posição do anterior, ficando onde estavam.
+    """
+    paginas = {}
+    for indice, (_item, pagina, bbox, _altura, _largura) in enumerate(itens):
+        if bbox is not None:
+            paginas.setdefault(pagina, []).append(bbox)
+    colunado = {}
+    for pagina, caixas in paginas.items():
+        largura = next(l for (_i, p, _b, _a, l) in itens if p == pagina)
+        colunado[pagina] = _duas_colunas(caixas, largura)
+
+    chaves, ultima = [], (0, 0, 0.0)
+    for indice, (_item, pagina, bbox, altura, largura) in enumerate(itens):
+        if bbox is None:
+            chaves.append((*ultima, indice))
+            continue
+        coluna = 0
+        if colunado.get(pagina) and bbox.l >= largura / 2 - largura * 0.02:
+            coluna = 1
+        ultima = (pagina, coluna, _distancia_ao_topo(bbox, altura))
+        chaves.append((*ultima, indice))
+    return [itens[i] for i in sorted(range(len(itens)), key=lambda i: chaves[i])]
+
+
+def _itens_ordenados(documento):
+    """Itens do documento pela ordem de leitura geométrica."""
+    recolhidos = []
+    for item, _nivel in documento.iterate_items():
+        pagina, bbox, altura, largura = 0, None, 0.0, 0.0
+        prov = getattr(item, "prov", None)
+        if prov:
+            pagina = prov[0].page_no
+            bbox = prov[0].bbox
+            pag = documento.pages.get(pagina)
+            if pag is not None and pag.size is not None:
+                altura, largura = pag.size.height, pag.size.width
+        recolhidos.append((item, pagina, bbox, altura, largura))
+    return [i[0] for i in ordenar_por_leitura(recolhidos)]
+
+
 def documento_para_texto(documento) -> str:
     """DoclingDocument → texto plano que o estruturar consome.
 
-    Percorre os itens pela ordem de leitura: imagens ficam de fora, as
-    tabelas saem entre sentinelas MARCA_TABELA_* e o resto sai como
-    texto limpo, sem sintaxe de Markdown pelo meio.
+    Percorre os itens pela ordem de leitura geométrica: imagens ficam de
+    fora, as tabelas saem entre sentinelas MARCA_TABELA_* e o resto sai
+    como texto limpo, sem sintaxe de Markdown pelo meio.
     """
     from docling_core.types.doc.document import (
         ListItem, PictureItem, TableItem, TextItem)
 
     linhas: list[str] = []
-    for item, _nivel in documento.iterate_items():
+    for item in _itens_ordenados(documento):
         if isinstance(item, PictureItem):
             continue
         if isinstance(item, TableItem):
@@ -125,13 +197,11 @@ def _converter(pdf_path: Path, paginas: tuple[int, int] | None):
     kwargs = {}
     if paginas is not None:  # 0-based fim-exclusivo → 1-based inclusivo
         kwargs["page_range"] = (paginas[0] + 1, paginas[1])
-    resultado = _obter_conversor().convert(str(pdf_path), **kwargs)
-    try:
-        from hierarchical.postprocessor import ResultPostprocessor
-        ResultPostprocessor(resultado, source=pdf_path).process()
-    except Exception:
-        pass  # hierarquia refinada é um extra; sem ela o estruturar resolve
-    return resultado
+    # sem o pós-processador docling-hierarchical-pdf: rebenta com
+    # page_range e a hierarquia que infere não acrescenta nada — quem
+    # reconhece capítulos e cláusulas é o estruturar, e a ordem de
+    # leitura vem da geometria (ordenar_por_leitura)
+    return _obter_conversor().convert(str(pdf_path), **kwargs)
 
 
 def extrair_pdf_docling(pdf_path: Path, paginas: tuple[int, int] | None = None,

@@ -18,6 +18,7 @@ from .lexical import codificar
 from .qdpx import exportar_qdpx
 from .export_xlsx import exportar_xlsx
 from .triagem import codigos_auto, triar
+from .sanidade import verificar as verificar_sanidade
 from .schemas import validar_doc, validar_anotacoes
 
 
@@ -118,6 +119,8 @@ def main():
             doc, texto = extrair(pdf, doc_id=pdf.stem,
                                  subtipo=(v or {}).get("subtipo", "desconhecido"))
             validar_doc(doc)
+            for aviso in verificar_sanidade(doc, texto):
+                problemas.append(f"{pdf.stem}: {aviso}")
             anot = codificar(doc, texto, codebook)
             if args.semantica:
                 from .semantico import codificar_semantico, backend_lmstudio

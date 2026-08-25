@@ -75,3 +75,56 @@ def test_a_regra_do_titulo_nao_se_aplica_ao_corpo():
     texto = (corpo + "\nAs partes acordam proceder a uma revisão global\n"
              "do clausulado no prazo de um ano.")
     assert "revisão global do clausulado" in juntar_linhas(texto)
+
+
+# ---------- número de parágrafo sem separador ----------
+
+def test_numero_sem_separador_recuperado():
+    # AguasSerraEstrela: o PDF tem "3- São considerados", o docling dá "3São"
+    texto = "Artigo 5.º\nCargos\n3São considerados cargos de interesse público.\n"
+    _doc, final = estruturar(texto, "t")
+    assert "3- São considerados" in final
+
+
+def test_numero_composto_sem_separador():
+    texto = "Artigo 5.º\nFatores\n2.1No fator antiguidade entra o número de anos.\n"
+    _doc, final = estruturar(texto, "t")
+    assert "2.1- No fator" in final
+
+
+def test_nao_mexe_em_ano_nem_em_ordinal():
+    texto = ("Cláusula 1.ª\nÂmbito\n"
+             "1- O acordo de 2025 aplica-se.\n"
+             "2- Vigora desde o 12.º ano de escolaridade.\n")
+    _doc, final = estruturar(texto, "t")
+    assert "de 2025 aplica-se" in final and "12.º ano" in final
+
+
+# ---------- numeração: ordinais a sério ----------
+
+def test_titulo_de_capitulo_nao_vira_clausula_vazia():
+    # AguasNorte: o CAPÍTULO XV chama-se "Cláusula geral e transitória" e
+    # a palavra "geral" era lida como número de cláusula
+    texto = ("CAPÍTULO XV\nCláusula geral e transitória\n"
+             "Cláusula 73.ª\nCláusula geral e transitória\n"
+             "1- Todas as disposições que violem a lei não são aplicáveis.\n")
+    doc, _ = estruturar(texto, "t")
+    rotulos = [n["rotulo"] for n in doc["nos"] if n["tipo"] == "clausula"]
+    assert rotulos == ["Cláusula 73.ª - Cláusula geral e transitória"]
+    cap = [n["rotulo"] for n in doc["nos"] if n["tipo"] == "capitulo"]
+    assert cap == ["CAPÍTULO XV - Cláusula geral e transitória"]
+
+
+def test_numeracao_por_extenso_continua_reconhecida():
+    texto = ("Cláusula décima segunda\nFérias\n1- O trabalhador tem direito.\n")
+    doc, _ = estruturar(texto, "t")
+    cl = [n["rotulo"] for n in doc["nos"] if n["tipo"] == "clausula"]
+    assert cl == ["Cláusula décima segunda - Férias"]
+
+
+def test_marcador_de_travessao_colado_faz_paragrafo():
+    # TRATOLIXO: "-25 % pela primeira hora" é uma alínea, não texto corrido
+    texto = ("Cláusula 76.ª - Acréscimos\n1- Os acréscimos são:\n"
+             "-25 % pela primeira hora;\n-37,5 % pelas seguintes;\n")
+    doc, _ = estruturar(texto, "t")
+    assert sum(1 for n in doc["nos"] if n["tipo"] == "paragrafo") == 3

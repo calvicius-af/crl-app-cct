@@ -17,9 +17,17 @@ from pathlib import Path
 RE_CAPITULO = re.compile(r"^(?:CAP[IÍ]TULO|T[IÍ]TULO)\s+([IVXLCD]+|\d+)\b(.*)$")
 RE_SECCAO = re.compile(r"^SEC[ÇC][AÃ]O\s+([IVXLCD]+|\d+)\b(.*)$", re.IGNORECASE)
 RE_ANEXO = re.compile(r"^ANEXO\s+([IVXLCD]+|\d+)?\b(.*)$")
-RE_CLAUSULA = re.compile(
-    r"^Cl[aá]usula\s+(\d+\.?[ªº]?(?:-[A-Z])?|[a-zçã]+)\s*(.*)$", re.IGNORECASE)
-RE_ARTIGO = re.compile(r"^Artigo\s+(\d+\.?[ºª]?|[a-zçã]+)\s*(.*)$", re.IGNORECASE)
+# numeração por extenso: só ordinais a sério. Qualquer palavra servia
+# antes, o que transformava o título do CAPÍTULO XV do AguasNorte
+# ("Cláusula geral e transitória") numa cláusula vazia
+_ORDINAL = (r"(?:primeir|segund|terceir|quart|quint|sext|s[eé]tim|oitav|non"
+            r"|d[eé]cim|vig[eé]sim|trig[eé]sim|quadrag[eé]sim|quinquag[eé]sim"
+            r"|sexag[eé]sim|sept?uag[eé]sim|octog[eé]sim|nonag[eé]sim"
+            r"|cent[eé]sim)[oa]")
+# "12.ª", "16.ª-A", "décima segunda"
+_NUMERACAO = rf"\d+\.?[ªº]?(?:-[A-Z])?|{_ORDINAL}(?:\s+{_ORDINAL})?"
+RE_CLAUSULA = re.compile(rf"^Cl[aá]usula\s+({_NUMERACAO})\s*(.*)$", re.IGNORECASE)
+RE_ARTIGO = re.compile(rf"^Artigo\s+({_NUMERACAO})\s*(.*)$", re.IGNORECASE)
 
 _RE_HEADINGS = [
     ("capitulo", RE_CAPITULO),
@@ -30,15 +38,22 @@ _RE_HEADINGS = [
 ]
 
 # marcadores que justificam manter a quebra de linha antes deles
+_MARCADOR_LISTA = r"\d+\s*[-–—.)]|[a-z]\)|[ivxl]+\)|[-–—•§]\s?"
+_MARCADOR_ESTRUTURAL = (r"Cl[aá]usula\s|Artigo\s|CAP[IÍ]TULO\s|SEC[ÇC][AÃ]O\s"
+                        r"|ANEXO\b|NOTA\b")
 RE_MARCADOR = re.compile(
-    r"^(?:\d+\s*[-–—.)]|[a-z]\)|[ivxl]+\)|[-–—•§]\s|"
-    r"Cl[aá]usula\s|Artigo\s|CAP[IÍ]TULO\s|SEC[ÇC][AÃ]O\s|ANEXO\b|NOTA\b)",
-    re.IGNORECASE)
+    rf"^(?:{_MARCADOR_LISTA}|{_MARCADOR_ESTRUTURAL})", re.IGNORECASE)
+# só os de lista: uma linha que comece por "Cláusula" mas não seja um
+# cabeçalho a sério ainda pode ser o título do cabeçalho anterior
+RE_MARCADOR_LISTA = re.compile(rf"^(?:{_MARCADOR_LISTA})", re.IGNORECASE)
 # pontuação forte, tolerando o fecho de parêntesis/aspas que a segue:
 # "(Valores em euros.)" termina a frase tanto como "Valores em euros."
 RE_PONTUACAO_FORTE = re.compile(r"""[.!?:;][)\]»”"']*\s*$""")
 # ordinal separado do número pelo PDF: "Artigo 1. º", "12. º ano"
 RE_ORDINAL_SEPARADO = re.compile(r"(\d)\s*\.\s+([ºª])")
+# número de parágrafo que perdeu o separador: "3São considerados…" (o PDF
+# tem "3- São"); exige maiúscula a seguir para não tocar em "12.º" ou "2025"
+RE_NUMERO_SEM_SEPARADOR = re.compile(r"(?m)^(\d+(?:\.\d+)?)([A-ZÀ-Ú][a-zà-ú])")
 # fim do bloco de título de uma convenção: o BTE fecha-o sempre com o
 # subtipo oficial, e o que vier a seguir já é o corpo do documento
 RE_FIM_TITULO_CONVENCAO = re.compile(
@@ -138,7 +153,7 @@ def _titulo_candidato(linha: str) -> bool:
     linha = linha.strip()
     return (0 < len(linha) <= 90
             and not _e_cabecalho(linha)
-            and not RE_MARCADOR.match(linha))
+            and not RE_MARCADOR_LISTA.match(linha))
 
 
 def _normalizar_rotulo(tipo: str, m: re.Match, titulo_extra: str | None) -> str:
@@ -160,6 +175,8 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
     # "Artigo 1. º" → "Artigo 1.º": o espaço a mais partia o rótulo em
     # duas metades ("Artigo 1. - º") e escondia o ordinal no corpo
     texto = RE_ORDINAL_SEPARADO.sub(r"\1.\2", texto)
+    # "3São considerados…" → "3- São considerados…" (repõe o que o PDF tem)
+    texto = RE_NUMERO_SEM_SEPARADOR.sub(r"\1- \2", texto)
     linhas = [l for l in juntar_linhas(texto).split("\n")
               if l.strip() and l not in (MARCA_TABELA_INI, MARCA_TABELA_FIM)]
 
@@ -344,7 +361,7 @@ def _destacar_assinaturas(nos: list[dict], texto: str) -> None:
     nos.sort(key=lambda n: (n["char_start"], n["char_end"]))
 
 
-RE_PARAGRAFO = re.compile(r"^(?:\d+\s*[-–—.)]|[a-z]\)|[ivxl]+\)|[-–—•§]\s)")
+RE_PARAGRAFO = re.compile(r"^(?:\d+\s*[-–—.)]|[a-z]\)|[ivxl]+\)|[-–—•§]\s?)")
 
 
 def _subsegmentar_paragrafos(nos: list[dict], texto: str) -> list[dict]:
