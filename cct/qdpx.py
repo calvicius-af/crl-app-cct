@@ -77,12 +77,26 @@ def espacar(texto: str, pontos: list[int]) -> str:
     return "".join(partes)
 
 
+def indices_inseridos(pontos: list[int]) -> list[int]:
+    """Onde ficam, no texto espaçado, as quebras que o exportador criou.
+
+    A k-ésima inserção (0-based) fica no índice `pontos[k] + k`, porque as
+    k anteriores já empurraram o texto para a direita. É esta lista que
+    define o contrato das seleções: retirando exatamente estes índices do
+    trecho exportado, obtém-se o trecho canónico carácter por carácter.
+    """
+    return [ponto + k for k, ponto in enumerate(pontos)]
+
+
 def _remapear(inicio: int, fim: int, pontos: list[int]) -> tuple[int, int]:
     """Converte um par de offsets do texto original para o texto espaçado.
 
     O início desloca-se também quando coincide com um ponto de inserção
     (a linha em branco fica antes da seleção); o fim, sendo exclusivo,
-    só conta as inserções estritamente anteriores.
+    só conta as inserções estritamente anteriores. Uma seleção que
+    atravesse pontos de inserção CONTÉM as quebras acrescentadas — não é
+    literalmente igual ao trecho canónico, é equivalente no sentido de
+    indices_inseridos.
     """
     return (inicio + bisect.bisect_right(pontos, inicio),
             fim + bisect.bisect_left(pontos, fim))
@@ -114,7 +128,14 @@ def exportar_qdpx(itens: list[tuple[dict, str, dict]], destino: Path,
 
     `espacado`: separa cláusulas e tabelas com uma linha em branco no
     texto exportado, remapeando os offsets das seleções no mesmo passo
-    (o modelo interno e os seus offsets ficam intactos)."""
+    (o modelo interno e os seus offsets ficam intactos).
+
+    Contrato das seleções exportadas: os extremos apontam para o mesmo
+    intervalo semântico do texto canónico; dentro dele podem existir as
+    quebras de linha que o exportador introduziu, e mais nada. Removendo
+    do trecho exportado exatamente os índices de indices_inseridos,
+    obtém-se o trecho canónico carácter por carácter — não se normaliza
+    espaço nenhum, para não esconder perdas reais."""
     destino = Path(destino)
     ET.register_namespace("", NS)
     agora = _agora()

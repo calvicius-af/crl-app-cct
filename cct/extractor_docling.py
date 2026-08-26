@@ -49,13 +49,23 @@ def limpar_texto_item(texto: str) -> str | None:
     return RE_HIFEN_SOLTO.sub(r"\1\2", texto)
 
 
-def celulas_sem_colspan(linha) -> list[str]:
+def celulas_da_linha(linha, indice_linha: int = 0) -> list[str]:
     """Uma célula por span, a partir de uma linha da grelha do docling.
 
-    A grelha repete a mesma célula em cada coluna que um colspan abrange
-    ("Competência | Competência | Competência"); só a primeira conta,
-    identificada por start_col_offset_idx. Células genuinamente repetidas
-    em colunas distintas (ex.: "n.a." numa tabela salarial) mantêm-se.
+    A grelha repete a mesma célula em todas as posições que o span
+    abrange: nas colunas de um colspan ("Competência | Competência |
+    Competência") e nas linhas de um rowspan. Uma célula só é emitida na
+    sua posição inicial, dada por start_col_offset_idx e
+    start_row_offset_idx em conjunto.
+
+    A continuação de um colspan é omitida (as colunas seguintes contêm o
+    resto da linha e não há nada a alinhar); a continuação de um rowspan
+    sai como célula vazia, para as colunas à direita não deslizarem para
+    a esquerda no texto separado por " | ".
+
+    Células genuinamente iguais em posições distintas (ex.: "n.a." numa
+    tabela salarial) mantêm-se todas — o que as distingue de um span é
+    começarem cada uma na sua própria posição.
     """
     saida = []
     for indice, celula in enumerate(linha):
@@ -63,7 +73,10 @@ def celulas_sem_colspan(linha) -> list[str]:
             saida.append("")
             continue
         if getattr(celula, "start_col_offset_idx", indice) != indice:
-            continue  # continuação de um colspan já emitido
+            continue  # continuação horizontal: já emitida nesta linha
+        if getattr(celula, "start_row_offset_idx", indice_linha) != indice_linha:
+            saida.append("")  # continuação vertical: emitida numa linha acima
+            continue
         texto = (getattr(celula, "text", "") or "").replace("\n", " ").strip()
         saida.append(re.sub(r"\s{2,}", " ", texto))
     return saida
@@ -76,21 +89,30 @@ def _linhas_de_tabela(tabela) -> list[str]:
     except AttributeError:
         return []
     linhas = []
-    for linha in grelha:
-        celulas = celulas_sem_colspan(linha)
+    for indice_linha, linha in enumerate(grelha):
+        celulas = celulas_da_linha(linha, indice_linha)
         if any(celulas):
             linhas.append(" | ".join(celulas))
     return linhas
 
 
-def _distancia_ao_topo(bbox, altura_pagina: float) -> float:
-    """Topo do item medido a partir do topo da página (origem indiferente)."""
-    try:
-        from docling_core.types.doc.base import CoordOrigin
-        if bbox.coord_origin == CoordOrigin.BOTTOMLEFT:
-            return altura_pagina - bbox.t
-    except Exception:
-        pass
+# origem das coordenadas do docling: o CoordOrigin dele é um enum de
+# strings, por isso comparamos pelo nome e não importamos docling_core —
+# assim a ordenação (e os seus testes) não arrasta a dependência opcional
+ORIGEM_INFERIOR = "BOTTOMLEFT"
+
+
+def distancia_ao_topo(bbox, altura_pagina: float) -> float:
+    """Topo do item medido a partir do topo da página (origem indiferente).
+
+    Com origem no canto inferior esquerdo (o que o docling usa nos PDF),
+    `t` cresce para cima e tem de ser invertido; com origem no canto
+    superior já é a distância ao topo.
+    """
+    origem = getattr(bbox, "coord_origin", None)
+    nome = getattr(origem, "name", origem)
+    if nome == ORIGEM_INFERIOR:
+        return altura_pagina - bbox.t
     return bbox.t
 
 
@@ -132,7 +154,7 @@ def ordenar_por_leitura(itens: list) -> list:
         coluna = 0
         if colunado.get(pagina) and bbox.l >= largura / 2 - largura * 0.02:
             coluna = 1
-        ultima = (pagina, coluna, _distancia_ao_topo(bbox, altura))
+        ultima = (pagina, coluna, distancia_ao_topo(bbox, altura))
         chaves.append((*ultima, indice))
     return [itens[i] for i in sorted(range(len(itens)), key=lambda i: chaves[i])]
 

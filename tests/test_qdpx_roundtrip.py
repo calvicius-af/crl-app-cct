@@ -14,7 +14,8 @@ import pytest
 
 from cct.adapter_v2 import adaptar_v2
 from cct.lexical import codificar
-from cct.qdpx import exportar_qdpx
+from cct.qdpx import (exportar_qdpx, indices_inseridos,
+                      pontos_de_espacamento)
 from tests.test_lexical import CODEBOOK
 
 NS = {"q": "urn:QDA-XML:project:1.0"}
@@ -60,12 +61,14 @@ def test_texto_fonte_preserva_o_conteudo(qdpx_path):
 
 
 def test_offsets_das_selecoes_batem_com_o_texto(qdpx_path):
-    # o gate real: cada seleção tem de recortar no texto exportado
-    # exatamente o trecho que a anotação marcou no texto interno
+    # O gate real. A exportação separa cláusulas e tabelas com linhas em
+    # branco (ISSUE-0003), por isso uma seleção que atravesse pontos de
+    # inserção CONTÉM essas quebras: o contrato não é igualdade literal,
+    # é que removendo exatamente as inserções se obtém o trecho canónico
+    # (ISSUE-0004). Não se normaliza espaço — isso esconderia perdas.
     doc, texto = adaptar_v2(FIXTURE.read_text(encoding="utf-8"))[0]
     anot = codificar(doc, texto, CODEBOOK)
-    esperados = sorted(texto[a["char_start"]:a["char_end"]]
-                       for a in anot["anotacoes"])
+    inseridos = set(indices_inseridos(pontos_de_espacamento(texto, doc)))
 
     with zipfile.ZipFile(qdpx_path) as zf:
         raiz = ET.fromstring(zf.read("project.qde").decode("utf-8"))
@@ -79,8 +82,11 @@ def test_offsets_das_selecoes_batem_com_o_texto(qdpx_path):
         ini, fim = int(sel.get("startPosition")), int(sel.get("endPosition"))
         assert 0 <= ini < fim <= len(exportado)
         assert sel.find("q:Coding/q:CodeRef", NS) is not None
-        obtidos.append(exportado[ini:fim])
-    assert sorted(obtidos) == esperados
+        obtidos.append("".join(
+            c for i, c in enumerate(exportado[ini:fim], start=ini)
+            if i not in inseridos))
+    esperados = [texto[a["char_start"]:a["char_end"]] for a in anot["anotacoes"]]
+    assert sorted(obtidos) == sorted(esperados)
 
 
 def test_codigos_referenciados_existem_no_codebook(qdpx_path):
