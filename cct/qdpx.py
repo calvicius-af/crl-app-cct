@@ -5,6 +5,7 @@ em Sources/{guid}.txt. Regras críticas para o MaxQDA:
 - texto fonte em UTF-8, sem BOM, quebras de linha LF;
 - offsets das PlainTextSelection contados sobre esse texto plano.
 """
+import bisect
 import re
 import uuid
 import zipfile
@@ -15,6 +16,9 @@ from pathlib import Path
 NS = "urn:QDA-XML:project:1.0"
 
 _RE_NUMERICO = re.compile(r"^\d+(?:\.\d+)+$")
+
+# nós que ganham uma linha em branco antes, para leitura no MaxQDA
+_TIPOS_ESPACADOS = ("capitulo", "seccao", "anexo", "clausula", "artigo")
 
 
 def _caminho(codigo: str) -> list[str]:
@@ -41,6 +45,63 @@ def _caminho(codigo: str) -> list[str]:
     return unicos
 
 
+def pontos_de_espacamento(texto: str, doc: dict) -> list[int]:
+    """Posições onde inserir uma linha em branco para leitura no MaxQDA.
+
+    Antes de cada cláusula/artigo/capítulo/secção/anexo e à volta de cada
+    bloco de tabela (o texto canónico não tem linhas vazias — são elas
+    que o estruturar descarta para garantir a propriedade zero-perda).
+    """
+    pontos = set()
+    for no in doc.get("nos", []):
+        if no.get("tipo") in _TIPOS_ESPACADOS and no.get("char_start", 0) > 0:
+            pontos.add(no["char_start"])
+    pos, antes_era_tabela = 0, False
+    for linha in texto.split("\n"):
+        e_tabela = " | " in linha
+        if e_tabela != antes_era_tabela and pos > 0:
+            pontos.add(pos)
+        antes_era_tabela = e_tabela
+        pos += len(linha) + 1
+    return sorted(pontos)
+
+
+def espacar(texto: str, pontos: list[int]) -> str:
+    """Insere uma quebra de linha em cada ponto (offsets do texto original)."""
+    partes, anterior = [], 0
+    for p in pontos:
+        partes.append(texto[anterior:p])
+        partes.append("\n")
+        anterior = p
+    partes.append(texto[anterior:])
+    return "".join(partes)
+
+
+def indices_inseridos(pontos: list[int]) -> list[int]:
+    """Onde ficam, no texto espaçado, as quebras que o exportador criou.
+
+    A k-ésima inserção (0-based) fica no índice `pontos[k] + k`, porque as
+    k anteriores já empurraram o texto para a direita. É esta lista que
+    define o contrato das seleções: retirando exatamente estes índices do
+    trecho exportado, obtém-se o trecho canónico carácter por carácter.
+    """
+    return [ponto + k for k, ponto in enumerate(pontos)]
+
+
+def _remapear(inicio: int, fim: int, pontos: list[int]) -> tuple[int, int]:
+    """Converte um par de offsets do texto original para o texto espaçado.
+
+    O início desloca-se também quando coincide com um ponto de inserção
+    (a linha em branco fica antes da seleção); o fim, sendo exclusivo,
+    só conta as inserções estritamente anteriores. Uma seleção que
+    atravesse pontos de inserção CONTÉM as quebras acrescentadas — não é
+    literalmente igual ao trecho canónico, é equivalente no sentido de
+    indices_inseridos.
+    """
+    return (inicio + bisect.bisect_right(pontos, inicio),
+            fim + bisect.bisect_left(pontos, fim))
+
+
 def _agora() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -57,12 +118,24 @@ def _guid_deterministico(caminho: tuple) -> str:
 def exportar_qdpx(itens: list[tuple[dict, str, dict]], destino: Path,
                   nome_projeto: str = "CRL CCT",
                   nome_utilizador: str = "Pipeline CCT",
-                  master: dict[str, dict] | None = None) -> Path:
+                  master: dict[str, dict] | None = None,
+                  espacado: bool = True) -> Path:
     """itens: lista de (doc, texto, anotacoes). Escreve o .qdpx em destino.
 
     `master`: registos do codebook .qdc do MaxQDA (cct.qdc.carregar_qdc);
     quando um segmento de código existe no master, reutiliza o seu GUID,
-    nome de exibição, cor e descrição."""
+    nome de exibição, cor e descrição.
+
+    `espacado`: separa cláusulas e tabelas com uma linha em branco no
+    texto exportado, remapeando os offsets das seleções no mesmo passo
+    (o modelo interno e os seus offsets ficam intactos).
+
+    Contrato das seleções exportadas: os extremos apontam para o mesmo
+    intervalo semântico do texto canónico; dentro dele podem existir as
+    quebras de linha que o exportador introduziu, e mais nada. Removendo
+    do trecho exportado exatamente os índices de indices_inseridos,
+    obtém-se o trecho canónico carácter por carácter — não se normaliza
+    espaço nenhum, para não esconder perdas reais."""
     destino = Path(destino)
     ET.register_namespace("", NS)
     agora = _agora()
@@ -122,7 +195,8 @@ def exportar_qdpx(itens: list[tuple[dict, str, dict]], destino: Path,
     fontes: list[tuple[str, str]] = []  # (guid, texto)
     for doc, texto, anot in itens:
         src_guid = str(uuid.uuid4())
-        fontes.append((src_guid, texto))
+        pontos = pontos_de_espacamento(texto, doc) if espacado else []
+        fontes.append((src_guid, espacar(texto, pontos) if pontos else texto))
         src = ET.SubElement(sources_el, f"{{{NS}}}TextSource", {
             "guid": src_guid,
             "name": doc["doc_id"],
@@ -133,11 +207,12 @@ def exportar_qdpx(itens: list[tuple[dict, str, dict]], destino: Path,
             "modifiedDateTime": agora,
         })
         for a in anot["anotacoes"]:
+            ini, fim = _remapear(a["char_start"], a["char_end"], pontos)
             sel = ET.SubElement(src, f"{{{NS}}}PlainTextSelection", {
                 "guid": str(uuid.uuid4()),
                 "name": "",
-                "startPosition": str(a["char_start"]),
-                "endPosition": str(a["char_end"]),
+                "startPosition": str(ini),
+                "endPosition": str(fim),
                 "creatingUser": user_guid,
                 "creationDateTime": agora,
                 "modifyingUser": user_guid,

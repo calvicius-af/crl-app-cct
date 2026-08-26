@@ -74,6 +74,13 @@ def verificar() -> int:
         n = len([d for d in (raiz / "examples").iterdir() if d.is_dir()])
         ok(f"examples/ com {n} exemplo(s) completo(s) (PDF → TXT → QDPX)")
 
+    print("== Docling (opcional, --extrator docling)")
+    try:
+        import docling  # noqa: F401
+        ok("docling instalado (tabelas de anexos e layouts difíceis)")
+    except ImportError:
+        print("  · docling não instalado (só afeta a opção --extrator docling)")
+
     print("== LM Studio (opcional, camada semântica)")
     try:
         import urllib.request

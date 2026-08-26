@@ -48,3 +48,28 @@ jobs:
             exit 1
           fi
           echo "OK — nenhum ficheiro de dados fora do sítio."
+
+  tipos-docling:
+    # O extrator docling é opcional e a suite normal corre sem ele (os
+    # testes usam objetos de teste). Este job instala só os TIPOS
+    # (docling-core, sem PyTorch) para confirmar que a forma real deles
+    # não mudou — ver tests/test_docling_integracao.py.
+    name: tipos docling (docling-core)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências + tipos do docling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install docling-core
+
+      - name: Correr os testes
+        run: python -m pytest -q -rs
