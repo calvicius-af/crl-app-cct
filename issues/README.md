@@ -27,7 +27,8 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 
 | # | Título | Estado |
 |---|---|---|
-| [0001](0001-numeracao-por-extenso.md) | Cláusulas com numeração por extenso não são reconhecidas | Aberta |
+| [0001](0001-numeracao-por-extenso.md) | Normalizar cláusulas com numeração por extenso | Em curso |
 | [0002](0002-quebras-de-linha-em-titulos-multilinha.md) | Quebras de linha nos blocos de título do início dos documentos | Aberta |
 | [0003](0003-qdpx-perde-ganhos-do-docling.md) | O QDPX perde os ganhos de legibilidade do extrator Docling | Em curso |
-| [0004](0004-revisao-pr-23.md) | Correções exigidas pela revisão do PR #23 | Aberta |
+| [0004](0004-revisao-pr-23.md) | Correções exigidas pela revisão do PR #23 | Resolvida |
+| [0005](0005-programa-qualidade-tecnica.md) | Programa de qualidade técnica pós-PR #23 | Aberta |

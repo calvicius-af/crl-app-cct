@@ -2,6 +2,7 @@
 
 - **Estado:** Aberta
 - **Data:** 2026-07-06
+- **GitHub:** #29 (sub-issue de #24)
 - **Onde dói:** `cct/extractor.py` (junção de linhas)
 
 ## O que acontece
@@ -38,3 +39,11 @@ cobertos por teste.
 
 **Impacto:** cosmético na leitura, sem efeito nas codificações (o bloco de título fica
 fora da análise temática, em `00 Estrutura`).
+
+## Progresso no PR #23
+
+O PR #23 melhorou a identificação do preâmbulo e dos limites dos subtipos
+oficiais, mas não apresentou uma prova suficiente de que todos os títulos
+iniciais centrados e multilinha ficam unidos sem fundir títulos estruturais.
+O problema mantém-se aberto como #29, com casos de regressão explícitos para os
+dois comportamentos.

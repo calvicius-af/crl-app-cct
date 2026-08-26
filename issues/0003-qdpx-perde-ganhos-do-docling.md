@@ -3,6 +3,7 @@
 - **Estado:** Em curso — pontos 1-3 implementados em 2026-08-25, a
   aguardar confirmação na importação para MaxQDA
 - **Data:** 2026-08-24
+- **GitHub:** #31 (sub-issue de #24; relacionada com #19)
 - **Onde dói:** `cct/extractor_docling.py`, `cct/extractor.py` (estruturar), `cct/qdpx.py`
 
 ## O que acontece
@@ -48,7 +49,7 @@ Markdown e passa a montar o texto a partir dos itens do
 DoclingDocument (`documento_para_texto`). Os cabeçalhos chegam como
 texto simples — não há `#` nenhum para limpar, seja qual for o nível — e
 as tabelas são lidas da grelha estruturada, emitindo **uma célula por
-span** (`celulas_sem_colspan`, que usa `start_col_offset_idx`). O teste
+span** (`celulas_da_linha`, que usa os offsets de linha e coluna). O teste
 `test_mantem_valores_repetidos_em_colunas_distintas` guarda o caso
 contrário: o nível M do AguasNorte é "n.a." em todas as colunas e são
 células distintas, que têm de sobreviver.
@@ -60,8 +61,10 @@ Os dois testes de gate da Fase 0 foram reescritos para verificar o
 invariante que importa — cada seleção recorta no texto exportado o mesmo
 trecho que a anotação marcou — em vez da identidade literal do texto.
 
-Falta: confirmar na importação para MaxQDA (QDPX em
-`results/2025_4_08_docling_v2/`).
+Falta apenas a validação humana final na importação para MaxQDA, registada no
+GitHub como #31 e ligada ao procedimento operacional #19. O artefacto a validar
+é o QDPX final produzido após o PR #23; a versão `v2` já não representa a
+implementação aceite.
 
 ## Notas
 

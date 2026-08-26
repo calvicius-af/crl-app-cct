@@ -1,6 +1,6 @@
 # ISSUE-0004: correções exigidas pela revisão do PR #23
 
-- **Estado:** Resolvida (2026-08-26) — a aguardar nova revisão crítica do PR #23
+- **Estado:** Resolvida (2026-08-26) — segunda revisão aprovada; merge autorizado
 - **Data:** 2026-08-26
 - **GitHub:** PR #23
 - **Onde dói:** `tests/test_extractor_docling.py`, `cct/extractor_docling.py`,
@@ -283,3 +283,30 @@ com todas as contagens acima.
 - tornar Docling uma dependência obrigatória;
 - corrigir o aviso legítimo da cláusula 76.ª do TRATOLIXO.
 
+## Segunda revisão e aceitação (2026-08-26)
+
+A correção foi revista de forma independente contra o plano acima. Não foram
+encontrados defeitos P0, P1 ou P2 e o PR foi aprovado para integração.
+
+Evidência final reproduzida:
+
+- os cinco checks do GitHub ficaram verdes: 147 testes passaram e 14 foram
+  ignorados na matriz normal; 151 passaram e 13 foram ignorados no job com os
+  tipos reais do Docling;
+- localmente, passaram 163 testes com Docling e 159 numa instalação criada
+  apenas com `requirements.txt`; o conjunto focado passou 43 testes;
+- o remapeamento dos offsets foi ainda exercitado exaustivamente sobre os
+  pontos de inserção, sem violações do contrato;
+- as quatro convenções reais produziram 300 cláusulas e 203 anotações; o único
+  aviso foi o já conhecido da cláusula 76.ª do TRATOLIXO;
+- o QDPX validou contra o XSD, contém quatro fontes, GUIDs únicos, `CodeRef`
+  resolvidos, nenhuma seleção vazia ou fora dos limites e nenhum `####`;
+- das 203 seleções, 161 são literalmente iguais e 42 equivalentes depois de
+  remover exatamente as quebras introduzidas pelo exportador: zero violações;
+- o comando de diagnóstico e a ajuda funcionam sem Docling; compilação e
+  verificação de anonimização passaram.
+
+Foi corrigida durante esta documentação uma linha em branco excedente no fim
+do ficheiro, única observação P3 da segunda revisão. A prevenção automática de
+erros equivalentes ficou incluída no programa de qualidade #24. A validação
+visual no MaxQDA continua deliberadamente aberta na ISSUE-0003 / GitHub #31.

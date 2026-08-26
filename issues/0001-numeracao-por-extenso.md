@@ -1,7 +1,8 @@
 # ISSUE-0001: cláusulas com numeração por extenso não são reconhecidas
 
-- **Estado:** Aberta
+- **Estado:** Em curso — reconhecimento implementado no PR #23; falta normalização numérica para diacronia
 - **Data:** 2026-07-07
+- **GitHub:** #28 (sub-issue de #24)
 - **Onde dói:** `cct/extractor.py`
 
 ## O que acontece
@@ -34,3 +35,13 @@ Implica converter numerais ordinais por extenso em português (`primeira` → 1,
 que emparelha cláusulas por número antes de recorrer à semelhança de conteúdo.
 
 Identificado como limitação conhecida no fecho da fase 5.
+
+## Progresso no PR #23
+
+O PR #23 passou a reconhecer cabeçalhos como `Cláusula décima segunda` e
+corrigiu os falsos positivos encontrados durante a revisão. A extração
+estrutural deixou, portanto, de estar bloqueada.
+
+Continua por resolver a normalização do ordinal para um número canónico. O
+emparelhamento em `cct/diacronia.py` ainda reconhece apenas algarismos, pelo que
+esta parte permanece aberta no GitHub como #28, dentro do programa #24.
