@@ -9,6 +9,7 @@ Uso mínimo:
 """
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import yaml
@@ -20,6 +21,7 @@ from .export_xlsx import exportar_xlsx
 from .triagem import codigos_auto, triar
 from .sanidade import verificar as verificar_sanidade
 from .schemas import validar_doc, validar_anotacoes
+from .proveniencia import agora_utc, construir_manifesto, escrever_manifesto
 
 
 def _novidades_via_versoes(pasta_versoes: Path, pdf: Path, doc: dict,
@@ -62,6 +64,7 @@ def _novidades_via_versoes(pasta_versoes: Path, pdf: Path, doc: dict,
 
 
 def main():
+    inicio_utc = agora_utc()
     p = argparse.ArgumentParser()
     p.add_argument("--pdfs", required=True, help="pasta com PDFs individuais de convenções")
     p.add_argument("--codebook", required=True)
@@ -103,6 +106,29 @@ def main():
     pdfs = sorted(Path(args.pdfs).glob("*.pdf"))
     if not pdfs:
         raise SystemExit(f"Sem PDFs em {args.pdfs}")
+
+    entradas = [*pdfs, Path(args.codebook)]
+    for opcional in (args.variaveis, args.master, args.metricas):
+        if opcional:
+            entradas.append(Path(opcional))
+    if args.pasta_versoes:
+        entradas.extend(sorted(Path(args.pasta_versoes).rglob("*.pdf")))
+    parametros = {chave: valor for chave, valor in vars(args).items()}
+    parametros["argv"] = sys.argv[1:]
+    comando = ["python", "-m", "cct.pipeline_tema", *sys.argv[1:]]
+    raiz = Path(__file__).resolve().parent.parent
+    manifesto_inicial = construir_manifesto(
+        raiz=raiz,
+        inicio_utc=inicio_utc,
+        parametros=parametros,
+        entradas=entradas,
+        saidas=[],
+        resumo={"documentos_encontrados": len(pdfs)},
+        problemas=[],
+        status="running",
+        comando=comando,
+    )
+    escrever_manifesto(out / "manifest.json", manifesto_inicial)
 
     extrair = extrair_pdf
     if args.extrator == "docling":
@@ -159,8 +185,31 @@ def main():
         relatorio.append("\nPROBLEMAS:")
         relatorio.extend(f"  {p}" for p in problemas)
     (out / "relatorio.txt").write_text("\n".join(relatorio), encoding="utf-8")
+    saidas = [out / "projeto.qdpx", out / "sugestoes_peritas.xlsx",
+              out / "relatorio.txt"]
+    resumo = {
+        "documentos_encontrados": len(pdfs),
+        "documentos_processados": len(itens),
+        "clausulas": sum(
+            1 for doc, _texto, _anot in itens
+            for no in doc["nos"] if no["tipo"] == "clausula"),
+        "anotacoes": sum(len(anot["anotacoes"])
+                          for _doc, _texto, anot in itens),
+    }
+    manifesto = construir_manifesto(
+        raiz=raiz,
+        inicio_utc=inicio_utc,
+        parametros=parametros,
+        entradas=entradas,
+        saidas=saidas,
+        resumo=resumo,
+        problemas=problemas,
+        comando=comando,
+    )
+    escrever_manifesto(out / "manifest.json", manifesto)
     print(f"\n{relatorio[0]}")
-    print(f"→ {out/'projeto.qdpx'}\n→ {out/'sugestoes_peritas.xlsx'}")
+    print(f"→ {out/'projeto.qdpx'}\n→ {out/'sugestoes_peritas.xlsx'}"
+          f"\n→ {out/'manifest.json'}")
     if problemas:
         print(f"⚠ {len(problemas)} problemas — ver {out/'relatorio.txt'}")
 

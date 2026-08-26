@@ -1,6 +1,6 @@
 # Dados: o que existe, de onde vem, como repor
 
-Os dados **não estão no repositório**. Ocupam cerca de 670 MB e são, na maior parte,
+Os dados **não estão no Git**. A dimensão varia entre instalações e são, na maior parte,
 documentos públicos que qualquer pessoa pode voltar a obter, ou exports de MaxQDA que
 pertencem ao CRL. Versioná-los tornaria o repositório inutilizável e não acrescentaria
 nada à reprodutibilidade — ver [ADR-0009](../adr/0009-layout-do-repositorio.md).
@@ -18,16 +18,26 @@ data/
 │   ├── bte/
 │   │   ├── bte_2021/             48 números completos do BTE de 2021
 │   │   ├── bte_2022/             240 convenções de 2022, uma por ficheiro
-│   │   ├── bte_2025/             277 convenções de 2025, uma por ficheiro
+│   │   ├── bte_2025/             corpus disponível de 2025; pode ser parcial
 │   │   └── bte2_2025.pdf         número completo usado pelos testes de extração
 │   ├── maxqda/                   exports do MaxQDA (ver abaixo)
 │   └── textos_consolidados/      21 pastas, uma por convenção, com as versões anteriores
 └── interim/                      resultados intermédios reproduzíveis (texto extraído, caches)
 ```
 
-`results/` guarda as saídas (QDPX, Excel das peritas, comparações, métricas) e também
-está fora do Git. Ambas as pastas podem ser apagadas sem perda: `data/interim/` e
-`results/` são inteiramente regeneráveis a partir de `data/raw/` e do código.
+`results/` guarda saídas, experiências, métricas e possíveis artefactos revistos por
+pessoas. Também está fora do Git, mas **não deve ser apagada em bloco**. Apenas caches e
+intermédios confirmados são descartáveis; projetos MQDA, Excel revisto, validações e
+entregáveis podem conter trabalho humano não regenerável. Ver
+[organização do workspace](organizacao-workspace.md).
+
+`data/raw/` é fonte e requer cópia de segurança. `data/interim/` é regenerável quando a
+corrida tem inputs e manifesto conhecidos. Para inventariar a instalação atual sem mover
+nada:
+
+```bash
+python scripts/inventariar_workspace.py
+```
 
 ## Boletim do Trabalho e Emprego (`data/raw/bte/`)
 

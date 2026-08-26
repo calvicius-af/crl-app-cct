@@ -1,32 +1,32 @@
-# ISSUE-0001: cláusulas com numeração por extenso não são reconhecidas
+# ISSUE-0001: normalizar cláusulas com numeração por extenso
 
 - **Estado:** Em curso — reconhecimento implementado no PR #23; falta normalização numérica para diacronia
 - **Data:** 2026-07-07
 - **GitHub:** #28 (sub-issue de #24)
-- **Onde dói:** `cct/extractor.py`
+- **Onde dói:** `cct/diacronia.py` e representação canónica do número
 
 ## O que acontece
 
-O extrator reconhece cláusulas numeradas em algarismos (`Cláusula 12.ª`, `Artigo 5.º`),
-mas não as que estão escritas por extenso (`Cláusula décima segunda`, `Cláusula primeira`).
-Nessas convenções, o texto é extraído corretamente mas fica agregado no nó anterior em vez
-de dar origem a um nó de cláusula próprio.
+Desde o PR #23, o extrator reconhece cláusulas escritas por extenso (`Cláusula décima
+segunda`, `Cláusula primeira`) e cria o nó estrutural correto. Contudo, o ordinal ainda
+não é convertido para um número canónico. A comparação diacrónica reconhece diretamente
+apenas algarismos, pelo que o emparelhamento por número não beneficia destes cabeçalhos.
 
 ## O que devia acontecer
 
-Uma cláusula com numeração por extenso deve produzir um nó `clausula` com o número
-correspondente, indistinguível de uma numerada em algarismos — incluindo para efeitos de
-comparação diacrónica, onde o emparelhamento por número deixa de funcionar.
+Uma cláusula por extenso deve conservar o rótulo original e expor o número canónico
+correspondente, indistinguível de uma numerada em algarismos para efeitos de comparação
+diacrónica.
 
 ## Como reproduzir
 
 ```bash
 python -m cct.cli extrair --pdf <PDF com numeração por extenso> --out-dir /tmp/probe
-# no .doc.json: os nós "clausula" ficam abaixo do número real de cláusulas do documento
+# o nó existe; falta confirmar que a diacronia o emparelha pelo número canónico
 ```
 
-Falta identificar uma convenção concreta do corpus onde isto aconteça, para servir de caso
-de teste. É o primeiro passo para resolver.
+O caso `Cláusula décima segunda` já está coberto na extração. Falta um par de versões que
+prove o emparelhamento diacrónico entre ordinal por extenso e numeração canónica.
 
 ## Notas
 

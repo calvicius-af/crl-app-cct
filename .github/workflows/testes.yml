@@ -49,6 +49,18 @@ jobs:
           fi
           echo "OK — nenhum ficheiro de dados fora do sítio."
 
+      - name: Verificar que não entraram ficheiros de credenciais
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        run: |
+          credenciais=$(git ls-files | grep -E '(^|/)\.env($|\.)' \
+                        | grep -vE '(^|/)\.env\.example$' || true)
+          if [ -n "$credenciais" ]; then
+            echo "Ficheiros de credenciais versionados:"
+            echo "$credenciais"
+            exit 1
+          fi
+          echo "OK — nenhum .env versionado."
+
   tipos-docling:
     # O extrator docling é opcional e a suite normal corre sem ele (os
     # testes usam objetos de teste). Este job instala só os TIPOS

@@ -8,7 +8,7 @@ se junta ao trabalho — pessoa ou agente — perceber como aqui se faz.
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m pytest -q      # 99 testes, ~5 segundos
+.venv/bin/python -m pytest -q      # suite completa; a contagem cresce com o projeto
 .venv/bin/python -m cct.doctor     # verifica dados e dependências
 ```
 
@@ -25,6 +25,8 @@ quando corrigires algo, acrescenta o teste que impede o regresso do problema.
 
 Casos difíceis vivem em `tests/fixtures/`; para verificação ponta a ponta há
 [`examples/`](examples/README.md).
+
+O mapa e a estrutura de destino da suite estão em [`tests/README.md`](tests/README.md).
 
 ## As três regras que não se quebram
 
@@ -59,6 +61,11 @@ git ls-files | grep -iE '\.(pdf|qdpx|mqda|xlsx|qdc)$'
 Nunca versionar: PDFs do BTE fora de `examples/`, exports do MaxQDA, ficheiros `.mqda`,
 resultados de corridas. O `.gitignore` cobre isto, mas convém confirmar — sobretudo antes
 do primeiro *push* para um repositório remoto.
+
+Uma nova corrida deve conservar o `manifest.json` que o pipeline gera. Antes de mover ou
+limpar ficheiros locais, correr `python scripts/inventariar_workspace.py` e seguir
+[a política do workspace](docs/dados/organizacao-workspace.md). Nunca guardar `.env` ou
+credenciais dentro de `vendor/`, mesmo sendo uma pasta ignorada pelo Git.
 
 ## Mensagens de commit
 

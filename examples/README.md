@@ -150,8 +150,14 @@ reconstrói integralmente o `.txt`, sem um único carácter a mais ou a menos.
 ### O `.qdpx` — o projeto para o MaxQDA
 
 Ficheiro no formato aberto **REFI-QDA 1.5**, que é um ZIP com `project.qde` (XML com a
-árvore de códigos e as posições dos segmentos) e `Sources/` (o texto). O texto lá dentro é
-byte a byte igual ao `.txt` desta pasta — foi verificado.
+árvore de códigos e as posições dos segmentos) e `Sources/` (o texto). Os exemplos
+versionados atuais são byte a byte iguais ao `.txt` emparelhado. O exportador atual pode
+inserir linhas em branco para legibilidade; nesse caso, os offsets são remapeados e a
+garantia passa a ser equivalência carácter a carácter depois de remover exatamente as
+inserções registadas pelo exportador.
+
+Quando estes exemplos forem regenerados, devem conservar também o `manifest.json` da
+corrida, para fixar commit, inputs, parâmetros e hashes.
 
 A árvore de códigos organiza-se em faixas, que dizem à equipa **o que fazer** com cada segmento:
 

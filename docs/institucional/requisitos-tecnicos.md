@@ -15,7 +15,7 @@ para o exterior, não requer serviços cloud, não abre portas de rede
 | Sistema operativo | Windows 10/11 (principal); macOS 13+ (secundário) |
 | Python | 3.11 ou superior, 64 bits, com tcl/tk (opção por omissão do instalador oficial) |
 | Privilégios | utilizador normal — sem administração após instalação do Python |
-| Disco | ~200 MB (Python + bibliotecas) + espaço para PDFs/resultados |
+| Disco | ~200 MB na instalação base + espaço para PDFs/resultados; Docling opcional requer vários GB |
 | Rede | não necessária em operação |
 
 ## 3. Bibliotecas Python (todas open-source, via pip)
@@ -34,6 +34,11 @@ para o exterior, não requer serviços cloud, não abre portas de rede
 Interface gráfica: **tkinter** (biblioteca padrão do Python — sem instalação
 adicional). Sem compiladores, sem binários externos, sem drivers.
 
+O extrator Docling é opcional e não integra a instalação base. Inclui PyTorch e modelos
+de layout/tabelas; deve ser instalado e pré-provisionado à parte quando a instituição o
+aprovar. A primeira execução pode descarregar modelos, pelo que numa rede fechada estes
+têm de ser preparados numa máquina autorizada e transferidos segundo a política interna.
+
 Instalação (com acesso pip/proxy autorizado, uma única vez):
 ```
 python -m venv .venv
@@ -51,8 +56,8 @@ na estação).
 - Saídas: ficheiros locais (.qdpx, .xlsx, .txt) na pasta escolhida.
 - Sem telemetria, sem atualizações automáticas, sem escrita fora das pastas
   do projeto.
-- Código-fonte auditável: ~15 módulos Python (~3 000 linhas), suite com
-  99 testes automáticos (`python -m pytest`).
+- Código-fonte auditável e suite automática (`python -m pytest`), executada no CI em
+  Linux/macOS e Python 3.11/3.12.
 
 ## 5. Componente opcional — camada semântica local
 Se ativada, a aplicação comunica com um servidor LLM **local** (por exemplo,
@@ -67,7 +72,8 @@ implementação.
 1. Instalar Python 3.11+ 64 bits (instalador oficial, opção tcl/tk).
 2. Copiar a pasta do projeto e criar o ambiente (ver §3).
 3. `python -m cct.doctor` → deve terminar com "Tudo pronto".
-4. `python -m pytest -q` → 99 testes, 0 falhas (≈10 s).
+4. `python -m pytest -q` → todos os testes aplicáveis passam; os que exigem corpus local
+   ou Docling real identificam claramente a dependência.
 5. Duplo clique em `AppCCT.bat` → a janela abre; botão "Verificar
    instalação" repete o passo 3 dentro da app.
 6. Corrida de fumo: pasta com 2 PDFs de teste + tema 4.08 → gera
@@ -78,4 +84,5 @@ implementação.
 - Atualizações = substituir a pasta do projeto, ou `git pull` (sem instaladores).
 - Configuração dos temas = ficheiros YAML editáveis pela equipa de análise
   (sem intervenção informática).
-- Logs de cada corrida em `results/<corrida>/relatorio.txt`.
+- Logs de cada corrida em `results/<corrida>/relatorio.txt` e proveniência verificável em
+  `results/<corrida>/manifest.json`.

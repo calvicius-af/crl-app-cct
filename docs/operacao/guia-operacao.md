@@ -18,6 +18,8 @@ Recebe PDFs de convenções coletivas do BTE e produz:
 2. **sugestoes_peritas.xlsx** — a mesma informação em Excel, com contexto,
    para quem não tem MaxQDA.
 3. **relatorio.txt** — o que correu bem e o que precisa de atenção.
+4. **manifest.json** — proveniência da corrida: comando, commit, ambiente,
+   hashes dos inputs/outputs e contagens.
 
 ---
 
