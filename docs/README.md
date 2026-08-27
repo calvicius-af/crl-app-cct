@@ -12,6 +12,7 @@ Por onde começar, consoante o que precisas:
 | saber se é fiável | [validacao/](validacao/README.md) — gates, memos das peritas, métricas |
 | instalar numa máquina nova | [dados/](dados/README.md) + [institucional/requisitos-tecnicos.md](institucional/requisitos-tecnicos.md) |
 | organizar corridas e resultados locais | [dados/organizacao-workspace.md](dados/organizacao-workspace.md) |
+| consultar a migração de agosto de 2026 | [dados/migracao-2026-08.md](dados/migracao-2026-08.md) |
 | apresentar o projeto | [institucional/](institucional/) — requisitos técnicos e proposta ao Instituto de Informática |
 | o enquadramento teórico | [research/](research/README.md) — AKN4EU, ELI, FRBR, REFI-QDA |
 | aprender a mexer no código | [formacao/](formacao/) |
