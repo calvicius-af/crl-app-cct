@@ -163,7 +163,7 @@ A árvore de códigos organiza-se em faixas, que dizem à equipa **o que fazer**
 
 | Faixa | Significado |
 |---|---|
-| `AUTO` | precisão medida ≥ 0,85 no gabarito — aceitar com verificação rápida |
+| `AUTO` | precisão medida ≥ 0,85 na amostra de referência — aceitar com verificação rápida |
 | `REVER` | sugestão a validar por pessoa |
 | `CONSOLIDADO` | texto republicado que não mudou face à versão anterior — pode ser lido por último |
 | `00 Estrutura` | preâmbulo, assinaturas e texto consolidado, excluídos da análise temática |
@@ -189,6 +189,6 @@ de 2026, já separados por convenção. As versões anteriores (2009 e 2020) vê
 textos consolidados do CRL. Não são redistribuídos neste repositório; ver
 [docs/dados/README.md](../docs/dados/README.md).
 
-`metricas_calibracao.json` é o resultado da avaliação da baseline lexical contra o gabarito
+`metricas_calibracao.json` é o resultado da avaliação da baseline lexical contra a amostra de referência
 manual do tema 4.8 (89 convenções de 2025, 788 segmentos codificados por peritas). É ele que
 determina que códigos podem ir para a faixa `AUTO`.

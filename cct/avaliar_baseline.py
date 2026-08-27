@@ -1,6 +1,6 @@
-"""Baseline lexical do tema 4.08 medida contra o gabarito manual (Fase 2).
+"""Baseline lexical do tema 4.08 medida contra a amostra de referência manual (Fase 2).
 
-Para cada convenção do gabarito: extrai o PDF individual (data/raw/bte/bte_2025/),
+Para cada convenção da amostra de referência: extrai o PDF individual (data/raw/bte/bte_2025/),
 codifica com o codebook YAML e compara com a codificação manual.
 
 Uso:
@@ -16,7 +16,7 @@ import yaml
 
 from .extractor import extrair_pdf
 from .lexical import codificar
-from .gabarito import carregar_gabarito
+from .referencia import carregar_referencia
 from .harness import avaliar, relatorio
 
 
@@ -31,8 +31,8 @@ def main():
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     codebook = yaml.safe_load(Path(args.codebook).read_text(encoding="utf-8"))
-    gab = carregar_gabarito(Path(args.xlsx))
-    docs = sorted({r["doc_id"] for r in gab})
+    referencia = carregar_referencia(Path(args.xlsx))
+    docs = sorted({r["doc_id"] for r in referencia})
 
     previstos = []
     falhas = []
@@ -61,7 +61,7 @@ def main():
             falhas.append((doc_id, str(e)))
             print(f"[{i}/{len(docs)}] {nome}: ERRO {e}")
 
-    m = avaliar(previstos, gab)
+    m = avaliar(previstos, referencia)
     (out / "previstos.json").write_text(
         json.dumps(previstos, ensure_ascii=False, indent=1), encoding="utf-8")
     (out / "metricas.json").write_text(

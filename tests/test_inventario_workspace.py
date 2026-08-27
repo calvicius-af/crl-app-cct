@@ -7,13 +7,17 @@ from scripts.inventariar_workspace import (classificar, inventariar,
 
 
 def test_classificacao_conservadora():
-    assert classificar(Path("data/raw/maxqda/gabarito.xlsx")) == "preservar_fonte"
+    assert classificar(Path("data/raw/maxqda/amostra_referencia.xlsx")) == "preservar_fonte"
     assert classificar(Path("data/interim/cache_llm/a.json")) == "cache_descartavel"
     assert classificar(Path("data/interim/docs/a.txt")) == "intermedio_regeneravel"
     assert (classificar(Path("results/mqda/revisto.mqda")) ==
             "possivel_trabalho_humano_preservar")
     assert (classificar(Path("results/docling_v2/projeto.qdpx")) ==
             "experiencia_preservar_ate_documentar")
+    assert classificar(Path("results/2025_4_08_issue0004/relatorio.txt")) == "resultado_validado_preservar"
+    assert classificar(Path("results/2026_4_08/projeto.qdpx")) == "resultado_reproduzivel_manifestar"
+    assert classificar(Path("results/comparacoes/resultado.xlsx")) == "benchmark_reproduzivel_manifestar"
+    assert classificar(Path("results/xlsx_peritas/revisao.xlsx")) == "confirmar_trabalho_humano"
     assert classificar(Path("archive/v1/codigo.py")) == "historico_preservar"
     assert classificar(Path("vendor/projeto/LICENSE")) == "terceiro_repor_da_origem"
 

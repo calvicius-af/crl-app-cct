@@ -2,10 +2,10 @@
 from cct.triagem import codigos_auto, triar
 
 METRICAS = {"por_codigo": {
-    "A": {"precisao": 0.95, "n_gabarito": 10},
-    "B": {"precisao": 0.40, "n_gabarito": 10},
-    "C": {"precisao": 1.00, "n_gabarito": 1},   # gabarito insuficiente
-    "D": {"precisao": None, "n_gabarito": 0},
+    "A": {"precisao": 0.95, "n_referencia": 10},
+    "B": {"precisao": 0.40, "n_referencia": 10},
+    "C": {"precisao": 1.00, "n_referencia": 1},   # amostra insuficiente
+    "D": {"precisao": None, "n_referencia": 0},
 }}
 
 

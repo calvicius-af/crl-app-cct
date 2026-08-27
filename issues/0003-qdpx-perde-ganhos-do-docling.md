@@ -86,7 +86,7 @@ Proposta original, por ponto (mantida para registo):
       TXT, recalculando os offsets das anotações no mesmo passo — é
       onde a legibilidade importa e mantém o modelo interno intacto;
    b) **no estruturar**: emitir a linha em branco como parte do texto
-      canónico — mais simples, mas mexe em todos os offsets, gabaritos
+      canónico — mais simples, mas mexe em todos os offsets, amostras de referência
       e comparações existentes; exigiria revalidar o harness completo.
    A via (a) é a recomendada.
 

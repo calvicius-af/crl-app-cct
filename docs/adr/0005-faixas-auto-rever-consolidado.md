@@ -7,7 +7,7 @@
 ## Contexto
 
 A codificação automática não é fiável ao ponto de substituir a análise humana: na
-avaliação contra o gabarito, a precisão global anda nos 0,57 (ver
+avaliação contra a amostra de referência, a precisão global anda nos 0,57 (ver
 [validação](../validacao/README.md)). Entregar 2 700 sugestões indiferenciadas às peritas
 seria pior do que não entregar nada — o custo de as filtrar anularia o ganho.
 
@@ -21,13 +21,13 @@ cada um:
 
 | Faixa | Critério | O que significa para quem revê |
 |---|---|---|
-| `AUTO` | precisão **medida no gabarito ≥ 0,85** para aquele código | aceitar com verificação rápida |
+| `AUTO` | precisão **medida na amostra de referência ≥ 0,85** para aquele código | aceitar com verificação rápida |
 | `REVER` | tudo o resto | validar uma a uma |
 | `CONSOLIDADO` | texto republicado sem alteração face à versão anterior | pode ser lido por último, ou não ser lido |
 | `00 Estrutura` | preâmbulo, assinaturas, marca de texto consolidado | fora da análise temática |
 
 O limiar é aplicado a partir de um ficheiro de métricas (`metricas.json`) produzido pela
-avaliação contra o gabarito. **Se não houver métricas, não há faixa `AUTO`** — o sistema
+avaliação contra a amostra de referência. **Se não houver métricas, não há faixa `AUTO`** — o sistema
 não presume qualidade que não mediu.
 
 ## Alternativas consideradas
@@ -42,7 +42,7 @@ não presume qualidade que não mediu.
 
 - A faixa `AUTO` é sempre pequena e conservadora (208 a 330 segmentos, contra 1 700 a
   2 400 em `REVER`, nas rondas de 2025).
-- Cada tema novo precisa de um gabarito para poder ter faixa `AUTO`. Sem gabarito, o
+- Cada tema novo precisa de uma amostra de referência para poder ter faixa `AUTO`. Sem amostra, o
   sistema funciona na mesma, todo em `REVER`.
 - As anotações vindas da camada semântica ([ADR-0006](0006-semantica-llm-local-desligada-por-omissao.md))
   vão **sempre** para `REVER`, independentemente da métrica.

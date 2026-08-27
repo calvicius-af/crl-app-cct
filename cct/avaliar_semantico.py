@@ -1,7 +1,7 @@
 """Fase 4: mede o ganho da camada semântica local sobre a baseline lexical.
 
 Corre lexical + semântica num LLM local OpenAI-compatível (por exemplo, LM
-Studio) nas convenções do gabarito e compara as métricas com e sem a camada
+Studio) nas convenções da amostra de referência e compara as métricas com e sem a camada
 semântica. As chamadas são cacheadas em data/interim/cache_llm_<modelo>.
 Custo controlado por --max-lotes por documento.
 
@@ -20,7 +20,7 @@ import yaml
 from .extractor import extrair_pdf
 from .lexical import codificar
 from .semantico import codificar_semantico, backend_lmstudio
-from .gabarito import carregar_gabarito
+from .referencia import carregar_referencia
 from .harness import avaliar, relatorio
 
 
@@ -42,8 +42,8 @@ def main():
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     codebook = yaml.safe_load(Path(args.codebook).read_text(encoding="utf-8"))
-    gab = carregar_gabarito(Path(args.xlsx))
-    docs = sorted({r["doc_id"] for r in gab})
+    referencia = carregar_referencia(Path(args.xlsx))
+    docs = sorted({r["doc_id"] for r in referencia})
 
     previstos_lex, previstos_tot = [], []
     for i, doc_id in enumerate(docs, 1):
@@ -68,8 +68,8 @@ def main():
         registar(previstos_tot, lex)
 
         pares_lex = {(doc_id, a["codigo"]) for a in lex["anotacoes"]}
-        pares_gab = {(g["doc_id"], g["codigo"]) for g in gab if g["doc_id"] == doc_id}
-        if args.apenas_fn and pares_gab <= pares_lex:
+        pares_ref = {(g["doc_id"], g["codigo"]) for g in referencia if g["doc_id"] == doc_id}
+        if args.apenas_fn and pares_ref <= pares_lex:
             print(f"[{i}/{len(docs)}] {nome}: lexical completo, sem LLM")
             continue
 
@@ -89,8 +89,8 @@ def main():
         for f in sem.get("falhas", []):
             print(f"    ⚠ {f}")
 
-    m_lex = avaliar(previstos_lex, gab)
-    m_tot = avaliar(previstos_tot, gab)
+    m_lex = avaliar(previstos_lex, referencia)
+    m_tot = avaliar(previstos_tot, referencia)
     (out / "metricas_lexical.json").write_text(json.dumps(m_lex, ensure_ascii=False, indent=1), encoding="utf-8")
     (out / "metricas_com_llm.json").write_text(json.dumps(m_tot, ensure_ascii=False, indent=1), encoding="utf-8")
     rel = ("== BASELINE LEXICAL ==\n" + relatorio(m_lex)

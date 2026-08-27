@@ -33,9 +33,9 @@ extrator — quase todos os casos difíceis do código nasceram de um destes com
 (quebras de linha a meio de frase, títulos de cláusula fundidos com o capítulo, fronteiras
 de segmento).
 
-## Métricas contra o gabarito
+## Métricas contra a amostra de referência
 
-O gabarito são 788 segmentos do tema 4.8 (proteção de dados) codificados manualmente por
+A amostra de referência contém 788 segmentos do tema 4.8 (proteção de dados) codificados manualmente por
 peritas em 89 convenções de 2025. O `cct/harness.py` compara a codificação automática com
 essa referência e produz precisão (quantas sugestões estão certas) e cobertura (quantos
 segmentos reais foram apanhados).

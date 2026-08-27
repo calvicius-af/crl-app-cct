@@ -19,7 +19,7 @@ clone limpo continua, assim, determinístico.
 | Codificação e triagem | `test_lexical.py`, `test_semantico.py`, `test_triagem.py`, `test_fase3*.py` |
 | Diacronia | `test_diacronia.py`, `test_escolher_par.py`, `test_fase5b.py` |
 | QDPX e offsets | `test_qdpx*.py`, `test_qdc.py` |
-| Dados e contratos | `test_schemas.py`, `test_variaveis.py`, `test_gabarito_harness.py` |
+| Dados e contratos | `test_schemas.py`, `test_variaveis.py`, `test_referencia_harness.py` |
 | Operação | `test_sanidade.py`, `test_proveniencia.py`, `test_inventario_workspace.py` |
 
 Os nomes `fase3`, `fase3b`, `fase3c` e `fase5b` são históricos. Não devem ser

@@ -66,7 +66,7 @@ Convenção de nomes de 2025 — `25_PR_003_BTE_02_ACIP_FESAHT.pdf`:
 | `BTE_02` | publicado no BTE n.º 2 |
 | `ACIP_FESAHT` | entidade empregadora e sindicato |
 
-Estes nomes não são decorativos: o pipeline cruza-os com o gabarito e com as variáveis do
+Estes nomes não são decorativos: o pipeline cruza-os com a amostra de referência e com as variáveis do
 MaxQDA por prefixo e por tokens, e o `cct/comparar.py` deduz o ano a partir deles para
 escolher que versões comparar. Mudar o esquema de nomes parte esse cruzamento.
 
@@ -78,16 +78,16 @@ Produzidos pela equipa do CRL a partir do projeto MaxQDA. Não são públicos.
 |---|---|---|
 | `VariaveisDocumento2025.xlsx` | MaxQDA → Variáveis de documento → Exportar | Metadados de cada convenção: subtipo (revisão parcial, consolidado…), setor, CAE. Determina como o extrator interpreta o documento. **Nota:** o MaxQDA trunca os nomes das variáveis a 30 caracteres — o cruzamento é feito por prefixo |
 | `MAXQDA_RNC_…Lista de Códigos.qdc` | MaxQDA → Livro de códigos → Exportar (.qdc) | Os 1393 códigos oficiais do CRL, com nomes, cores e descrições (definição, critérios, base legal). O QDPX gerado reutiliza-os, para que os projetos sejam compatíveis entre si |
-| `4_08_ParaClaudeAppCCT.xlsx` | MaxQDA → Segmentos codificados → Exportar | **Gabarito** do tema 4.8: 788 segmentos codificados manualmente por peritas em 89 convenções de 2025, com 19 códigos hierárquicos. É a régua contra a qual toda a qualidade é medida |
+| `4_08_ParaClaudeAppCCT.xlsx` | MaxQDA → Segmentos codificados → Exportar | **Amostra de referência** do tema 4.8: 788 segmentos codificados manualmente por peritas em 89 convenções de 2025, com 19 códigos hierárquicos. É a base contra a qual toda a qualidade é medida |
 
-Sem estes ficheiros o pipeline corre na mesma, com menos metadados; sem o gabarito, não é
+Sem estes ficheiros o pipeline corre na mesma, com menos metadados; sem a amostra de referência, não é
 possível calibrar a faixa `AUTO` nem medir precisão e cobertura.
 
 ## Textos consolidados (`data/raw/textos_consolidados/`)
 
 Uma pasta por convenção (21 no total), cada uma com o PDF de 2025 e as versões anteriores
 que existirem, mais os documentos de comparação manual feitos pela equipa (`Comparei_*.docx`),
-que serviram de gabarito para validar o comparador automático.
+que serviram de amostra de referência para validar o comparador automático.
 
 A regra de nomes importa: o `cct/comparar.py` deduz o ano do nome do ficheiro
 (`2020_TINITA_SITEMAQ.pdf`, `25112_BTE_19_…`) e distingue textos completos de revisões

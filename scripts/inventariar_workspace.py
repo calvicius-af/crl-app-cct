@@ -42,6 +42,21 @@ def classificar(caminho_relativo: Path) -> str:
     if partes and partes[0] == "vendor":
         return "terceiro_repor_da_origem"
     if partes and partes[0] == "results":
+        # Decisões explícitas para os conjuntos já reconhecidos no workspace.
+        if texto.startswith("results/2025_4_08_issue0004/"):
+            return "resultado_validado_preservar"
+        if texto.startswith("results/2026_4_08/"):
+            return "resultado_reproduzivel_manifestar"
+        if texto.startswith("results/comparacoes/"):
+            return "benchmark_reproduzivel_manifestar"
+        if texto.startswith("results/metricas/"):
+            return "benchmark_reproduzivel_manifestar"
+        if texto.startswith("results/xlsx_peritas/"):
+            return "confirmar_trabalho_humano"
+        if texto.startswith("results/qdpx/") and "anotad" in texto:
+            return "possivel_trabalho_humano_preservar"
+        if texto.startswith("results/qdpx/"):
+            return "resultado_reproduzivel_manifestar"
         if sufixo == ".mqda" or any(marca in texto for marca in ("anotad", "triado")):
             return "possivel_trabalho_humano_preservar"
         if any(marca in texto for marca in ("docling", "prova_richtext")):
@@ -112,7 +127,7 @@ def resumo_markdown(inventario: dict) -> str:
         linhas.append(f"| `{classe}` | {ficheiros[classe]} | {volumes[classe]} |")
     linhas.extend([
         "",
-        "O detalhe, incluindo SHA-256, está em `workspace_inventory.json`.",
+        "O detalhe, incluindo SHA-256 e caminhos, está em `workspace_inventory.json`.",
         "",
     ])
     return "\n".join(linhas)

@@ -1,6 +1,6 @@
 # Codebook do tema 4.08 — Direitos de Personalidade e Proteção de Dados
 # Fonte: livro de códigos do CRL (termos de pesquisa lexical por subcódigo).
-# Os ids seguem a forma usada no gabarito MaxQDA (4.08.x.y).
+# Os ids seguem a forma usada na amostra de referência MaxQDA (4.08.x.y).
 tema: "4.08 Direitos Personalidade e Proteção Dados"
 # eixos agregadores: recebem codificação sempre que um subcódigo dispara
 eixos: ["4.08.1", "4.08.2", "4.08.3", "4.08.4", "4.08.5", "4.08.6"]
@@ -42,7 +42,7 @@ codigos:
              acompanhamento à distância, contexto pessoal, contexto familiar]
   - id: "4.08.5.1"
     nome: "Registo de pessoal, atualização e consulta"
-    # variantes mineradas dos segmentos FN do gabarito (06/07/2026):
+    # variantes mineradas dos segmentos FN da amostra de referência (06/07/2026):
     # as convenções usam "registo do pessoal" e "registo dos trabalhadores"
     termos: [processo individual, registo de pessoal, registo do pessoal,
              registo dos trabalhadores, cadastro individual,

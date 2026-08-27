@@ -80,7 +80,7 @@ docs: registar a decisão sobre o layout do repositório (ADR-0009)
 
 Os ficheiros em `codebooks/` são mantidos pela equipa de análise, não por quem programa.
 O formato e o procedimento para acrescentar termos em falta (mineração dos falsos
-negativos do gabarito) estão em
+negativos da amostra de referência) estão em
 [docs/operacao/prompts-codebooks.md](docs/operacao/prompts-codebooks.md). Uma alteração de
 codebook deve vir acompanhada da métrica antes e depois — é a única forma de saber se
 melhorou.
