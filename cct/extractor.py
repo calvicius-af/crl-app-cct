@@ -17,17 +17,29 @@ from pathlib import Path
 RE_CAPITULO = re.compile(r"^(?:CAP[IÍ]TULO|T[IÍ]TULO)\s+([IVXLCD]+|\d+)\b(.*)$")
 RE_SECCAO = re.compile(r"^SEC[ÇC][AÃ]O\s+([IVXLCD]+|\d+)\b(.*)$", re.IGNORECASE)
 RE_ANEXO = re.compile(r"^ANEXO\s+([IVXLCD]+|\d+)?\b(.*)$")
-# numeração por extenso: só ordinais a sério. Qualquer palavra servia
+# numeração por extenso: só designadores a sério. Qualquer palavra servia
 # antes, o que transformava o título do CAPÍTULO XV do AguasNorte
-# ("Cláusula geral e transitória") numa cláusula vazia
+# ("Cláusula geral e transitória") numa cláusula vazia — mas restringir só
+# a ordinais deixava cair "Artigo único"/"Cláusula única", que é redação
+# corrente quando o instrumento tem um só artigo (EMARP 2025, anexo I)
 _ORDINAL = (r"(?:primeir|segund|terceir|quart|quint|sext|s[eé]tim|oitav|non"
             r"|d[eé]cim|vig[eé]sim|trig[eé]sim|quadrag[eé]sim|quinquag[eé]sim"
             r"|sexag[eé]sim|sept?uag[eé]sim|octog[eé]sim|nonag[eé]sim"
             r"|cent[eé]sim)[oa]")
-# "12.ª", "16.ª-A", "décima segunda"
-_NUMERACAO = rf"\d+\.?[ªº]?(?:-[A-Z])?|{_ORDINAL}(?:\s+{_ORDINAL})?"
-RE_CLAUSULA = re.compile(rf"^Cl[aá]usula\s+({_NUMERACAO})\s*(.*)$", re.IGNORECASE)
-RE_ARTIGO = re.compile(rf"^Artigo\s+({_NUMERACAO})\s*(.*)$", re.IGNORECASE)
+_UNICO = r"[úu]nic[oa]"
+# "12.ª", "16.ª-A", "décima segunda", "único"
+_NUMERACAO = (rf"\d+\.?[ªº]?(?:-[A-Z])?|{_UNICO}"
+              rf"|{_ORDINAL}(?:\s+{_ORDINAL})?")
+# a palavra-chave tem de vir capitalizada: no BTE os cabeçalhos são
+# "Cláusula 1.ª" ou "CLÁUSULA 1.ª", nunca minúsculos. Com IGNORECASE, uma
+# remissão partida pelo PDF ("… nos termos do\nartigo 253.º do Código do
+# Trabalho…") virava um nó falso que roubava o corpo à cláusula real —
+# 4 casos nos 6 documentos de 2025, um deles com 3746 caracteres.
+# A numeração continua indiferente a maiúsculas (grupo com (?i:…)).
+RE_CLAUSULA = re.compile(
+    rf"^(?:Cl[aá]usula|CL[AÁ]USULA)\s+((?i:{_NUMERACAO}))\s*(.*)$")
+RE_ARTIGO = re.compile(
+    rf"^(?:Artigo|ARTIGO)\s+((?i:{_NUMERACAO}))\s*(.*)$")
 
 _RE_HEADINGS = [
     ("capitulo", RE_CAPITULO),

@@ -128,3 +128,53 @@ def test_marcador_de_travessao_colado_faz_paragrafo():
              "-25 % pela primeira hora;\n-37,5 % pelas seguintes;\n")
     doc, _ = estruturar(texto, "t")
     assert sum(1 for n in doc["nos"] if n["tipo"] == "paragrafo") == 3
+
+
+def test_artigo_unico_e_clausula_unica_sao_reconhecidos():
+    # regressão apanhada na revisão de 2026-08-27: ao restringir a
+    # numeração por extenso a ordinais, "Artigo único" (redação corrente
+    # quando o instrumento tem um só artigo — EMARP 2025, anexo I) deixou
+    # de ser cabeçalho: o nó desaparecia e o rótulo colava-se ao corpo
+    # frase do EMARP real (>90 chars, logo não é candidata a título — a
+    # ambiguidade entre título e primeira frase está registada à parte)
+    texto = ("ANEXO I - Mapa de pessoal\n"
+             "Artigo único\n"
+             "Excecionalmente, poderá ser atribuído o nível remuneratório "
+             "subsequente ao indicado no mapa de pessoal no caso de ausência "
+             "de candidatura.\n")
+    doc, final = estruturar(texto, "t")
+    arts = [n for n in doc["nos"] if n["tipo"] == "artigo"]
+    assert [n["rotulo"] for n in arts] == ["Artigo único"]
+    assert "Artigo único\nExcecionalmente" in final  # não se colam
+
+    texto = "Cláusula única\nÂmbito\n1- Aplica-se a todos.\n"
+    doc, _ = estruturar(texto, "t")
+    cl = [n["rotulo"] for n in doc["nos"] if n["tipo"] == "clausula"]
+    assert cl == ["Cláusula única - Âmbito"]
+
+
+def test_titulo_nomeado_continua_excluido():
+    # o contraponto: "geral e transitória" é título, não designador
+    from cct.extractor import RE_CLAUSULA
+    assert not RE_CLAUSULA.match("Cláusula geral e transitória")
+    assert not RE_CLAUSULA.match("Cláusula final")
+
+
+def test_remissao_em_minusculas_nao_cria_no_falso():
+    # revisão de 2026-08-27: com IGNORECASE, uma remissão partida pelo PDF
+    # ("… nos termos do\nartigo 253.º do Código do Trabalho…") virava um nó
+    # de artigo que roubava o corpo à cláusula real — 4 casos nos 6
+    # documentos de 2025, um deles com 3746 caracteres mal atribuídos
+    texto = ("Cláusula 54.ª - Atualização\n"
+             "1- A atualização faz-se de acordo com a fórmula prevista na\n"
+             "cláusula 33.ª supra.\n")
+    doc, _ = estruturar(texto, "t")
+    rotulos = [n["rotulo"] for n in doc["nos"] if n["tipo"] in ("clausula", "artigo")]
+    assert rotulos == ["Cláusula 54.ª - Atualização"]
+
+
+def test_cabecalho_em_maiusculas_continua_a_contar():
+    for texto, tipo in [("CLÁUSULA 1.ª\nÂmbito\n1- Aplica-se.\n", "clausula"),
+                        ("ARTIGO 5.º\nObjeto\n1- Define o objeto.\n", "artigo")]:
+        doc, _ = estruturar(texto, "t")
+        assert [n["tipo"] for n in doc["nos"] if n["tipo"] == tipo] == [tipo]

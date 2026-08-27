@@ -215,9 +215,17 @@ emite cada célula apenas na sua posição inicial, considerando
 
 Representação decidida e documentada: a continuação **horizontal** é omitida (as
 colunas seguintes trazem o resto da linha) e a continuação **vertical** sai como
-célula vazia. Assim as linhas de uma tabela com spans emitem todas o mesmo
-número de células e nenhuma coluna desliza — há uma asserção explícita disso em
-`test_span_misto_emitido_uma_vez`.
+célula vazia.
+
+Garantias efetivamente asseguradas, medidas com um teste de propriedade sobre
+400 tabelas geradas com spans aleatórios: **nenhuma célula se perde** e
+**nenhuma é emitida mais do que uma vez**. O alinhamento das colunas **não** é
+uma garantia geral: quando duas linhas têm colspans diferentes, emitem números
+de células diferentes (143 das 400 tabelas). Isso é inerente a «uma célula por
+span» — só se evitaria enchendo as continuações horizontais com células vazias,
+o que devolveria o ruído que a correção veio eliminar. Correção de 2026-08-27:
+uma versão anterior desta secção afirmava alinhamento garantido, o que é falso
+fora do caso particular de `test_span_misto_emitido_uma_vez`.
 
 O caso da revisão passa a dar `['Categoria | A', ' | B']`.
 

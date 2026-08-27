@@ -58,10 +58,13 @@ def celulas_da_linha(linha, indice_linha: int = 0) -> list[str]:
     sua posição inicial, dada por start_col_offset_idx e
     start_row_offset_idx em conjunto.
 
-    A continuação de um colspan é omitida (as colunas seguintes contêm o
-    resto da linha e não há nada a alinhar); a continuação de um rowspan
-    sai como célula vazia, para as colunas à direita não deslizarem para
-    a esquerda no texto separado por " | ".
+    A continuação de um colspan é omitida; a continuação de um rowspan sai
+    como célula vazia, para as colunas à direita não deslizarem para a
+    esquerda no texto separado por " | ". Garante-se que nenhuma célula
+    se perde e que nenhuma sai repetida; NÃO se garante que todas as
+    linhas tenham o mesmo número de células — quando duas linhas têm
+    colspans diferentes, emitem contagens diferentes, o que é inerente a
+    "uma célula por span".
 
     Células genuinamente iguais em posições distintas (ex.: "n.a." numa
     tabela salarial) mantêm-se todas — o que as distingue de um span é
