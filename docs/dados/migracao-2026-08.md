@@ -40,3 +40,11 @@ Antes de uma nova migração:
 Para reverter apenas a organização de pastas, mover cada conjunto para o
 caminho anterior usando a tabela acima; não reconstruir os ficheiros a partir
 do conteúdo.
+
+## Consolidação final
+
+Na fase final, as referências de trabalho MaxQDA passaram para
+`data/reference/maxqda/tema-4.08/`; as experiências Docling e a prova de
+rich-text passaram para `results/experiments/`. Os caches LLM e os intermédios
+de julho de 2026 foram removidos por excederem a retenção definida. Esta última
+remoção só abrangeu ficheiros regeneráveis, nunca fontes ou trabalho humano.

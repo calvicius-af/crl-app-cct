@@ -22,6 +22,8 @@ data/
 │   │   └── bte2_2025.pdf         número completo usado pelos testes de extração
 │   ├── maxqda/                   exports do MaxQDA (ver abaixo)
 │   └── textos_consolidados/      21 pastas, uma por convenção, com as versões anteriores
+├── reference/                    referências humanas preserváveis
+│   └── maxqda/tema-4.08/         projectos MQDA e exports QDPX de trabalho
 └── interim/                      resultados intermédios reproduzíveis (texto extraído, caches)
 ```
 

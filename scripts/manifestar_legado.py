@@ -58,6 +58,12 @@ def main() -> None:
          "results/metricas", "benchmark_reproduzivel_manifestar"),
         (raiz / "results/benchmarks/tema-4.08/comparacoes",
          "results/comparacoes", "benchmark_reproduzivel_manifestar"),
+        (raiz / "data/reference/maxqda/tema-4.08",
+         "results/{mqda,qdpx}", "referencia_humana_preservar"),
+        (raiz / "results/experiments/docling",
+         "results/*docling*", "experiencia_preservar_ate_documentar"),
+        (raiz / "results/experiments/qdpx-richtext",
+         "results/prova_richtext", "experiencia_preservar_ate_documentar"),
     ]
     for pasta, origem, classificacao in alvos:
         if not pasta.is_dir():

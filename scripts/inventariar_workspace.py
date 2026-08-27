@@ -33,6 +33,8 @@ def classificar(caminho_relativo: Path) -> str:
 
     if partes[:2] == ("data", "raw"):
         return "preservar_fonte"
+    if partes[:2] == ("data", "reference"):
+        return "referencia_humana_preservar"
     if len(partes) >= 3 and partes[:2] == ("data", "interim"):
         if partes[2].startswith("cache"):
             return "cache_descartavel"
@@ -51,10 +53,8 @@ def classificar(caminho_relativo: Path) -> str:
             return "benchmark_reproduzivel_manifestar"
         if texto.startswith("results/benchmarks/tema-4.08/metricas/"):
             return "benchmark_reproduzivel_manifestar"
-        if texto.startswith("results/qdpx/") and "anotad" in texto:
-            return "possivel_trabalho_humano_preservar"
-        if texto.startswith("results/qdpx/"):
-            return "resultado_reproduzivel_manifestar"
+        if texto.startswith("results/experiments/"):
+            return "experiencia_preservar_ate_documentar"
         if sufixo == ".mqda" or any(marca in texto for marca in ("anotad", "triado")):
             return "possivel_trabalho_humano_preservar"
         if any(marca in texto for marca in ("docling", "prova_richtext")):

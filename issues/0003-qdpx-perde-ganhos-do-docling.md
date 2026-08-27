@@ -9,7 +9,7 @@
 ## O que acontece
 
 Na importação para MaxQDA do QDPX gerado com `--extrator docling`
-(`results/2025_4_08_docling_teste/projeto.qdpx`, verificação do utilizador
+(`results/experiments/docling/2025-08-24-inicial/projeto.qdpx`, verificação do utilizador
 de 2026-08-24), as melhorias vistas no Markdown do docling não chegam ao
 texto final:
 

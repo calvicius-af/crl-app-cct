@@ -63,7 +63,7 @@ conhecido da cláusula 76.ª do TRATOLIXO, cujo corpo termina sem ponto no PDF.
 
 O QDPX resultante contém quatro fontes e 203 seleções, todas não vazias e com
 offsets dentro dos limites. Não contém `####` e é textualmente igual à corrida
-guardada em `results/2025_4_08_docling_v5/`. A descrição do PR refere 205
+guardada em `results/experiments/docling/2025-08-25-v5/`. A descrição do PR refere 205
 seleções; essa contagem não foi reproduzida e deve ser corrigida para 203 ou
 justificada com inputs diferentes.
 

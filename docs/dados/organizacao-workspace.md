@@ -119,8 +119,8 @@ O inventário actual aplica uma decisão conservadora aos resultados existentes:
 | `results/runs/2026/2026_4_08/` | resultado reproduzível a documentar | confirmar inputs e associar corrida |
 | `results/benchmarks/tema-4.08/{comparacoes,metricas}/` | benchmark reproduzível a documentar | guardar método, versão e manifesto |
 | `results/benchmarks/tema-4.08/comparacoes/legacy/{manual,auto}/` | exportações históricas | preservar; não usar como destino de novas corridas |
-| `results/qdpx/` | resultado reproduzível; excepção `*Anotada*` humana | não eliminar a versão anotada |
-| `results/*docling*`, `results/prova_richtext/` | experiência a preservar | registar conclusão ou decisão de abandono |
+| `data/reference/maxqda/tema-4.08/` | projectos e exports MaxQDA | preservar como referência humana |
+| `results/experiments/{docling,qdpx-richtext}/` | experiência a preservar | registar conclusão ou decisão de abandono |
 | `results/**/*.mqda`, caminhos `anotad`/`triado` | trabalho humano a preservar | cópia de segurança antes de qualquer migração |
 
 Os resultados que não encaixem nestas regras devem permanecer
@@ -131,10 +131,14 @@ nome do ficheiro.
 
 ## Retenção sugerida
 
-- cache: 30 dias ou limpeza manual confirmada;
-- intermédios de corridas falhadas: 90 dias;
+- cache: 30 dias; remover com `python scripts/limpar_cache.py --apply`;
+- intermédios de corridas falhadas: 90 dias; depois desse prazo, eliminar;
 - corridas reproduzíveis não promovidas: manter as últimas 3 por combinação
   tema/ano/extrator;
 - experiências: até existir conclusão documentada;
 - fontes, referências humanas, validados e entregáveis: sem eliminação
   automática.
+
+Todos os ficheiros removidos pela retenção devem constar de um inventário
+gerado imediatamente antes da operação. A política só permite eliminar cache e
+intermédios regeneráveis; os restantes casos exigem classificação explícita.

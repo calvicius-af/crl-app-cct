@@ -10,9 +10,9 @@ def test_classificacao_conservadora():
     assert classificar(Path("data/raw/maxqda/amostra_referencia.xlsx")) == "preservar_fonte"
     assert classificar(Path("data/interim/cache_llm/a.json")) == "cache_descartavel"
     assert classificar(Path("data/interim/docs/a.txt")) == "intermedio_regeneravel"
-    assert (classificar(Path("results/mqda/revisto.mqda")) ==
-            "possivel_trabalho_humano_preservar")
-    assert (classificar(Path("results/docling_v2/projeto.qdpx")) ==
+    assert (classificar(Path("data/reference/maxqda/tema-4.08/projects/revisto.mqda")) ==
+            "referencia_humana_preservar")
+    assert (classificar(Path("results/experiments/docling/v2/projeto.qdpx")) ==
             "experiencia_preservar_ate_documentar")
     assert classificar(Path("results/validated/2025_4_08_issue0004/relatorio.txt")) == "resultado_validado_preservar"
     assert classificar(Path("results/runs/2026/2026_4_08/projeto.qdpx")) == "resultado_reproduzivel_manifestar"
