@@ -85,6 +85,10 @@ Cada nova execução de `cct.pipeline_tema` escreve `manifest.json` com:
 O manifesto prova proveniência; não prova qualidade. A aprovação humana fica em
 `validation/` e promove o conjunto para `results/validated/`.
 
+Para resultados antigos já migrados, usar `scripts/manifestar_legado.py`.
+O manifesto resultante é uma prova de integridade e localização actual; não
+substitui os inputs ou o comando original.
+
 ## Inventário da instalação atual
 
 ```bash

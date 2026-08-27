@@ -17,6 +17,11 @@ Os ficheiros não foram reescritos. O inventário foi regenerado depois da
 operação, permitindo confirmar o número, tamanho e SHA-256 dos artefactos
 restantes em [RESUMO.md](../../results/_inventory/RESUMO.md).
 
+Foi também preparado `scripts/manifestar_legado.py`, que cria um manifesto
+local para cada conjunto migrado. Estes manifestos registam hashes e origem de
+migração, mas assinalam expressamente que a proveniência original é parcial e
+que a aprovação humana está pendente.
+
 ## Estado e próximos critérios
 
 Os resultados validados ainda precisam de uma evidência humana de aprovação e
