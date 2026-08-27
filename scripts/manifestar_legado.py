@@ -7,9 +7,13 @@ Regista apenas os ficheiros presentes, os seus hashes e a origem conhecida.
 from __future__ import annotations
 
 import argparse
+import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Permite executar ``python scripts/manifestar_legado.py`` a partir da raiz.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from cct.proveniencia import registo_ficheiro, estado_git
 
 
@@ -60,7 +64,7 @@ def main() -> None:
             continue
         destino = pasta / "manifest.json"
         manifesto = criar_manifesto(raiz, pasta, origem, classificacao)
-        destino.write_text(__import__("json").dumps(manifesto, ensure_ascii=False, indent=2) + "\n",
+        destino.write_text(json.dumps(manifesto, ensure_ascii=False, indent=2) + "\n",
                            encoding="utf-8")
         print(destino)
 
