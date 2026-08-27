@@ -89,6 +89,10 @@ Para resultados antigos já migrados, usar `scripts/manifestar_legado.py`.
 O manifesto resultante é uma prova de integridade e localização actual; não
 substitui os inputs ou o comando original.
 
+Verificar os hashes de todos os manifestos locais com
+`python scripts/verificar_manifestos.py` antes de arquivar, mover ou eliminar
+um conjunto de resultados.
+
 ## Inventário da instalação atual
 
 ```bash
