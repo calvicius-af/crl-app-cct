@@ -248,7 +248,7 @@ entre dois nós espaçados, seleção com três pontos de inserção, e extremos
 A diferença de 4 testes entre os dois jobs do CI é exatamente o ficheiro de
 integração opcional.
 
-Corrida das quatro convenções (`results/2025_4_08_issue0004/`): 4/4, **300
+Corrida das quatro convenções (`results/validated/2025_4_08_issue0004/`): 4/4, **300
 cláusulas e 203 anotações**, reproduzindo as contagens da revisão. QDPX com ZIP
 e XML válidos, 4 fontes, 203 seleções, 0 vazias, 0 fora de limites, 0 cardinais
 de Markdown, 36 códigos e todos os `CodeRef` a resolver. Único aviso de

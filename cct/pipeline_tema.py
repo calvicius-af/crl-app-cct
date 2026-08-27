@@ -5,7 +5,7 @@ Extração → codificação lexical (+ semântica opcional) → triagem calibra
 
 Uso mínimo:
   python -m cct.pipeline_tema --pdfs data/raw/bte/bte_2026 \
-      --codebook codebooks/4_08_protecao_dados.yaml --out results/2026_4_08
+      --codebook codebooks/4_08_protecao_dados.yaml --out results/runs/2026/2026_4_08
 """
 import argparse
 import json

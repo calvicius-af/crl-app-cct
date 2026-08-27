@@ -96,9 +96,9 @@ ou: `python -m cct.app`. Preencher os campos e carregar em "Correr".
     --codebook codebooks/4_08_protecao_dados.yaml \
     --variaveis data/raw/maxqda/VariaveisDocumento2026.xlsx \
     --master "data/raw/maxqda/MAXQDA_..._Lista de Códigos.qdc" \
-    --metricas results/metricas/baseline_4_08_v4/metricas.json \
+    --metricas results/benchmarks/tema-4.08/metricas/baseline_4_08_v4/metricas.json \
     --pasta-versoes data/raw/textos_consolidados \
-    --out results/2026_4_08
+    --out results/runs/2026/2026_4_08
 ```
 Só `--pdfs`, `--codebook` e `--out` são obrigatórios; o resto melhora o
 resultado mas pode faltar.
@@ -115,7 +115,7 @@ lento (~1-1,7 s/página) e de exigir instalação à parte:
 ### Comparar duas versões de uma convenção (avulso)
 ```
 .venv/bin/python -m cct.comparar --pasta data/raw/textos_consolidados/ACIP_FESAHT \
-    --out results/comparacoes/ACIP.xlsx
+    --out results/benchmarks/tema-4.08/comparacoes/ACIP.xlsx
 ```
 Sai um Excel com cada cláusula classificada: `=` / `alteracao` / `nova` /
 `removida`, com as diferenças exatas.
@@ -148,7 +148,7 @@ problemas — o resto do lote NÃO é afetado. Corrige só esses e volta a corre
    incluindo a mineração automática dos dados de 2025).
 3. Remede-se contra a amostra de referência:
    `python -m cct.avaliar_baseline --xlsx <amostra-referencia>.xlsx --pdfs <pasta>
-   --codebook <tema>.yaml --out results/metricas/baseline_X`
+   --codebook <tema>.yaml --out results/benchmarks/<tema>/metricas/baseline_X`
 4. A triagem AUTO/REVER recalibra-se sozinha na corrida seguinte
    (passar o novo `metricas.json` em `--metricas`).
 

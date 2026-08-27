@@ -68,7 +68,7 @@ python -m cct.pipeline_tema \
     --pdfs data/raw/bte/bte_2026 \
     --codebook codebooks/4_08_protecao_dados.yaml \
     --pasta-versoes data/raw/textos_consolidados \
-    --out results/2026_4_08
+    --out results/runs/2026/2026_4_08
 ```
 
 Cada corrida cria também `manifest.json`, com o comando, commit, versões, hashes dos
@@ -78,7 +78,7 @@ Comparar duas versões de uma convenção:
 
 ```bash
 python -m cct.comparar --pasta data/raw/textos_consolidados/ACIP_FESAHT \
-    --out results/comparacoes/ACIP.xlsx
+    --out results/benchmarks/tema-4.08/comparacoes/ACIP.xlsx
 ```
 
 O guia de operação completo, com o que fazer quando algo corre mal, está em

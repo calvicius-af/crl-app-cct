@@ -9,7 +9,7 @@ Uso:
   .venv/bin/python -m cct.avaliar_semantico \
       --xlsx data/raw/maxqda/4_08_ParaClaudeAppCCT.xlsx --pdfs data/raw/bte/bte_2025 \
       --codebook codebooks/4_08_protecao_dados.yaml \
-      --out results/metricas/semantico_4_08 [--apenas-fn] [--max-lotes 4]
+      --out results/benchmarks/tema-4.08/metricas/semantico_4_08 [--apenas-fn] [--max-lotes 4]
 """
 import argparse
 import json

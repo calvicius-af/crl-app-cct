@@ -43,16 +43,14 @@ def classificar(caminho_relativo: Path) -> str:
         return "terceiro_repor_da_origem"
     if partes and partes[0] == "results":
         # Decisões explícitas para os conjuntos já reconhecidos no workspace.
-        if texto.startswith("results/2025_4_08_issue0004/"):
+        if texto.startswith("results/validated/2025_4_08_issue0004/"):
             return "resultado_validado_preservar"
-        if texto.startswith("results/2026_4_08/"):
+        if texto.startswith("results/runs/2026/2026_4_08/"):
             return "resultado_reproduzivel_manifestar"
-        if texto.startswith("results/comparacoes/"):
+        if texto.startswith("results/benchmarks/tema-4.08/comparacoes/"):
             return "benchmark_reproduzivel_manifestar"
-        if texto.startswith("results/metricas/"):
+        if texto.startswith("results/benchmarks/tema-4.08/metricas/"):
             return "benchmark_reproduzivel_manifestar"
-        if texto.startswith("results/xlsx_peritas/"):
-            return "confirmar_trabalho_humano"
         if texto.startswith("results/qdpx/") and "anotad" in texto:
             return "possivel_trabalho_humano_preservar"
         if texto.startswith("results/qdpx/"):

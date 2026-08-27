@@ -6,7 +6,7 @@ codifica com o codebook YAML e compara com a codificação manual.
 Uso:
   python -m cct.avaliar_baseline --xlsx data/raw/maxqda/4_08_ParaClaudeAppCCT.xlsx \
       --pdfs data/raw/bte/bte_2025 --codebook codebooks/4_08_protecao_dados.yaml \
-      --out results/metricas/baseline_4_08
+      --out results/benchmarks/tema-4.08/metricas/baseline_4_08
 """
 import argparse
 import json

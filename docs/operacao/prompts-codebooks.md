@@ -99,7 +99,7 @@ adivinhado. Foi assim que o 4.08.5.1 subiu de F1 0.72 para 0.84.
 ### Passo 1 — medir a baseline
 ```
 python -m cct.avaliar_baseline --xlsx <amostra-referencia>.xlsx --pdfs data/raw/bte/bte_2025 \
-    --codebook codebooks/<tema>.yaml --out results/metricas/baseline_<tema>
+    --codebook codebooks/<tema>.yaml --out results/benchmarks/<tema>/metricas/baseline_<tema>
 ```
 O `relatorio.txt` mostra precisão/cobertura por subcódigo. Interpretar:
 - **cobertura baixa** (muitos FN) → faltam termos → Passo 2;
@@ -114,7 +114,7 @@ python - <<'FIM'
 import json
 from pathlib import Path
 from cct.referencia import carregar_referencia
-prev = json.load(open("results/metricas/baseline_<tema>/previstos.json"))
+prev = json.load(open("results/benchmarks/<tema>/metricas/baseline_<tema>/previstos.json"))
 referencia = carregar_referencia(Path("<amostra-referencia>.xlsx"))
 pares = {(p["doc_id"], p["codigo"]) for p in prev}
 for g in gab:

@@ -109,11 +109,10 @@ O inventário actual aplica uma decisão conservadora aos resultados existentes:
 
 | Caminho | Classe | Acção futura |
 |---|---|---|
-| `results/2025_4_08_issue0004/` | resultado validado a preservar | associar manifesto e evidência de validação |
-| `results/2026_4_08/` | resultado reproduzível a documentar | confirmar inputs e associar corrida |
-| `results/comparacoes/`, `results/metricas/` | benchmark reproduzível a documentar | guardar método, versão e manifesto |
+| `results/validated/2025_4_08_issue0004/` | resultado validado a preservar | associar manifesto e evidência de validação |
+| `results/runs/2026/2026_4_08/` | resultado reproduzível a documentar | confirmar inputs e associar corrida |
+| `results/benchmarks/tema-4.08/{comparacoes,metricas}/` | benchmark reproduzível a documentar | guardar método, versão e manifesto |
 | `results/qdpx/` | resultado reproduzível; excepção `*Anotada*` humana | não eliminar a versão anotada |
-| `results/xlsx_peritas/` | natureza a confirmar | verificar se houve revisão manual antes de mover |
 | `results/*docling*`, `results/prova_richtext/` | experiência a preservar | registar conclusão ou decisão de abandono |
 | `results/**/*.mqda`, caminhos `anotad`/`triado` | trabalho humano a preservar | cópia de segurança antes de qualquer migração |
 
