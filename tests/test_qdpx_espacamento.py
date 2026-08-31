@@ -189,3 +189,23 @@ def test_espacado_desligavel(tmp_path):
     with zipfile.ZipFile(destino) as zf:
         fonte = next(n for n in zf.namelist() if n.endswith(".txt"))
         assert zf.read(fonte).decode("utf-8") == texto
+
+
+def test_contrato_vale_para_qualquer_intervalo():
+    """Propriedade: o contrato não depende dos casos escolhidos à mão.
+
+    Para 500 intervalos aleatórios do texto canónico, o trecho exportado
+    menos as inserções é sempre o trecho canónico.
+    """
+    import random
+    aleatorio = random.Random(7)
+    doc, texto = _canonico()
+    pontos = pontos_de_espacamento(texto, doc)
+    exportado = espacar(texto, pontos)
+    inseridos = set(indices_inseridos(pontos))
+    assert pontos, "o fixture tem de ter pontos de inserção"
+    for _ in range(500):
+        i = aleatorio.randrange(0, len(texto))
+        j = aleatorio.randrange(i + 1, len(texto) + 1)
+        ini, fim = _remapear(i, j, pontos)
+        assert _sem_insercoes(exportado, inseridos, ini, fim) == texto[i:j]

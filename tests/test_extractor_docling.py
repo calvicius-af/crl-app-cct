@@ -92,7 +92,9 @@ def test_span_misto_emitido_uma_vez():
                       _celula("Nível 3", 0, 2), _celula("Nível 4", 1, 2)], 2, 3)
     linhas = _linhas_de_tabela(tabela)
     assert linhas == ["Carreira técnica | Nível 3", " | Nível 4"]
-    assert len({l.count("|") for l in linhas}) == 1  # colunas alinhadas
+    # NESTE caso as colunas ficam alinhadas; não é garantia geral — ver
+    # test_nenhuma_celula_se_perde_nem_se_repete
+    assert len({l.count("|") for l in linhas}) == 1
 
 
 def test_valores_repetidos_em_colunas_distintas_sobrevivem():
@@ -213,3 +215,39 @@ def test_clausula_com_sufixo_de_letra():
     doc, _ = estruturar(texto, "t")
     cl = [n for n in doc["nos"] if n["tipo"] == "clausula"]
     assert cl and cl[0]["rotulo"] == "Cláusula 16.ª-D - Isenção de horário"
+
+
+def test_nenhuma_celula_se_perde_nem_se_repete():
+    """Propriedade sobre tabelas geradas: são estas as garantias reais.
+
+    Cada célula sai exatamente uma vez, seja qual for a combinação de
+    spans. O alinhamento das colunas não é garantido — linhas com
+    colspans diferentes emitem contagens diferentes, o que é inerente a
+    "uma célula por span" e está documentado em celulas_da_linha.
+    """
+    import random
+    aleatorio = random.Random(11)
+    for _ in range(120):
+        n_linhas = aleatorio.randint(1, 5)
+        n_colunas = aleatorio.randint(1, 5)
+        ocupado = [[False] * n_colunas for _ in range(n_linhas)]
+        celulas = []
+        for linha in range(n_linhas):
+            for coluna in range(n_colunas):
+                if ocupado[linha][coluna]:
+                    continue
+                alt = aleatorio.randint(1, min(2, n_linhas - linha))
+                larg = aleatorio.randint(1, min(2, n_colunas - coluna))
+                if any(ocupado[linha + a][coluna + b]
+                       for a in range(alt) for b in range(larg)):
+                    alt = larg = 1
+                for a in range(alt):
+                    for b in range(larg):
+                        ocupado[linha + a][coluna + b] = True
+                celulas.append(_celula(f"c{linha}_{coluna}", linha, coluna,
+                                       linhas=alt, colunas=larg))
+        saida = "\n".join(_linhas_de_tabela(
+            _tabela(celulas, n_linhas, n_colunas)))
+        for celula in celulas:
+            assert saida.count(celula.text) == 1, (
+                f"{celula.text} saiu {saida.count(celula.text)}x em {saida!r}")

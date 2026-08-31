@@ -107,7 +107,7 @@ resultado mas pode faltar.
 extração. Recupera tabelas de anexos (tabelas salariais, perfis de função)
 e layouts difíceis que o extrator clássico perde, ao custo de ser mais
 lento (~1-1,7 s/página) e de exigir instalação à parte:
-`.venv/bin/python -m pip install docling docling-hierarchical-pdf`
+`.venv/bin/python -m pip install docling`
 (≈4 GB com PyTorch; em Mac Apple Silicon o Python tem de ser arm64 —
 `python3 -c "import platform; print(platform.machine())"` deve dizer
 `arm64`). A primeira corrida descarrega os modelos de layout.

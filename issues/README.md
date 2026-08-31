@@ -32,3 +32,4 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0003](0003-qdpx-perde-ganhos-do-docling.md) | O QDPX perde os ganhos de legibilidade do extrator Docling | Em curso |
 | [0004](0004-revisao-pr-23.md) | Correções exigidas pela revisão do PR #23 | Resolvida |
 | [0005](0005-programa-qualidade-tecnica.md) | Programa de qualidade técnica pós-PR #23 | Aberta |
+| [0006](0006-colunas-cortam-cabecalhos-centrados.md) | O corte em duas colunas parte cabeçalhos centrados (pdfplumber) | Aberta |
