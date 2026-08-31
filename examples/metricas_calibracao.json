@@ -8,7 +8,7 @@
    "precisao": 0.7317073170731707,
    "cobertura": 1.0,
    "f1": 0.8450704225352113,
-   "n_gabarito": 60
+   "n_referencia": 60
   },
   "4.08.1.1": {
    "vp": 60,
@@ -18,7 +18,7 @@
    "precisao": 0.7792207792207793,
    "cobertura": 1.0,
    "f1": 0.8759124087591241,
-   "n_gabarito": 60
+   "n_referencia": 60
   },
   "4.08.1.2": {
    "vp": 3,
@@ -28,7 +28,7 @@
    "precisao": 0.07894736842105263,
    "cobertura": 1.0,
    "f1": 0.14634146341463414,
-   "n_gabarito": 3
+   "n_referencia": 3
   },
   "4.08.2": {
    "vp": 5,
@@ -38,7 +38,7 @@
    "precisao": 0.1724137931034483,
    "cobertura": 1.0,
    "f1": 0.29411764705882354,
-   "n_gabarito": 5
+   "n_referencia": 5
   },
   "4.08.2.1": {
    "vp": 4,
@@ -48,7 +48,7 @@
    "precisao": 0.14285714285714285,
    "cobertura": 1.0,
    "f1": 0.25,
-   "n_gabarito": 4
+   "n_referencia": 4
   },
   "4.08.2.2": {
    "vp": 2,
@@ -58,7 +58,7 @@
    "precisao": 0.5,
    "cobertura": 0.6666666666666666,
    "f1": 0.5714285714285715,
-   "n_gabarito": 3
+   "n_referencia": 3
   },
   "4.08.3": {
    "vp": 3,
@@ -68,7 +68,7 @@
    "precisao": 1.0,
    "cobertura": 1.0,
    "f1": 1.0,
-   "n_gabarito": 3
+   "n_referencia": 3
   },
   "4.08.3.1": {
    "vp": 3,
@@ -78,7 +78,7 @@
    "precisao": 1.0,
    "cobertura": 1.0,
    "f1": 1.0,
-   "n_gabarito": 3
+   "n_referencia": 3
   },
   "4.08.4": {
    "vp": 22,
@@ -88,7 +88,7 @@
    "precisao": 0.3793103448275862,
    "cobertura": 0.9565217391304348,
    "f1": 0.54320987654321,
-   "n_gabarito": 23
+   "n_referencia": 23
   },
   "4.08.4.1": {
    "vp": 13,
@@ -98,7 +98,7 @@
    "precisao": 0.2549019607843137,
    "cobertura": 0.9285714285714286,
    "f1": 0.39999999999999997,
-   "n_gabarito": 14
+   "n_referencia": 14
   },
   "4.08.4.2": {
    "vp": 12,
@@ -108,7 +108,7 @@
    "precisao": 0.5714285714285714,
    "cobertura": 0.9230769230769231,
    "f1": 0.7058823529411765,
-   "n_gabarito": 13
+   "n_referencia": 13
   },
   "4.08.5": {
    "vp": 60,
@@ -118,7 +118,7 @@
    "precisao": 0.8695652173913043,
    "cobertura": 0.8333333333333334,
    "f1": 0.851063829787234,
-   "n_gabarito": 72
+   "n_referencia": 72
   },
   "4.08.5.1": {
    "vp": 54,
@@ -128,7 +128,7 @@
    "precisao": 0.9152542372881356,
    "cobertura": 0.782608695652174,
    "f1": 0.8437499999999999,
-   "n_gabarito": 69
+   "n_referencia": 69
   },
   "4.08.5.2": {
    "vp": 11,
@@ -138,7 +138,7 @@
    "precisao": 0.5789473684210527,
    "cobertura": 0.6875,
    "f1": 0.6285714285714286,
-   "n_gabarito": 16
+   "n_referencia": 16
   },
   "4.08.5.3": {
    "vp": 0,
@@ -148,7 +148,7 @@
    "precisao": 0.0,
    "cobertura": 0.0,
    "f1": 0.0,
-   "n_gabarito": 1
+   "n_referencia": 1
   },
   "4.08.5.4": {
    "vp": 1,
@@ -158,7 +158,7 @@
    "precisao": 0.25,
    "cobertura": 0.5,
    "f1": 0.3333333333333333,
-   "n_gabarito": 2
+   "n_referencia": 2
   },
   "4.08.5.5": {
    "vp": 6,
@@ -168,7 +168,7 @@
    "precisao": 0.6,
    "cobertura": 0.5,
    "f1": 0.5454545454545454,
-   "n_gabarito": 12
+   "n_referencia": 12
   },
   "4.08.6": {
    "vp": 2,
@@ -178,7 +178,7 @@
    "precisao": 1.0,
    "cobertura": 1.0,
    "f1": 1.0,
-   "n_gabarito": 2
+   "n_referencia": 2
   },
   "4.08.6.1": {
    "vp": 2,
@@ -188,7 +188,7 @@
    "precisao": 1.0,
    "cobertura": 1.0,
    "f1": 1.0,
-   "n_gabarito": 2
+   "n_referencia": 2
   }
  },
  "global": {

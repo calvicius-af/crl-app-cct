@@ -1,13 +1,13 @@
-"""Harness de avaliação: anotações do pipeline vs gabarito manual.
+"""Harness de avaliação: anotações do pipeline vs amostra de referência manual.
 
 Dois níveis (plano, Fase 2):
-- documento: o par (doc_id, código) previsto existe no gabarito?
+- documento: o par (doc_id, código) previsto existe na amostra de referência?
 - segmento: além do par certo, o texto do nó anotado sobrepõe-se ao
-  segmento do gabarito? (comparação por contenção de texto normalizado,
+  segmento da amostra de referência? (comparação por contenção de texto normalizado,
   porque os offsets do MaxQDA e do pipeline não são diretamente comparáveis)
 
 `previstos`: [{doc_id, codigo, texto}] — texto = conteúdo do nó anotado.
-`gabarito`:  [{doc_id, codigo, segmento}].
+`referencia`:  [{doc_id, codigo, segmento}].
 """
 import re
 from collections import defaultdict
@@ -29,29 +29,29 @@ def _sobrepoe(texto_no: str, segmento: str) -> bool:
     return janela in longo
 
 
-def avaliar(previstos: list[dict], gabarito: list[dict]) -> dict:
-    pares_gab = defaultdict(list)   # (doc, codigo) -> [segmentos]
-    for g in gabarito:
-        pares_gab[(g["doc_id"], g["codigo"])].append(g["segmento"])
+def avaliar(previstos: list[dict], referencia: list[dict]) -> dict:
+    pares_ref = defaultdict(list)   # (doc, codigo) -> [segmentos]
+    for ref in referencia:
+        pares_ref[(ref["doc_id"], ref["codigo"])].append(ref["segmento"])
 
     pares_prev = defaultdict(list)  # (doc, codigo) -> [textos]
     for p in previstos:
         pares_prev[(p["doc_id"], p["codigo"])].append(p.get("texto", ""))
 
-    codigos = {c for _, c in pares_gab} | {c for _, c in pares_prev}
+    codigos = {c for _, c in pares_ref} | {c for _, c in pares_prev}
     por_codigo = {}
     tot = {"vp": 0, "fp": 0, "fn": 0, "vp_segmento": 0}
 
     for cod in sorted(codigos):
-        gab_docs = {d for (d, c) in pares_gab if c == cod}
+        ref_docs = {d for (d, c) in pares_ref if c == cod}
         prev_docs = {d for (d, c) in pares_prev if c == cod}
-        vp = len(gab_docs & prev_docs)
-        fp = len(prev_docs - gab_docs)
-        fn = len(gab_docs - prev_docs)
+        vp = len(ref_docs & prev_docs)
+        fp = len(prev_docs - ref_docs)
+        fn = len(ref_docs - prev_docs)
 
         vp_seg = 0
-        for doc in gab_docs & prev_docs:
-            segmentos = pares_gab[(doc, cod)]
+        for doc in ref_docs & prev_docs:
+            segmentos = pares_ref[(doc, cod)]
             textos = pares_prev[(doc, cod)]
             if any(_sobrepoe(t, s) for t in textos for s in segmentos):
                 vp_seg += 1
@@ -63,7 +63,7 @@ def avaliar(previstos: list[dict], gabarito: list[dict]) -> dict:
         por_codigo[cod] = {
             "vp": vp, "fp": fp, "fn": fn, "vp_segmento": vp_seg,
             "precisao": precisao, "cobertura": cobertura, "f1": f1,
-            "n_gabarito": len(gab_docs),
+            "n_referencia": len(ref_docs),
         }
         tot["vp"] += vp
         tot["fp"] += fp
@@ -76,11 +76,11 @@ def avaliar(previstos: list[dict], gabarito: list[dict]) -> dict:
 
 
 def relatorio(m: dict) -> str:
-    linhas = [f"{'código':<12} {'n_gab':>5} {'VP':>4} {'FP':>4} {'FN':>4} "
+    linhas = [f"{'código':<12} {'n_ref':>5} {'VP':>4} {'FP':>4} {'FN':>4} "
               f"{'VPseg':>5} {'prec':>6} {'cob':>6} {'F1':>6}"]
     for cod, r in m["por_codigo"].items():
         fmt = lambda v: f"{v:.2f}" if isinstance(v, float) else ("--" if v is None else str(v))
-        linhas.append(f"{cod:<12} {r['n_gabarito']:>5} {r['vp']:>4} {r['fp']:>4} "
+        linhas.append(f"{cod:<12} {r['n_referencia']:>5} {r['vp']:>4} {r['fp']:>4} "
                       f"{r['fn']:>4} {r['vp_segmento']:>5} {fmt(r['precisao']):>6} "
                       f"{fmt(r['cobertura']):>6} {fmt(r['f1']):>6}")
     g = m["global"]

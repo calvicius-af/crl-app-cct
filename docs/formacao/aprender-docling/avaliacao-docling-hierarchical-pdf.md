@@ -203,7 +203,7 @@ Duas vias possíveis, por ordem de esforço:
 2. **Melhor alinhada com o AppCCT** — usar só o `ResultPostprocessor` como motor de
    reestruturação, alimentando-o com a hierarquia que as regex do `cct/extractor.py` já
    produzem, em vez da inferida. Evita duplicar conhecimento de domínio em dois sítios e
-   mantém as regex — que estão validadas contra gabarito humano — como fonte única da
+   mantém as regex — que estão validadas contra uma amostra de referência humana — como fonte única da
    verdade sobre o que é uma cláusula.
 
 Em qualquer das vias, a camada de validação de `docs/validacao/` continua a ser necessária.

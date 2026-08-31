@@ -14,11 +14,12 @@ de comandos e não contém lógica própria.
                        └──────────────┬──────────────┘
  PDFs do BTE ────────┐                │ orquestra
  (data/raw/bte/)     │   ┌────────────▼─────────────────────────────┐
-                     ├──►│ 1. EXTRAÇÃO        cct/extractor.py      │
+                     ├──►│ 1. EXTRAÇÃO        extractor.py ou       │
+                     │   │                    extractor_docling.py  │
  Variáveis MaxQDA ───┤   │  PDF → doc.json + doc.txt                │
  (.xlsx)             │   │  colunas duplas, tabelas, headers,       │
                      │   │  hierarquia, parágrafos, consolidado,    │
- Codebook master ────┤   │  assinaturas          [pdfplumber]       │
+ Codebook master ────┤   │  assinaturas   [pdfplumber | Docling]    │
  (.qdc)              │   └────────────┬─────────────────────────────┘
                      │                │ doc.json (JSON Schema)
  Codebooks YAML ─────┤   ┌────────────▼─────────────────────────────┐
@@ -48,13 +49,18 @@ de comandos e não contém lógica própria.
         │  GUIDs estáveis) │ │  contexto)      │ │                │
         │ cct/qdpx.py      │ │ cct/export_xlsx │ │                │
         └──────────────────┘ └─────────────────┘ └────────────────┘
+                                      │
+                             manifest.json
+                     proveniência, hashes, versões e contagens
 
  TRANSVERSAIS
-   cct/harness.py + avaliar_baseline.py  → métricas vs gabarito (calibração)
-   cct/qdc.py / variaveis.py / gabarito.py → leitores dos exports MaxQDA
+   cct/harness.py + avaliar_baseline.py  → métricas vs amostra de referência (calibração)
+   cct/qdc.py / variaveis.py / referencia.py → leitores dos exports MaxQDA
    cct/comparar.py                        → comparação avulsa de versões
    cct/doctor.py                          → verificação do ambiente
    cct/bench_llm.py                       → avaliação de modelos locais
+   cct/sanidade.py                        → avisos estruturais por documento
+   cct/proveniencia.py                    → manifesto verificável da corrida
 ```
 
 ## Princípios de desenho
@@ -66,30 +72,37 @@ de comandos e não contém lógica própria.
 3. **Contratos validados** — doc.json e anotacoes.json têm JSON Schema;
    a propriedade "zero perda de texto" é verificada por teste.
 4. **Qualidade medida, não presumida** — o harness compara sempre com o
-   gabarito humano; a faixa AUTO só existe onde a precisão medida ≥ 0.85.
-5. **Offline por omissão** — único tráfego de rede possível: o LLM local
-   opcional em 127.0.0.1 (LM Studio).
+   amostra de referência humana; a faixa AUTO só existe onde a precisão medida ≥ 0.85.
+5. **Offline por omissão** — o LLM opcional só aceita loopback. O Docling pode
+   descarregar modelos na primeira execução e deve ser pré-provisionado em redes fechadas.
 
-## Módulos (`cct/`, ~3 000 linhas, 99 testes)
+## Módulos (`cct/`)
 | Módulo | Responsabilidade |
 |---|---|
 | extractor.py | PDF → estrutura hierárquica com offsets (o módulo mais crítico) |
+| extractor_docling.py | extrator alternativo para tabelas e layouts difíceis |
 | schemas.py | contratos de dados (JSON Schema) |
 | lexical.py | codificação por termos/condições; níveis cláusula/parágrafo |
 | semantico.py | codificação LLM (backend plugável, cache, validação) |
 | diacronia.py | alinhamento e classificação =/alteração/nova/removida |
 | triagem.py | faixas AUTO/REVER/CONSOLIDADO calibradas |
 | qdpx.py | exportador REFI-QDA (árvore de códigos, GUIDs determinísticos) |
+| sanidade.py | controlos estruturais e avisos antes da exportação |
+| proveniencia.py | manifesto da corrida com hashes, ambiente e contagens |
 | export_xlsx.py | Excel das peritas com contexto |
-| qdc.py, variaveis.py, gabarito.py | leitores dos exports do MaxQDA |
-| harness.py, avaliar_*.py | métricas contra gabarito |
+| qdc.py, variaveis.py, referencia.py | leitores dos exports do MaxQDA |
+| harness.py, avaliar_*.py | métricas contra a amostra de referência |
 | localizador.py | localizar convenções em números completos do BTE |
 | pipeline_tema.py, comparar.py | orquestradores CLI |
 | app.py, doctor.py | interface gráfica e verificação de ambiente |
 
+O QDPX pode inserir linhas em branco para legibilidade. Os offsets são remapeados e o
+contrato é de equivalência semântica: removendo exatamente as inserções calculadas pelo
+exportador, recupera-se o trecho canónico carácter por carácter.
+
 ## Fluxos de dados externos
 - **MaxQDA → pipeline**: variáveis (.xlsx), codebook master (.qdc),
-  gabaritos de segmentos (.xlsx) — todos exports nativos do MaxQDA.
+  amostras de referência de segmentos (.xlsx) — todos exports nativos do MaxQDA.
 - **Pipeline → MaxQDA**: projeto .qdpx (REFI-QDA 1.5, importação nativa
   no MaxQDA 2022+). GUIDs determinísticos garantem compatibilidade entre
   exports sucessivos.

@@ -27,7 +27,8 @@ Detalhe em [docs/arquitetura/arquitetura.md](docs/arquitetura/arquitetura.md).
 
 ## Estado
 
-Fases 0 a 5 concluídas, **99 testes automáticos** a passar. Em uso real: o corpus de 2025
+Fases 0 a 5 concluídas, com uma suite automática executada no CI em Linux e macOS,
+Python 3.11 e 3.12. Em uso real: o corpus de 2025
 (89 convenções do tema 4.8, proteção de dados) foi processado e revisto por peritas em
 cinco rondas sucessivas.
 
@@ -41,7 +42,9 @@ remissões entre documentos, prova com um segundo tema. Ver [specs/](specs/READM
 
 ## Instalação
 
-Requer **Python 3.11 ou superior**. Quatro dependências, todas com licença permissiva.
+Requer **Python 3.11 ou superior**. A instalação base tem quatro dependências diretas,
+todas com licença permissiva. O extrator Docling é opcional e significativamente mais
+pesado.
 
 ```bash
 python -m venv .venv
@@ -65,14 +68,17 @@ python -m cct.pipeline_tema \
     --pdfs data/raw/bte/bte_2026 \
     --codebook codebooks/4_08_protecao_dados.yaml \
     --pasta-versoes data/raw/textos_consolidados \
-    --out results/2026_4_08
+    --out results/runs/2026/2026_4_08
 ```
+
+Cada corrida cria também `manifest.json`, com o comando, commit, versões, hashes dos
+inputs/outputs, contagens e problemas encontrados.
 
 Comparar duas versões de uma convenção:
 
 ```bash
 python -m cct.comparar --pasta data/raw/textos_consolidados/ACIP_FESAHT \
-    --out results/comparacoes/ACIP.xlsx
+    --out results/benchmarks/tema-4.08/comparacoes/ACIP.xlsx
 ```
 
 O guia de operação completo, com o que fazer quando algo corre mal, está em
@@ -82,7 +88,7 @@ O guia de operação completo, com o que fazer quando algo corre mal, está em
 
 ```text
 cct/            código-fonte da aplicação
-tests/          99 testes (pytest) — escritos antes da implementação
+tests/          testes pytest: unidade, integração, corpus e formatos
 codebooks/      os temas de codificação, em YAML: configuração, não código
 examples/       dois casos completos, PDF → TXT → QDPX (versionados)
 scripts/        lançadores da aplicação gráfica
@@ -103,7 +109,9 @@ Não versionadas, mas presentes numa instalação de trabalho: `data/` (fontes),
 `results/` (saídas), `vendor/` (software de terceiros consultado) e `archive/`
 (versões anteriores do projeto). Porquê, e como repor:
 [docs/dados/README.md](docs/dados/README.md) e
-[ADR-0009](docs/adr/0009-layout-do-repositorio.md).
+[ADR-0009](docs/adr/0009-layout-do-repositorio.md). O ciclo de vida de fontes, caches,
+corridas e resultados humanos está em
+[organização do workspace](docs/dados/organizacao-workspace.md).
 
 ## Regras que não se quebram
 
@@ -119,10 +127,13 @@ porquê antes de mexer:
 
 ## Privacidade e funcionamento offline
 
-A aplicação corre inteiramente na máquina local. Não faz pedidos de rede, com uma única
-exceção opcional: se a camada semântica for ativada, fala com um modelo de linguagem em
+A aplicação corre localmente. A instalação base não faz pedidos de rede em operação. Há
+duas exceções opcionais a preparar antes de usar numa rede fechada: o Docling pode
+descarregar modelos na primeira execução, e a camada semântica, se ativada, fala com um
+modelo de linguagem em
 `localhost` (por exemplo, LM Studio) — dentro da própria máquina, nunca para o exterior.
-O código recusa URLs que não sejam de loopback. Essa camada está desligada por omissão
+Os modelos do Docling podem ser pré-instalados para funcionamento offline. O código da
+camada semântica recusa URLs que não sejam de loopback e essa camada está desligada por omissão
 ([ADR-0006](docs/adr/0006-semantica-llm-local-desligada-por-omissao.md),
 [ADR-0012](docs/adr/0012-modelos-locais-obrigatorios.md)).
 

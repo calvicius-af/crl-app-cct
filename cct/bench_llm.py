@@ -1,6 +1,6 @@
 """Banco de ensaio de modelos locais para codificação semântica 4.08.
 
-Amostra fixa de cláusulas com resposta conhecida (positivas do gabarito,
+Amostra fixa de cláusulas com resposta conhecida (positivas da amostra de referência,
 incluindo recondução terminológica difícil, e negativas), corrida contra
 cada modelo do LM Studio. Mede: validade do JSON, acertos, falsos
 positivos, e latência — a base para decidir que modelo especializar.

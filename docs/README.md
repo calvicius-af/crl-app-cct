@@ -6,11 +6,13 @@ Por onde começar, consoante o que precisas:
 |---|---|
 | ver o sistema a funcionar, com ficheiros reais | [../examples/](../examples/README.md) |
 | perceber como funciona | [arquitetura/arquitetura.md](arquitetura/arquitetura.md) |
-| perceber **porque** é assim | [adr/](adr/README.md) — 11 decisões registadas |
+| perceber **porque** é assim | [adr/](adr/README.md) — 14 decisões registadas |
 | operá-lo | [operacao/guia-operacao.md](operacao/guia-operacao.md) |
 | criar ou afinar um codebook | [operacao/prompts-codebooks.md](operacao/prompts-codebooks.md) |
 | saber se é fiável | [validacao/](validacao/README.md) — gates, memos das peritas, métricas |
 | instalar numa máquina nova | [dados/](dados/README.md) + [institucional/requisitos-tecnicos.md](institucional/requisitos-tecnicos.md) |
+| organizar corridas e resultados locais | [dados/organizacao-workspace.md](dados/organizacao-workspace.md) |
+| consultar a migração de agosto de 2026 | [dados/migracao-2026-08.md](dados/migracao-2026-08.md) |
 | apresentar o projeto | [institucional/](institucional/) — requisitos técnicos e proposta ao Instituto de Informática |
 | o enquadramento teórico | [research/](research/README.md) — AKN4EU, ELI, FRBR, REFI-QDA |
 | aprender a mexer no código | [formacao/](formacao/) |

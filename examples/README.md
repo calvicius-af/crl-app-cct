@@ -150,14 +150,20 @@ reconstrói integralmente o `.txt`, sem um único carácter a mais ou a menos.
 ### O `.qdpx` — o projeto para o MaxQDA
 
 Ficheiro no formato aberto **REFI-QDA 1.5**, que é um ZIP com `project.qde` (XML com a
-árvore de códigos e as posições dos segmentos) e `Sources/` (o texto). O texto lá dentro é
-byte a byte igual ao `.txt` desta pasta — foi verificado.
+árvore de códigos e as posições dos segmentos) e `Sources/` (o texto). Os exemplos
+versionados atuais são byte a byte iguais ao `.txt` emparelhado. O exportador atual pode
+inserir linhas em branco para legibilidade; nesse caso, os offsets são remapeados e a
+garantia passa a ser equivalência carácter a carácter depois de remover exatamente as
+inserções registadas pelo exportador.
+
+Quando estes exemplos forem regenerados, devem conservar também o `manifest.json` da
+corrida, para fixar commit, inputs, parâmetros e hashes.
 
 A árvore de códigos organiza-se em faixas, que dizem à equipa **o que fazer** com cada segmento:
 
 | Faixa | Significado |
 |---|---|
-| `AUTO` | precisão medida ≥ 0,85 no gabarito — aceitar com verificação rápida |
+| `AUTO` | precisão medida ≥ 0,85 na amostra de referência — aceitar com verificação rápida |
 | `REVER` | sugestão a validar por pessoa |
 | `CONSOLIDADO` | texto republicado que não mudou face à versão anterior — pode ser lido por último |
 | `00 Estrutura` | preâmbulo, assinaturas e texto consolidado, excluídos da análise temática |
@@ -183,6 +189,6 @@ de 2026, já separados por convenção. As versões anteriores (2009 e 2020) vê
 textos consolidados do CRL. Não são redistribuídos neste repositório; ver
 [docs/dados/README.md](../docs/dados/README.md).
 
-`metricas_calibracao.json` é o resultado da avaliação da baseline lexical contra o gabarito
+`metricas_calibracao.json` é o resultado da avaliação da baseline lexical contra a amostra de referência
 manual do tema 4.8 (89 convenções de 2025, 788 segmentos codificados por peritas). É ele que
 determina que códigos podem ir para a faixa `AUTO`.

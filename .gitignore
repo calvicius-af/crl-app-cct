@@ -38,6 +38,8 @@ examples/**/entrada/versoes/**/*.pdf
 .DS_Store
 Thumbs.db
 .env
+.env.*
+!.env.example
 *.local
 
 # Configuração de máquina do Claude Code (settings.json é partilhável)

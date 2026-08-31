@@ -45,6 +45,7 @@ seguir*.
 | [0011](0011-fluxo-spec-driven.md) | Adoção de um fluxo *spec-driven* para as próximas funcionalidades | Proposto |
 | [0012](0012-modelos-locais-obrigatorios.md) | Modelos locais obrigatórios; remover backend externo Claude CLI | Aceite |
 | [0013](0013-anonimizacao-dos-exemplos-publicados.md) | Anonimização dos exemplos publicados e exclusão dos PDFs originais | Aceite |
+| [0014](0014-ciclo-de-vida-dos-artefactos-locais.md) | Ciclo de vida de caches, corridas e artefactos humanos fora do Git | Aceite |
 
 Os dez primeiros foram escritos **retroativamente**, em agosto de 2026, a partir do
 histórico do desenvolvimento (fases 0 a 5, entre janeiro e julho de 2026). Registam

@@ -2,8 +2,8 @@
 
 ## Superfície de exposição
 
-A aplicação corre inteiramente na máquina local e **não faz pedidos de rede**. Não abre
-portas, não escuta ligações, não envia telemetria.
+A aplicação corre na máquina local, não abre portas, não escuta ligações e não envia
+telemetria. A instalação base não faz pedidos de rede durante o processamento.
 
 A única exceção é opcional e local: se a camada semântica for ativada (`--semantica`), a
 aplicação fala com um servidor de modelo de linguagem em `http://127.0.0.1:1234`
@@ -12,7 +12,12 @@ somente `localhost`, `127.0.0.1` ou `::1`; uma URL remota falha antes de qualque
 rede. Não existe backend para serviços externos — ver
 [ADR-0012](docs/adr/0012-modelos-locais-obrigatorios.md).
 
-Não há credenciais, chaves nem segredos: não há nada a que autenticar-se.
+O extrator Docling opcional pode descarregar modelos na primeira execução. Em ambientes
+fechados, os modelos devem ser pré-instalados a partir de uma origem aprovada; a execução
+normal usa apenas os ficheiros locais.
+
+O produto não requer credenciais, chaves ou segredos. Ficheiros `.env` não devem ser
+guardados no repositório nem dentro das cópias locais em `vendor/`.
 
 ## Dados tratados
 
@@ -35,9 +40,11 @@ da entidade responsável pelos sistemas.
 
 ## Dependências
 
-Quatro bibliotecas, todas com licença permissiva: `pdfplumber`, `openpyxl`, `pyyaml`,
-`jsonschema` (mais `pytest` em desenvolvimento). A interface gráfica usa `tkinter`, da
-biblioteca padrão do Python.
+Quatro bibliotecas diretas na instalação base, todas com licença permissiva:
+`pdfplumber`, `openpyxl`, `pyyaml`, `jsonschema` (mais `pytest` em desenvolvimento). A
+interface gráfica usa `tkinter`, da biblioteca padrão do Python. O Docling é opcional e
+tem uma cadeia de dependências distinta, que deve ser inventariada e fixada antes de uma
+instalação institucional.
 
 Se o repositório for alojado no GitHub, recomenda-se ativar os alertas do Dependabot e o
 *secret scanning*, que são gratuitos em repositórios públicos e privados.

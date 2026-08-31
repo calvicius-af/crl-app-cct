@@ -43,8 +43,9 @@ spec quando chegar a sua vez:
 
 - **Recolha automática do BTE**: descarregar os números do boletim a partir de
   `bte.gep.msess.gov.pt` em vez de os copiar à mão.
-- **Numeração por extenso**: cláusulas escritas como "cláusula décima segunda" não são
-  reconhecidas pelo extrator.
+- **Numeração por extenso**: o extrator já reconhece cabeçalhos como "cláusula décima
+  segunda"; falta convertê-los para número canónico na comparação diacrónica
+  ([ISSUE-0001](../issues/0001-numeracao-por-extenso.md)).
 - **Nível N1 — remissões**: extrair as referências entre cláusulas e entre convenções, e
   representá-las como grafo (ver [ADR-0001](../docs/adr/0001-sqlite-em-vez-de-neo4j.md)).
 - **Diacronia sobre 2021/2022**: os dados existem em `data/raw/bte/`, o método está
