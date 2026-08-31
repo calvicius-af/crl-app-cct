@@ -32,7 +32,7 @@ perder a propriedade de zero-perda nem a rastreabilidade por offsets.
   um ambiente virtual limpo com `docling` ocupa **5,5 GB**, contra os ~30 MB das quatro
   dependências actuais do AppCCT. Isto é um argumento de decisão, não um detalhe.
 - Só CPU. Nada de pipeline VLM com GPU.
-- O AppCCT tem 99 testes a passar e um corpus revisto por peritas. Aprende-se ao lado do
+- O AppCCT tem uma suite automática e um corpus revisto por peritas. Aprende-se ao lado do
   pipeline, não por cima dele.
 
 ## Out of scope

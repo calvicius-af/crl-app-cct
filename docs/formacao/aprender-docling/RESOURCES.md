@@ -53,7 +53,7 @@ conhecimento paramétrico do modelo. A versão de referência é **Docling 2.121
 - **Nenhuma fonte trata PDFs jurídicos portugueses.** O corpus do BTE — duas colunas,
   `Cláusula 1.ª` centrada em linha própria, tabelas salariais que atravessam páginas — não
   está representado em nenhum *benchmark* do Docling. Aqui a evidência tem de ser
-  produzida localmente: o AppCCT já tem gabarito humano em `docs/validacao/`, e é essa a
+  produzida localmente: o AppCCT já tem uma amostra de referência humana em `docs/validacao/`, e é essa a
   única medida que conta.
 - Não há material publicado a comparar `pdfplumber` com Docling em documentos de duas
   colunas. A comparação da lição 04 é original.

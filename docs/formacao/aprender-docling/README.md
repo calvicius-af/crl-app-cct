@@ -46,7 +46,7 @@ start docs\formacao\aprender-docling\lessons\0001-primeira-conversao.html  # Win
 | 01 | [A primeira conversão](lessons/0001-primeira-conversao.html) | Um PDF do BTE convertido, e a distinção entre backend, modelo de layout e pipeline |
 | 02 | [Ler a estrutura, não o texto](lessons/0002-ler-a-estrutura.html) | Listar as cláusulas de uma convenção sem uma única regex |
 | 03 | [Modelos offline](lessons/0003-modelos-offline.html) | O Docling a correr numa máquina do CRL sem internet |
-| 04 | _por escrever_ | Docling contra o `cct/extractor.py`, no mesmo PDF, contra o gabarito de `docs/validacao/` |
+| 04 | _por transformar em lição_ | Docling contra `pdfplumber`; a evidência técnica já existe na [revisão do PR #23](../../../issues/0004-revisao-pr-23.md) |
 
 A lição 04 precisa de números produzidos por ti — é assim que esta oficina funciona.
 
@@ -63,9 +63,7 @@ A lição 04 precisa de números produzidos por ti — é assim que esta oficina
 
 ## Nota de honestidade
 
-As lições foram escritas contra o Docling **2.121.0** instalado e introspecionado, mas
-**nenhuma conversão foi executada ponta a ponta** — o ambiente onde foram escritas tem o
-`huggingface.co` bloqueado, e o pipeline precisa de descarregar modelos à primeira
-utilização. As afirmações sobre a API estão verificadas; as afirmações sobre o
-comportamento num PDF concreto do BTE são hipóteses que os exercícios te mandam testar.
-Ver [`NOTES.md`](NOTES.md), secção *Verificação do material*.
+As lições foram escritas contra o Docling **2.121.0**. Depois da primeira versão do
+material, houve conversão real e o PR #23 integrou o Docling como extrator opcional,
+validado automaticamente sobre quatro convenções. A importação visual do QDPX final no
+MaxQDA continua pendente. Ver [`NOTES.md`](NOTES.md), secção *Verificação do material*.

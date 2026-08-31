@@ -1,4 +1,4 @@
-"""Leitor do gabarito MaxQDA (XLSX de segmentos codificados manualmente).
+"""Leitor da amostra de referência MaxQDA (XLSX de segmentos codificados manualmente).
 
 Colunas esperadas: Código, Segmento, Nome do documento, Tipo_conv,
 SubTipo_conv, … O código vem como caminho hierárquico
@@ -17,7 +17,7 @@ def normalizar_codigo(bruto: str) -> str:
     return m.group(1) if m else folha
 
 
-def carregar_gabarito(xlsx_path: Path) -> list[dict]:
+def carregar_referencia(xlsx_path: Path) -> list[dict]:
     import openpyxl
 
     wb = openpyxl.load_workbook(xlsx_path, read_only=True)

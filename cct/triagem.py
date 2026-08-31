@@ -1,7 +1,7 @@
-"""Triagem AUTO/REVER (Fase 3): calibrada com a precisão medida no gabarito.
+"""Triagem AUTO/REVER (Fase 3): calibrada com a precisão medida na amostra de referência.
 
 Uma anotação vai para a faixa AUTO quando o seu código tem precisão medida
-≥ limiar (por omissão 0.85) num gabarito com pelo menos `n_minimo` documentos;
+≥ limiar (por omissão 0.85) numa amostra de referência com pelo menos `n_minimo` documentos;
 todas as restantes vão para REVER. No MaxQDA os códigos aparecem prefixados
 (AUTO/…, REVER/…), permitindo rever só o que precisa de olhos humanos.
 """
@@ -14,7 +14,7 @@ def codigos_auto(metricas: dict, limiar: float = LIMIAR_AUTO,
     aptos = set()
     for cod, r in metricas.get("por_codigo", {}).items():
         p = r.get("precisao")
-        if p is not None and p >= limiar and r.get("n_gabarito", 0) >= n_minimo:
+        if p is not None and p >= limiar and r.get("n_referencia", 0) >= n_minimo:
             aptos.add(cod)
     return aptos
 

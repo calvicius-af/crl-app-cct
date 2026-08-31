@@ -3,6 +3,8 @@
 - **Estado:** Aceite
 - **Data:** 2026-08-04
 - **Decidido por:** CRL (António Fula)
+- **Refinada por:** [ADR-0014](0014-ciclo-de-vida-dos-artefactos-locais.md), que substitui
+  apenas a classificação de todo o `results/` como descartável
 
 ## Contexto
 

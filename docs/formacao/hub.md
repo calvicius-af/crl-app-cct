@@ -45,7 +45,7 @@ Desenham-se as 6 etapas no papel (design abstrato), mas a validação faz-se **i
 - [[Plano do tracer PDF — Python e pipeline CCT]] — primeiro ciclo curto da v1: PDF real → texto/Markdown → avaliação → capitalização.
 - [[Rubrica de avaliação — tracer PDF Python+CCT]] — critérios mínimos de desempenho para fechar o primeiro tracer.
 - [Aprender Docling — oficina](aprender-docling/README.md) — primeira instância do sub-processo `construir-expert`, sobre a fonte técnica Docling: missão, fontes anotadas, lições e cartão de referência.
-- [Base dinâmica do projeto](Processo%20de%20Formação%20Pragmática.base) — documentos, decisões e nós ligados ao projeto.
+- Base dinâmica do projeto — vive no vault Obsidian e não é distribuída neste repositório.
 - [[AGENTS|AGENTS local]] — regras específicas para trabalho futuro nesta pasta.
 
 ## As 6 etapas (ciclo ISD / ADDIE) e o âmbito da v1

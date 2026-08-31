@@ -18,6 +18,8 @@ Recebe PDFs de convenções coletivas do BTE e produz:
 2. **sugestoes_peritas.xlsx** — a mesma informação em Excel, com contexto,
    para quem não tem MaxQDA.
 3. **relatorio.txt** — o que correu bem e o que precisa de atenção.
+4. **manifest.json** — proveniência da corrida: comando, commit, ambiente,
+   hashes dos inputs/outputs e contagens.
 
 ---
 
@@ -94,9 +96,9 @@ ou: `python -m cct.app`. Preencher os campos e carregar em "Correr".
     --codebook codebooks/4_08_protecao_dados.yaml \
     --variaveis data/raw/maxqda/VariaveisDocumento2026.xlsx \
     --master "data/raw/maxqda/MAXQDA_..._Lista de Códigos.qdc" \
-    --metricas results/metricas/baseline_4_08_v4/metricas.json \
+    --metricas results/benchmarks/tema-4.08/metricas/baseline_4_08_v4/metricas.json \
     --pasta-versoes data/raw/textos_consolidados \
-    --out results/2026_4_08
+    --out results/runs/2026/2026_4_08
 ```
 Só `--pdfs`, `--codebook` e `--out` são obrigatórios; o resto melhora o
 resultado mas pode faltar.
@@ -113,7 +115,7 @@ lento (~1-1,7 s/página) e de exigir instalação à parte:
 ### Comparar duas versões de uma convenção (avulso)
 ```
 .venv/bin/python -m cct.comparar --pasta data/raw/textos_consolidados/ACIP_FESAHT \
-    --out results/comparacoes/ACIP.xlsx
+    --out results/benchmarks/tema-4.08/comparacoes/ACIP.xlsx
 ```
 Sai um Excel com cada cláusula classificada: `=` / `alteracao` / `nova` /
 `removida`, com as diferenças exatas.
@@ -129,7 +131,7 @@ Sai um Excel com cada cláusula classificada: `=` / `alteracao` / `nova` /
 | "a versão antiga parece parcial" | a base da comparação é uma revisão de 2-3 páginas | juntar à subpasta o último texto completo |
 | "PDF digitalizado?" / 0 cláusulas | o PDF é uma imagem (scan) | obter o PDF nativo do BTE; OCR ainda não suportado |
 | subtipo sempre "desconhecido" | falta o ficheiro de variáveis ou o nome do PDF não bate certo com o MaxQDA | ver 3.2; o cruzamento usa os primeiros ~30 caracteres do nome |
-| códigos todos em REVER, nada em AUTO | falta `--metricas` (calibração) | usar o metricas.json da última avaliação contra gabarito |
+| códigos todos em REVER, nada em AUTO | falta `--metricas` (calibração) | usar o metricas.json da última avaliação contra a amostra de referência |
 | erro ao importar QDPX no MaxQDA | versão antiga do MaxQDA | usar MaxQDA 2022 ou superior (REFI-QDA) |
 | a app/comando "não faz nada" | ambiente por instalar | correr `python -m cct.doctor` e seguir as instruções |
 
@@ -144,9 +146,9 @@ problemas — o resto do lote NÃO é afetado. Corrige só esses e volta a corre
    exportados para HTML).
 2. Ajustam-se os termos no YAML do tema (ver `prompts-codebooks.md`,
    incluindo a mineração automática dos dados de 2025).
-3. Remede-se contra o gabarito:
-   `python -m cct.avaliar_baseline --xlsx <gabarito>.xlsx --pdfs <pasta>
-   --codebook <tema>.yaml --out results/metricas/baseline_X`
+3. Remede-se contra a amostra de referência:
+   `python -m cct.avaliar_baseline --xlsx <amostra-referencia>.xlsx --pdfs <pasta>
+   --codebook <tema>.yaml --out results/benchmarks/<tema>/metricas/baseline_X`
 4. A triagem AUTO/REVER recalibra-se sozinha na corrida seguinte
    (passar o novo `metricas.json` em `--metricas`).
 

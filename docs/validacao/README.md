@@ -5,7 +5,7 @@ de realidade feito por pessoas, não por código. Esta pasta guarda o registo de
 
 Há duas formas de medir, e são complementares:
 
-1. **Testes automáticos** (99 testes, `python -m pytest -q`) — verificam propriedades que
+1. **Testes automáticos** (`python -m pytest -q`) — verificam propriedades que
    nunca podem falhar: zero perda de texto, conformidade dos ficheiros com o JSON Schema,
    estabilidade dos GUIDs, comportamento do comparador em casos construídos.
 2. **Gates manuais** — o ficheiro é importado no MaxQDA e lido por quem faz a análise a
@@ -21,6 +21,11 @@ Há duas formas de medir, e são complementares:
 | F1b | Rodapés do BTE, tabelas, texto sem linhas em branco | [checklist-maxqda-f1b.md](checklist-maxqda-f1b.md) |
 | F3 | Triagem AUTO/REVER e árvore de códigos aninhada | [memos-peritas-4_08-v1.html](memos-peritas-4_08-v1.html) |
 | F4 | Consolidado, assinaturas, GUIDs do codebook master | [memos-peritas-4_08-v3.html](memos-peritas-4_08-v3.html) |
+| PR #23 | Docling opcional, ordem de leitura, spans, sanidade e offsets QDPX | [revisão técnica](../../issues/0004-revisao-pr-23.md) |
+
+A validação visual do QDPX Docling final no MaxQDA continua pendente na
+[ISSUE-0003](../../issues/0003-qdpx-perde-ganhos-do-docling.md). Testes automáticos e
+importação humana são gates diferentes; um não substitui o outro.
 
 Os memos são exports HTML do MaxQDA: abrem em qualquer navegador e mostram o comentário
 de quem reviu, junto ao texto a que se refere. Vale a pena lê-los antes de mexer no
@@ -28,9 +33,9 @@ extrator — quase todos os casos difíceis do código nasceram de um destes com
 (quebras de linha a meio de frase, títulos de cláusula fundidos com o capítulo, fronteiras
 de segmento).
 
-## Métricas contra o gabarito
+## Métricas contra a amostra de referência
 
-O gabarito são 788 segmentos do tema 4.8 (proteção de dados) codificados manualmente por
+A amostra de referência contém 788 segmentos do tema 4.8 (proteção de dados) codificados manualmente por
 peritas em 89 convenções de 2025. O `cct/harness.py` compara a codificação automática com
 essa referência e produz precisão (quantas sugestões estão certas) e cobertura (quantos
 segmentos reais foram apanhados).

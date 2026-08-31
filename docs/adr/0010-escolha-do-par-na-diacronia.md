@@ -7,8 +7,8 @@
 ## Contexto
 
 A comparação entre versões de uma convenção (o que mudou de 2020 para 2025) foi
-construída e validada contra os gabaritos feitos à mão pela equipa: no caso ACIP
-2009 → 2025, as quatro alterações do gabarito foram todas apanhadas.
+construída e validada contra as amostras de referência feitas à mão pela equipa: no caso ACIP
+2009 → 2025, as quatro alterações da amostra de referência foram todas apanhadas.
 
 Ao correr o lote completo — 44 pares — apareceu um problema que não era do comparador.
 Em **36% dos pares**, a versão "anterior" escolhida era uma **revisão parcial**: um

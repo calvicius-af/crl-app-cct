@@ -6,7 +6,7 @@ Uso:
 
   # ou escolha automática do par dentro de uma pasta de versões:
   python -m cct.comparar --pasta data/raw/textos_consolidados/NORQUIFAR_FIEQUIMETAL \
-      --out results/comparacoes/NORQUIFAR.xlsx
+      --out results/benchmarks/tema-4.08/comparacoes/NORQUIFAR.xlsx
 """
 import argparse
 import re

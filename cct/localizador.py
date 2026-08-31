@@ -1,6 +1,6 @@
 """Localiza convenções individuais dentro de um número do BTE.
 
-O gabarito identifica documentos como "25_PR_016_BTE_04_EMARP_SINTAP":
+A amostra de referência identifica documentos como "25_PR_016_BTE_04_EMARP_SINTAP":
 o número do BTE (04) dá o ficheiro (bte4_2025.pdf) e os tokens das partes
 (EMARP, SINTAP) permitem encontrar a convenção certa dentro do número.
 """
@@ -25,7 +25,7 @@ def _colapsar(s: str) -> str:
 
 
 def _subtokens(token: str) -> list[str]:
-    """Divide tokens camel-case do gabarito: 'AguasRibatejo' → [aguas, ribatejo]."""
+    """Divide tokens camel-case da referência: 'AguasRibatejo' → [aguas, ribatejo]."""
     partes = re.findall(r"[A-ZÀ-Ý]+(?![a-z])|[A-ZÀ-Ý][a-zà-ÿ]+|[a-zà-ÿ]+|\d+", token)
     return [_colapsar(p) for p in partes if len(p) > 1]
 

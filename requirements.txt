@@ -6,6 +6,5 @@ jsonschema>=4.0
 # extrator docling, opcional (--extrator docling): pesado (PyTorch, ~4 GB)
 # e requer Python arm64 no macOS Apple Silicon
 # docling>=2.121
-# docling-hierarchical-pdf>=0.1.8
 # desenvolvimento/testes (opcional em produção)
 pytest>=8.0

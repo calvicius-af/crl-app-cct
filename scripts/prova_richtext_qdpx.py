@@ -102,7 +102,7 @@ def docx_bytes() -> bytes:
 
 def main():
     destino = Path(sys.argv[1] if len(sys.argv) > 1
-                   else "results/prova_richtext/prova_richtext.qdpx")
+                   else "results/experiments/qdpx-richtext/prova_richtext.qdpx")
     destino.parent.mkdir(parents=True, exist_ok=True)
 
     texto = texto_plano()

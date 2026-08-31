@@ -90,32 +90,32 @@ ERROS REPORTADOS:
 
 ---
 
-## 4. Melhorar termos com os dados de 2025 (mineração do gabarito)
+## 4. Melhorar termos com os dados de 2025 (mineração da amostra de referência)
 
-Quando existe um gabarito (export do MaxQDA com segmentos codificados à
+Quando existe uma amostra de referência (export do MaxQDA com segmentos codificados à
 mão, como o `4_08_ParaClaudeAppCCT.xlsx`), o processo é medido, não
 adivinhado. Foi assim que o 4.08.5.1 subiu de F1 0.72 para 0.84.
 
 ### Passo 1 — medir a baseline
 ```
-python -m cct.avaliar_baseline --xlsx <gabarito>.xlsx --pdfs data/raw/bte/bte_2025 \
-    --codebook codebooks/<tema>.yaml --out results/metricas/baseline_<tema>
+python -m cct.avaliar_baseline --xlsx <amostra-referencia>.xlsx --pdfs data/raw/bte/bte_2025 \
+    --codebook codebooks/<tema>.yaml --out results/benchmarks/<tema>/metricas/baseline_<tema>
 ```
 O `relatorio.txt` mostra precisão/cobertura por subcódigo. Interpretar:
 - **cobertura baixa** (muitos FN) → faltam termos → Passo 2;
 - **precisão baixa** (muitos FP) → termos genéricos → Passo 3.
 
 ### Passo 2 — encontrar termos em falta (FN)
-Os segmentos do gabarito que o lexical falhou contêm o vocabulário que
+Os segmentos da amostra de referência que o lexical falhou contêm o vocabulário que
 falta. Extraí-los e pedir a um LLM que proponha termos:
 
 ```
 python - <<'FIM'
 import json
 from pathlib import Path
-from cct.gabarito import carregar_gabarito
-prev = json.load(open("results/metricas/baseline_<tema>/previstos.json"))
-gab = carregar_gabarito(Path("<gabarito>.xlsx"))
+from cct.referencia import carregar_referencia
+prev = json.load(open("results/benchmarks/<tema>/metricas/baseline_<tema>/previstos.json"))
+referencia = carregar_referencia(Path("<amostra-referencia>.xlsx"))
 pares = {(p["doc_id"], p["codigo"]) for p in prev}
 for g in gab:
     if (g["doc_id"], g["codigo"]) not in pares:
@@ -144,7 +144,7 @@ em cláusulas de pagamento). Traduzir o padrão numa condição:
 sentido errado).
 
 ### Passo 4 — remedir e fechar
-Repetir o Passo 1. Se a precisão de um subcódigo ficar ≥ 0.85 com gabarito
+Repetir o Passo 1. Se a precisão de um subcódigo ficar ≥ 0.85 com amostra de referência
 suficiente (≥ 2 documentos), passa automaticamente para a faixa AUTO na
 corrida seguinte (via `--metricas`). Guardar o YAML no git/backup — o
 codebook é o ativo mais valioso do tema.

@@ -32,7 +32,7 @@ Importante para a honestidade das lições:
   `do_cell_matching=True`), valores de `DocItemLabel`, assinatura de
   `iterate_items` e de `download_models`, lista completa das flags de `docling convert`.
 - **Verificado por leitura do código-fonte** no commit `06faa09`.
-- **NÃO executado ponta a ponta.** O ambiente onde estas lições foram escritas tem o
+- **Estado inicial do material: não executado ponta a ponta.** O ambiente onde estas lições foram escritas tem o
   `huggingface.co` bloqueado por política de rede, e o pipeline standard precisa de
   descarregar os modelos de layout e de tabelas à primeira utilização. Nenhuma conversão
   foi corrida. Os tempos, contagens e excertos de output que as lições pedem para observar
@@ -83,19 +83,24 @@ Importante para a honestidade das lições:
   explicitamente não faz e que é a peça em falta para chegar perto do AKN4EU.
   Compatibilidade com docling 2.121 verificada ao nível da API; **não** testada em
   execução, pela mesma limitação de rede.
+- **Actualização de 2026-08-26 — decisão e integração.** O PR #23 integrou o Docling como
+  extrator opcional e manteve `pdfplumber` por omissão. A suite foi executada com e sem os
+  tipos reais do Docling e quatro convenções reais produziram 300 cláusulas e 203
+  anotações. O pós-processador `docling-hierarchical-pdf` foi removido por não demonstrar
+  ganho líquido. A evidência está em
+  [`issues/0004-revisao-pr-23.md`](../../../issues/0004-revisao-pr-23.md).
 
 ## Dívidas e próximos passos
 
-- [ ] Lição 04: comparar `pdfplumber` (o extractor actual) e Docling no mesmo PDF do BTE,
-      contra o gabarito de `docs/validacao/`. É a lição que fecha a missão.
+- [ ] Lição 04: transformar a comparação e os resultados já produzidos numa lição de
+      avaliação reproduzível.
 - [ ] Criar `GLOSSARY.md` assim que o formando usar corretamente `DoclingDocument`,
       *label*, proveniência e *backend* vs *pipeline*.
 - [ ] Escrever registo de aprendizagem depois da lição 02 se houver evidência (código
       escrito pelo formando que percorra o documento sem regex).
-- [ ] Decidir se o Docling entra como dependência opcional (`pip install cct[docling]`)
-      ou fica como ferramenta de análise fora do pipeline. Depende da lição 04.
+- [x] Decidir a integração: Docling é extrator opcional e `pdfplumber` continua por
+      omissão (PR #23).
 - [ ] Confirmar se as tabelas salariais que atravessam páginas ficam partidas em vários
       `TableItem` — não se encontrou fonte que responda; é experiência a fazer.
-- [ ] Provar a adaptação do `docling-hierarchical-pdf` num PDF real do BTE, e medir se
-      `CAPÍTULO` e `Cláusula` têm mesmo tamanho de letra no corpus — ver a
-      [avaliação](avaliacao-docling-hierarchical-pdf.md), secção "Por verificar".
+- [x] Avaliar `docling-hierarchical-pdf`: a abordagem foi testada e não adotada por não
+      demonstrar ganho líquido no pipeline final.

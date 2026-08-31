@@ -9,7 +9,7 @@
 ## O que acontece
 
 Na importação para MaxQDA do QDPX gerado com `--extrator docling`
-(`results/2025_4_08_docling_teste/projeto.qdpx`, verificação do utilizador
+(`results/experiments/docling/2025-08-24-inicial/projeto.qdpx`, verificação do utilizador
 de 2026-08-24), as melhorias vistas no Markdown do docling não chegam ao
 texto final:
 
@@ -86,7 +86,7 @@ Proposta original, por ponto (mantida para registo):
       TXT, recalculando os offsets das anotações no mesmo passo — é
       onde a legibilidade importa e mantém o modelo interno intacto;
    b) **no estruturar**: emitir a linha em branco como parte do texto
-      canónico — mais simples, mas mexe em todos os offsets, gabaritos
+      canónico — mais simples, mas mexe em todos os offsets, amostras de referência
       e comparações existentes; exigiria revalidar o harness completo.
    A via (a) é a recomendada.
 

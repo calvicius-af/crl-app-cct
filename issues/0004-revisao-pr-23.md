@@ -63,7 +63,7 @@ conhecido da cláusula 76.ª do TRATOLIXO, cujo corpo termina sem ponto no PDF.
 
 O QDPX resultante contém quatro fontes e 203 seleções, todas não vazias e com
 offsets dentro dos limites. Não contém `####` e é textualmente igual à corrida
-guardada em `results/2025_4_08_docling_v5/`. A descrição do PR refere 205
+guardada em `results/experiments/docling/2025-08-25-v5/`. A descrição do PR refere 205
 seleções; essa contagem não foi reproduzida e deve ser corrigida para 203 ou
 justificada com inputs diferentes.
 
@@ -248,7 +248,7 @@ entre dois nós espaçados, seleção com três pontos de inserção, e extremos
 A diferença de 4 testes entre os dois jobs do CI é exatamente o ficheiro de
 integração opcional.
 
-Corrida das quatro convenções (`results/2025_4_08_issue0004/`): 4/4, **300
+Corrida das quatro convenções (`results/validated/2025_4_08_issue0004/`): 4/4, **300
 cláusulas e 203 anotações**, reproduzindo as contagens da revisão. QDPX com ZIP
 e XML válidos, 4 fontes, 203 seleções, 0 vazias, 0 fora de limites, 0 cardinais
 de Markdown, 36 códigos e todos os `CodeRef` a resolver. Único aviso de
