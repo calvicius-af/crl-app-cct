@@ -32,7 +32,11 @@ def verificar() -> int:
             ok(pacote)
         except ImportError:
             falha(f"falta a biblioteca {pacote}",
-                  f"correr: python -m pip install {pacote}")
+                  "instalar as dependências: duplo clique em "
+                  "scripts/instalar_offline.bat (Windows) ou "
+                  "instalar_offline.command (macOS) — instalação sem internet, "
+                  "ver docs/institucional/instalacao-offline.md; "
+                  f"com acesso à internet basta: python -m pip install {pacote}")
     try:
         import tkinter  # noqa: F401
         ok("tkinter (app gráfica)")
