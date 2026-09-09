@@ -16,7 +16,7 @@ para o exterior, não requer serviços cloud, não abre portas de rede
 | Python | 3.11 ou superior, 64 bits, com tcl/tk (opção por omissão do instalador oficial) |
 | Privilégios | utilizador normal — sem administração após instalação do Python |
 | Disco | ~200 MB na instalação base + espaço para PDFs/resultados; Docling opcional requer vários GB |
-| Rede | não necessária em operação |
+| Rede | não necessária em operação (exceção opcional em §5-A) |
 
 ## 3. Bibliotecas Python (todas open-source, via pip)
 | Pacote | Versão mín. | Licença | Função |
@@ -68,6 +68,27 @@ Uma eventual integração interna do Instituto de Informática requer uma decis�
 e implementação próprias. Se o Instituto preferir, a camada pode ser excluída do plano de
 implementação.
 
+## 5-A. Componente opcional — recolha automática do BTE
+Se autorizada, a aplicação descarrega documentos públicos do Boletim do
+Trabalho e Emprego, a partir das ligações que constam dos ficheiros-índice
+fornecidos pela DGERT. Características relevantes para segurança de rede:
+
+| Aspeto | Comportamento |
+|---|---|
+| Ativação | desligada por omissão; exige `--confirmar-rede` em cada corrida (na app gráfica, uma pergunta de confirmação) |
+| Destinos | lista fechada: `bte.dgcp.mtsss.gov.pt`, `bte.gep.msess.gov.pt`, `bte.gep.mtsss.gov.pt`. Revalidada a cada redirecionamento |
+| Protocolo | HTTPS apenas; pedidos `GET`; sem cookies, sem autenticação, sem envio de dados do CRL |
+| Descoberta | nenhuma — a aplicação não navega nem infere endereços; só descarrega os URL que constam dos índices |
+| Proxy | usa o proxy do sistema (`HTTPS_PROXY`) |
+| Bibliotecas | `urllib` da biblioteca padrão do Python — sem dependências novas |
+| Volume | ~1 MB por documento; ~14 documentos por número do boletim; pausa de 1 s entre pedidos |
+| Se bloqueado | a equipa coloca os PDFs à mão numa pasta local e corre apenas a fase de nomeação, que é offline |
+
+Decisão de arquitetura e alternativas ponderadas:
+[ADR-0015](../adr/0015-recolha-em-rede-desligada-por-omissao.md).
+Se o Instituto preferir, esta componente pode ser excluída do plano de
+implementação sem qualquer efeito no resto da aplicação.
+
 ## 6. Plano de teste sugerido (estação padrão Windows)
 1. Instalar Python 3.11+ 64 bits (instalador oficial, opção tcl/tk).
 2. Copiar a pasta do projeto e criar o ambiente (ver §3).
@@ -85,4 +106,4 @@ implementação.
 - Configuração dos temas = ficheiros YAML editáveis pela equipa de análise
   (sem intervenção informática).
 - Logs de cada corrida em `results/<corrida>/relatorio.txt` e proveniência verificável em
-  `results/<corrida>/manifest.json`.
+  `results/<corrida>/manifest.json`; os da recolha do BTE em `results/aquisicao/`.

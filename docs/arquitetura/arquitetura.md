@@ -12,7 +12,15 @@ de comandos e não contém lógica própria.
  ENTRADAS              │   App gráfica (cct/app.py)  │   tkinter, stdlib
                        │   ou linha de comandos      │
                        └──────────────┬──────────────┘
- PDFs do BTE ────────┐                │ orquestra
+ Índices do BTE ─────┐                │ orquestra
+ (data/raw/indices/) │   ┌────────────▼─────────────────────────────┐
+                     ├──►│ 0. AQUISIÇÃO (opcional)                  │
+                     │   │  cct/recolha.py  → descarrega (só aqui   │
+                     │   │  há rede; desligada por omissão)         │
+                     │   │  cct/nomeacao.py → AA_PR_NNN_BTE_NN_…    │
+                     │   └────────────┬─────────────────────────────┘
+                     │                │ PDFs em data/raw/bte/bte_<ano>/
+ PDFs do BTE ────────┤                │
  (data/raw/bte/)     │   ┌────────────▼─────────────────────────────┐
                      ├──►│ 1. EXTRAÇÃO        extractor.py ou       │
                      │   │                    extractor_docling.py  │
@@ -93,6 +101,9 @@ de comandos e não contém lógica própria.
 | qdc.py, variaveis.py, referencia.py | leitores dos exports do MaxQDA |
 | harness.py, avaliar_*.py | métricas contra a amostra de referência |
 | localizador.py | localizar convenções em números completos do BTE |
+| recolha.py | ler os índices do BTE e descarregar os documentos (única fase com rede) |
+| nomeacao.py | siglas dos outorgantes, ordinais estáveis e nomes do esquema do pipeline |
+| aquisicao.py | encadeia recolha + nomeação numa corrida |
 | pipeline_tema.py, comparar.py | orquestradores CLI |
 | app.py, doctor.py | interface gráfica e verificação de ambiente |
 
@@ -107,3 +118,6 @@ exportador, recupera-se o trecho canónico carácter por carácter.
   no MaxQDA 2022+). GUIDs determinísticos garantem compatibilidade entre
   exports sucessivos.
 - **Pipeline → peritas**: .xlsx autónomo (não requer MaxQDA).
+- **BTE → pipeline** (opcional): índices .xlsx da DGERT e PDFs públicos de
+  `bte.dgcp.mtsss.gov.pt`, descarregados apenas com autorização explícita
+  ([ADR-0015](../adr/0015-recolha-em-rede-desligada-por-omissao.md)).

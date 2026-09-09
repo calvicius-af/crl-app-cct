@@ -14,17 +14,23 @@ autorizado do CRL.
 
 ```text
 data/
-├── raw/                          entrada — nunca escrever aqui
+├── raw/                          entrada — só a nomeação escreve aqui
+│   ├── indices/                  índices .xlsx do BTE, um por número (ver abaixo)
 │   ├── bte/
 │   │   ├── bte_2021/             48 números completos do BTE de 2021
 │   │   ├── bte_2022/             240 convenções de 2022, uma por ficheiro
 │   │   ├── bte_2025/             corpus disponível de 2025; pode ser parcial
+│   │   ├── bte_2026/             convenções de 2026
+│   │   │   └── extensoes/        portarias e avisos (fora do glob do pipeline)
 │   │   └── bte2_2025.pdf         número completo usado pelos testes de extração
 │   ├── maxqda/                   exports do MaxQDA (ver abaixo)
 │   └── textos_consolidados/      21 pastas, uma por convenção, com as versões anteriores
 ├── reference/                    referências humanas preserváveis
 │   └── maxqda/tema-4.08/         projectos MQDA e exports QDPX de trabalho
-└── interim/                      resultados intermédios reproduzíveis (texto extraído, caches)
+├── interim/                      resultados intermédios reproduzíveis (texto extraído, caches)
+│   └── recolha/<ano>/<nº>/       PDFs descarregados, com o nome de origem
+└── registo/
+    └── registo_bte.jsonl         registo da recolha — NÃO APAGAR (ver abaixo)
 ```
 
 `results/` guarda saídas, experiências, métricas e possíveis artefactos revistos por
@@ -33,7 +39,7 @@ intermédios confirmados são descartáveis; projetos MQDA, Excel revisto, valid
 entregáveis podem conter trabalho humano não regenerável. Ver
 [organização do workspace](organizacao-workspace.md).
 
-`data/raw/` é fonte e requer cópia de segurança. `data/interim/` é regenerável quando a
+`data/raw/` é fonte e requer cópia de segurança, tal como `data/reference/` e `data/registo/` (guarda os ordinais da recolha — ver abaixo). `data/interim/` é regenerável quando a
 corrida tem inputs e manifesto conhecidos. Para inventariar a instalação atual sem mover
 nada:
 
@@ -47,8 +53,11 @@ Publicação oficial do Gabinete de Estratégia e Planeamento (GEP/MTSSS), de ac
 público. Os números completos descarregam-se de:
 
 ```
-https://bte.gep.msess.gov.pt/completos/<ano>/bte<n>_<ano>.pdf
+https://bte.dgcp.mtsss.gov.pt/completos/<ano>/bte<n>_<ano>.pdf
 ```
+
+O endereço antigo (`bte.gep.msess.gov.pt/completos/…`) continua a funcionar, mas responde
+com um redirecionamento para o anfitrião acima.
 
 Há dois formatos em uso, e o pipeline lida com ambos:
 
@@ -112,3 +121,56 @@ nomes dos signatários, que constam da publicação oficial. Os exports do MaxQD
 trabalho interno do CRL e não devem ser publicados sem decisão da instituição. O
 `.gitignore` está construído para que nada disto entre no repositório por acidente; a
 verificação está descrita no [CONTRIBUTING](../../CONTRIBUTING.md).
+
+
+## Índices do BTE (`data/raw/indices/`) e recolha automática
+
+A DGERT fornece, por cada número do boletim, um ficheiro Excel com a lista dos
+documentos publicados: identificador, título, tipo, número do BTE, código IRCT,
+outorgantes e a ligação direta para o PDF de cada documento (por exemplo
+`BTE31_2026.xlsx`, com os 14 documentos do n.º 31 de 2026).
+
+Depositar esses ficheiros em `data/raw/indices/` — tal como vêm, sem editar — é tudo o que
+a recolha automática precisa:
+
+```bash
+python -m cct.aquisicao --indices data/raw/indices                       # simula
+python -m cct.aquisicao --indices data/raw/indices --confirmar-rede --aplicar
+```
+
+O que acontece, em duas fases ([SPEC-0001](../../specs/0001-recolha-e-nomeacao-do-bte.md)):
+
+1. **Recolha** (`cct/recolha.py`) — descarrega os PDFs para
+   `data/interim/recolha/<ano>/<nº do BTE>/`, com o **nome de origem** (`00260057.pdf`).
+   Nada é descarregado duas vezes: o registo guarda o `sha256`, o `ETag` e o
+   `Last-Modified` de cada documento, e a segunda corrida sobre o mesmo índice não faz
+   um único pedido de rede.
+2. **Nomeação** (`cct/nomeacao.py`) — copia cada PDF para
+   `data/raw/bte/bte_<ano>/` já com o nome do esquema
+   (`26_PR_003_BTE_31_AEVP_FESAHT.pdf`). As portarias de extensão e os avisos vão para
+   a subpasta `extensoes/`, para não entrarem no `glob("*.pdf")` do pipeline.
+
+A rede está **desligada por omissão** e só liga com `--confirmar-rede`
+([ADR-0015](../adr/0015-recolha-em-rede-desligada-por-omissao.md)). Numa rede fechada,
+basta a equipa colocar os PDFs à mão em `data/interim/recolha/<ano>/<nº>/` e correr só a
+nomeação.
+
+### O registo (`data/registo/registo_bte.jsonl`)
+
+Uma linha JSON por documento, com a proveniência (índice, tipo, código IRCT,
+outorgantes), o estado da descarga e o nome atribuído. **É o único ficheiro que a
+aplicação escreve dentro de `data/` fora de `interim/`, e não deve ser apagado**: é ele
+que guarda os números sequenciais já atribuídos. Apagá-lo faz a numeração recomeçar em 1
+e produz nomes diferentes para os mesmos documentos.
+
+### Siglas dos outorgantes
+
+O nome usa a sigla de cada lado da mesa. Quando a sigla está declarada no nome do
+outorgante — `… - ACRAL`, `(AEVP)`, `FESAHT - Federação…` — é usada tal e qual. Quando
+não está, é derivada das palavras distintivas (`Sindicato Nacional dos Motoristas` →
+`Motoristas`) e **assinalada no relatório para confirmação humana**. Para fixar os casos
+que a equipa quer decididos de uma vez por todas:
+
+```bash
+python -m cct.nomeacao --siglas siglas.csv --aplicar     # ficheiro 'nome;sigla' por linha
+```
