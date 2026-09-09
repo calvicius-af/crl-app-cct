@@ -71,14 +71,29 @@ def carregar_variaveis(xlsx_path: Path) -> list[dict]:
 
 
 def procurar(variaveis: list[dict], doc_id: str) -> dict | None:
-    """Cruza um doc_id completo com o nome truncado do MaxQDA (por prefixo)."""
+    """Cruza um doc_id completo com o nome truncado do MaxQDA (por prefixo).
+
+    O corte tem de cair numa fronteira de token ("_") em qualquer dos dois
+    lados que continue além do prefixo partilhado — nunca a meio de uma
+    palavra. Sem isto, um nome do MaxQDA truncado a meio de uma sigla (ex.:
+    "...EMARP_SIN") cruzava-se com qualquer doc_id que por coincidência
+    começasse pelas mesmas letras (ex.: uma convenção "...EMARP_SINALCO"
+    completamente diferente) — confirmado com dados reais em
+    data/raw/maxqda/VariaveisDocumento2025.xlsx, onde os nomes exportados têm
+    comprimentos muito variados (27 a 60 caracteres), não um corte fixo a 30.
+    """
     alvo = _norm(doc_id.removesuffix("_TXT"))
     melhor = None
     melhor_len = 0
     for v in variaveis:
         nome = _norm(v["nome_maxqda"].removesuffix("_txt"))
         pref = min(len(nome), len(alvo))
-        if nome[:pref] == alvo[:pref] and pref > melhor_len:
-            melhor, melhor_len = v, pref
+        if nome[:pref] != alvo[:pref] or pref <= melhor_len:
+            continue
+        if pref < len(nome) and nome[pref] != "_":
+            continue
+        if pref < len(alvo) and alvo[pref] != "_":
+            continue
+        melhor, melhor_len = v, pref
     # exige um prefixo suficientemente longo para não cruzar documentos errados
     return melhor if melhor_len >= 20 else None

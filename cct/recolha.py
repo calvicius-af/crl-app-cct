@@ -18,12 +18,14 @@ import hashlib
 import json
 import os
 import time
-import unicodedata
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
+
+from .localizador import _sem_acentos
+from .schemas import validar_registo
 
 RAIZ = Path(__file__).resolve().parent.parent
 
@@ -60,9 +62,7 @@ INDICES_OMISSAO = RAIZ / "data" / "raw" / "indices"
 
 def _norm(s) -> str:
     """Minúsculas, sem acentos e sem pontuação — para comparar cabeçalhos."""
-    s = "".join(c for c in unicodedata.normalize("NFD", str(s or ""))
-                if unicodedata.category(c) != "Mn")
-    return "".join(c for c in s.lower() if c.isalnum())
+    return "".join(c for c in _sem_acentos(s).lower() if c.isalnum())
 
 
 def familia(tipo: str) -> str | None:
@@ -150,10 +150,32 @@ def ler_indice(xlsx: Path) -> list[dict]:
             item["folha"] = ws.title
             item["posicao"] = posicao
             item["familia"] = familia(item["tipo"])
-            _completar(item)
+            try:
+                _completar(item)
+            except ValueError as e:
+                print(f"AVISO — linha ignorada em {xlsx.name} ({ws.title}, "
+                     f"posição {posicao}): {e}")
+                continue
             itens.append(item)
     wb.close()
     return itens
+
+
+def _nome_seguro(ficheiro: str) -> str:
+    """Reduz a um nome de ficheiro simples — sem separadores, sem travessia.
+
+    O valor de origem vem de uma coluna da folha de cálculo do índice (ou de
+    um URL), uma fonte externa que pode ter erros de cópia/OCR ou, no limite,
+    ser adulterada. `Path(ficheiro).name` descarta qualquer componente de
+    directório; o que resta ainda pode ser "" ou ".." (ex.: um URL terminado
+    em "/.."), por isso a rejeição explícita a seguir.
+    """
+    if not ficheiro:
+        return ""
+    nome = Path(ficheiro).name
+    if not nome or nome in (".", ".."):
+        raise ValueError(f"nome de ficheiro inválido no índice: {ficheiro!r}")
+    return nome
 
 
 def _completar(item: dict) -> None:
@@ -161,9 +183,9 @@ def _completar(item: dict) -> None:
     item["ano"] = _inteiro(item.get("ano"))
     item["num_bte"] = _inteiro(item.get("num_bte"))
     url = (item.get("url") or "").strip()
-    ficheiro = (item.get("ficheiro") or "").strip()
+    ficheiro = _nome_seguro((item.get("ficheiro") or "").strip())
     if url:
-        ficheiro = ficheiro or Path(urlparse(url).path).name
+        ficheiro = ficheiro or _nome_seguro(Path(urlparse(url).path).name)
         partes = [p for p in urlparse(url).path.split("/") if p]
         if item["ano"] is None and len(partes) >= 3:
             item["ano"] = _inteiro(partes[-3])
@@ -207,14 +229,30 @@ class Registo:
 
     @classmethod
     def carregar(cls, caminho: Path) -> "Registo":
+        """Carrega o registo, validando cada entrada contra REGISTO_SCHEMA.
+
+        Uma linha inválida (JSON malformado, sem "chave", ou com "ano"/
+        "num_bte"/ordinal do tipo errado) é ignorada com um aviso — em vez de
+        entrar sem verificação e produzir mais tarde um nome de ficheiro como
+        "00_PR_000_BTE_00_…" (ver PR #35, achado nº10) — mas não interrompe a
+        leitura do resto do ficheiro.
+        """
+        import jsonschema
+
         caminho = Path(caminho)
         entradas: dict[str, dict] = {}
         if caminho.exists():
-            for linha in caminho.read_text(encoding="utf-8").splitlines():
+            for n, linha in enumerate(caminho.read_text(encoding="utf-8").splitlines(), 1):
                 linha = linha.strip()
                 if not linha:
                     continue
-                e = json.loads(linha)
+                try:
+                    e = json.loads(linha)
+                    validar_registo(e)
+                except (json.JSONDecodeError, jsonschema.ValidationError, KeyError) as exc:
+                    print(f"AVISO — {caminho.name}, linha {n}: entrada de registo "
+                         f"inválida, ignorada: {exc}")
+                    continue
                 entradas[e["chave"]] = e          # última linha ganha
         return cls(caminho, entradas)
 
@@ -316,6 +354,12 @@ def descarregar_item(item: dict, destino_raiz: Path, registo: Registo, *,
     anterior = registo.get(item["chave"]) or {}
     descarga = dict(anterior.get("descarga") or {})
     caminho = destino_raiz / str(item["ano"]) / str(item["num_bte"]) / item["ficheiro"]
+    raiz_resolvida = destino_raiz.resolve()
+    if raiz_resolvida not in caminho.resolve().parents and caminho.resolve() != raiz_resolvida:
+        # cinto-e-suspensórios: _nome_seguro() já devia ter impedido isto em
+        # _completar(), mas um caminho de escrita nunca deve confiar só numa
+        # camada de validação a montante.
+        raise ValueError(f"caminho de destino fora de {destino_raiz}: {caminho}")
 
     if descarga.get("sha256") and caminho.exists():
         if sha256_ficheiro(caminho) == descarga["sha256"]:
@@ -367,6 +411,11 @@ def descarregar_item(item: dict, destino_raiz: Path, registo: Registo, *,
                                               "erro": erro or "sem resposta"})
 
 
+INTERVALO_PERSISTENCIA = 20   # guardar o registo a cada N pedidos de rede,
+                              # não só no fim — uma corrida interrompida a
+                              # meio não deve perder o que já foi descarregado
+
+
 def recolher(indices: list[Path], destino: Path, registo: Registo, *,
              rede: bool = False, familias: tuple[str, ...] = FAMILIAS_POR_OMISSAO,
              abridor=None, pausa: float = 1.0,
@@ -375,6 +424,10 @@ def recolher(indices: list[Path], destino: Path, registo: Registo, *,
 
     Com `rede=False` (omissão) não é aberta nenhuma ligação: os documentos em
     falta ficam com estado `por_descarregar`.
+
+    O registo é guardado a cada `INTERVALO_PERSISTENCIA` pedidos de rede e
+    sempre no fim, mesmo em caso de excepção — uma corrida interrompida a
+    meio (rede, Ctrl-C, suspensão) não obriga a redescarregar tudo.
     """
     abridor = abridor or abridor_urllib
     resumo = {"indices": [], "por_estado": {}, "tipos_desconhecidos": {},
@@ -384,65 +437,68 @@ def recolher(indices: list[Path], destino: Path, registo: Registo, *,
     def contar(estado):
         resumo["por_estado"][estado] = resumo["por_estado"].get(estado, 0) + 1
 
-    for indice in indices:
-        itens = ler_indice(indice)
-        resumo["indices"].append({"ficheiro": indice.name, "linhas": len(itens)})
-        for item in itens:
-            resumo["documentos"] += 1
-            if item["familia"] is None:
-                tipo = item.get("tipo") or "(sem tipo)"
-                resumo["tipos_desconhecidos"][tipo] = \
-                    resumo["tipos_desconhecidos"].get(tipo, 0) + 1
-                registo.actualizar(item, descarga={"estado": "ignorado",
-                                                   "motivo": f"tipo desconhecido: {tipo}"})
-                contar("ignorado")
-                continue
-            if item["familia"] not in familias:
-                registo.actualizar(item, descarga={
-                    "estado": "ignorado",
-                    "motivo": f"família fora do âmbito: {item['familia']}"})
-                contar("ignorado")
-                continue
-            if not item["url"]:
-                resumo["problemas"].append(
-                    f"{item['chave']}: sem ligação para o documento")
-                registo.actualizar(item, descarga={"estado": "falhado",
-                                                   "erro": "sem URL"})
-                contar("falhado")
-                continue
+    try:
+        for indice in indices:
+            itens = ler_indice(indice)
+            resumo["indices"].append({"ficheiro": indice.name, "linhas": len(itens)})
+            for item in itens:
+                resumo["documentos"] += 1
+                if item["familia"] is None:
+                    tipo = item.get("tipo") or "(sem tipo)"
+                    resumo["tipos_desconhecidos"][tipo] = \
+                        resumo["tipos_desconhecidos"].get(tipo, 0) + 1
+                    registo.actualizar(item, descarga={"estado": "ignorado",
+                                                       "motivo": f"tipo desconhecido: {tipo}"})
+                    contar("ignorado")
+                    continue
+                if item["familia"] not in familias:
+                    registo.actualizar(item, descarga={
+                        "estado": "ignorado",
+                        "motivo": f"família fora do âmbito: {item['familia']}"})
+                    contar("ignorado")
+                    continue
+                if not item["url"]:
+                    resumo["problemas"].append(
+                        f"{item['chave']}: sem ligação para o documento")
+                    registo.actualizar(item, descarga={"estado": "falhado",
+                                                       "erro": "sem URL"})
+                    contar("falhado")
+                    continue
 
-            anterior = (registo.get(item["chave"]) or {}).get("descarga") or {}
-            caminho_ant = Path(anterior.get("caminho", ""))
-            if anterior.get("sha256") and caminho_ant.exists() and \
-                    sha256_ficheiro(caminho_ant) == anterior["sha256"]:
-                registo.actualizar(item, descarga={**anterior,
-                                                   "estado": "ja_existente"})
-                contar("ja_existente")
-                continue
+                anterior = (registo.get(item["chave"]) or {}).get("descarga") or {}
+                caminho_ant = Path(anterior.get("caminho", ""))
+                if anterior.get("sha256") and caminho_ant.exists() and \
+                        sha256_ficheiro(caminho_ant) == anterior["sha256"]:
+                    registo.actualizar(item, descarga={**anterior,
+                                                       "estado": "ja_existente"})
+                    contar("ja_existente")
+                    continue
 
-            if not rede:
-                registo.actualizar(item, descarga={**anterior,
-                                                   "estado": "por_descarregar"})
-                contar("por_descarregar")
-                continue
+                if not rede:
+                    registo.actualizar(item, descarga={**anterior,
+                                                       "estado": "por_descarregar"})
+                    contar("por_descarregar")
+                    continue
 
-            if limite is not None and pedidos >= limite:
-                registo.actualizar(item, descarga={**anterior,
-                                                   "estado": "por_descarregar"})
-                contar("por_descarregar")
-                continue
+                if limite is not None and pedidos >= limite:
+                    registo.actualizar(item, descarga={**anterior,
+                                                       "estado": "por_descarregar"})
+                    contar("por_descarregar")
+                    continue
 
-            if pedidos and pausa:
-                time.sleep(pausa)
-            pedidos += 1
-            entrada = descarregar_item(item, destino, registo, abridor=abridor)
-            estado = entrada["descarga"]["estado"]
-            contar(estado)
-            if estado == "falhado":
-                resumo["problemas"].append(
-                    f"{item['chave']}: {entrada['descarga'].get('erro')}")
-
-    registo.guardar()
+                if pedidos and pausa:
+                    time.sleep(pausa)
+                pedidos += 1
+                entrada = descarregar_item(item, destino, registo, abridor=abridor)
+                estado = entrada["descarga"]["estado"]
+                contar(estado)
+                if estado == "falhado":
+                    resumo["problemas"].append(
+                        f"{item['chave']}: {entrada['descarga'].get('erro')}")
+                if pedidos % INTERVALO_PERSISTENCIA == 0:
+                    registo.guardar()
+    finally:
+        registo.guardar()
     resumo["pedidos_de_rede"] = pedidos
     return resumo
 

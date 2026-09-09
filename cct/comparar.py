@@ -19,6 +19,10 @@ from .diacronia import comparar_versoes, exportar_comparacao_xlsx
 def _ano(nome: str) -> int | None:
     if re.match(r"^\d{1,2}_BTE_", nome):
         return 2025  # numeração PR de 2025 ("3_BTE_2_…")
+    m = re.match(r"^(\d{2})_[A-Z]{2}_\d+_BTE_\d+_", nome)
+    if m:
+        return 2000 + int(m.group(1))  # esquema da aquisição automática (cct.nomeacao):
+                                       # "26_PR_003_BTE_31_…", "26_PE_001_BTE_31_…"
     m = re.match(r"^(\d{2})\d{3}_", nome)
     if m:
         return 2000 + int(m.group(1))  # "25146_", "24122_", "19000_"

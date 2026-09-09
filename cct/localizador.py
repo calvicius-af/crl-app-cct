@@ -3,6 +3,13 @@
 A amostra de referência identifica documentos como "25_PR_016_BTE_04_EMARP_SINTAP":
 o número do BTE (04) dá o ficheiro (bte4_2025.pdf) e os tokens das partes
 (EMARP, SINTAP) permitem encontrar a convenção certa dentro do número.
+
+O token depois do ano (aqui "PR") identifica a família documental — "PR" para
+convenções, mas cct.nomeacao usa também "PE"/"AV"/"AA" para portarias de
+extensão, avisos e acordos de adesão (ver TOKEN_FAMILIA em cct/nomeacao.py).
+RE_DOC_ID aceita qualquer sigla de duas letras maiúsculas nessa posição — não
+lista as famílias uma a uma, para não ter de ser revisto sempre que
+cct.nomeacao ganhar uma família nova.
 """
 import re
 import unicodedata
@@ -12,11 +19,17 @@ RE_INICIO_CONVENCAO = re.compile(
     r"^(Contrato coletivo|Acordo coletivo|Acordo de empresa|Acordo de adesão)"
     r"\s+(entre|celebrado)", re.MULTILINE)
 
-RE_DOC_ID = re.compile(r"^(\d{2})_PR_\d+_BTE_(\d+)_(.+?)(?:_TXT)?$")
+RE_DOC_ID = re.compile(r"^(\d{2})_[A-Z]{2}_\d+_BTE_(\d+)_(.+?)(?:_TXT)?$")
 
 
-def _sem_acentos(s: str) -> str:
-    return "".join(c for c in unicodedata.normalize("NFD", s)
+def _sem_acentos(s) -> str:
+    """Remove marcas de acentuação (NFD → descarta categoria 'Mn').
+
+    Implementação partilhada — cct/nomeacao.py e cct/recolha.py importam
+    daqui em vez de reimplementar, para não terem três versões da mesma
+    normalização a poderem divergir silenciosamente (ver PR #35, achado nº9).
+    """
+    return "".join(c for c in unicodedata.normalize("NFD", str(s or ""))
                    if unicodedata.category(c) != "Mn")
 
 

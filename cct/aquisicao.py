@@ -9,10 +9,12 @@ Uso:
 """
 import argparse
 import os
+import sys
 import time
 from pathlib import Path
 
 from . import nomeacao, recolha
+from .proveniencia import agora_utc, construir_manifesto, escrever_manifesto
 from .recolha import (DESTINO_OMISSAO, FAMILIAS_POR_OMISSAO, INDICES_OMISSAO,
                       REGISTO_OMISSAO, RAIZ, Registo)
 
@@ -23,6 +25,7 @@ def _indices(caminho: Path) -> list[Path]:
 
 
 def main(argv=None):
+    inicio_utc = agora_utc()
     p = argparse.ArgumentParser(
         prog="cct.aquisicao",
         description="Recolhe os documentos do BTE e renomeia-os para o pipeline. "
@@ -37,6 +40,9 @@ def main(argv=None):
     p.add_argument("--familias", default=",".join(FAMILIAS_POR_OMISSAO))
     p.add_argument("--confirmar-rede", action="store_true")
     p.add_argument("--aplicar", action="store_true")
+    p.add_argument("--aceitar-heuristicas", action="store_true",
+                   help="escreve mesmo os documentos com sigla derivada por "
+                        "heurística, sem esperar por confirmação humana")
     p.add_argument("--pausa", type=float, default=1.0)
     p.add_argument("--limite", type=int)
     p.add_argument("--relatorio", default=str(RAIZ / "results" / "aquisicao"))
@@ -59,7 +65,8 @@ def main(argv=None):
 
     tabela = nomeacao.carregar_siglas(Path(args.siglas)) if args.siglas else None
     r2 = nomeacao.nomear(registo, Path(args.destino), aplicar=args.aplicar,
-                         tabela=tabela, familias=familias)
+                         tabela=tabela, familias=familias,
+                         aceitar_heuristicas=args.aceitar_heuristicas)
     texto2 = nomeacao.texto_resumo(r2, aplicar=args.aplicar)
     print(texto2)
 
@@ -77,10 +84,25 @@ def main(argv=None):
         encoding="utf-8")
     print(f"\n→ {destino_rel}")
 
+    problemas = r1["problemas"] + r2["problemas"]
+    parametros = {chave: valor for chave, valor in vars(args).items()}
+    comando = ["python", "-m", "cct.aquisicao", *(argv if argv is not None else sys.argv[1:])]
+    manifesto = construir_manifesto(
+        raiz=RAIZ, inicio_utc=inicio_utc, parametros=parametros,
+        entradas=indices, saidas=[destino_rel, Path(args.registo)],
+        resumo={"documentos_no_indice": r1["documentos"],
+               "descarregados": r1["por_estado"].get("descarregado", 0),
+               "nomeados": r2["por_estado"].get("nomeado", 0),
+               "por_confirmar": r2["por_estado"].get("por_confirmar", 0)},
+        problemas=problemas, comando=comando)
+    caminho_manifesto = pasta / "manifest.json"
+    escrever_manifesto(caminho_manifesto, manifesto)
+    print(f"→ {caminho_manifesto}")
+
     if not rede or not args.aplicar:
         print("Corrida de simulação. Para executar: "
               "--confirmar-rede --aplicar")
-    return 1 if (r1["problemas"] or r2["problemas"]) else 0
+    return 1 if problemas else 0
 
 
 if __name__ == "__main__":

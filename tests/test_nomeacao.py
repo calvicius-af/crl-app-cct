@@ -119,8 +119,13 @@ def test_varios_outorgantes_do_mesmo_lado_geram_aviso():
 def test_nomes_do_bte31(registo_com_recolha):
     registo, tmp_path = registo_com_recolha
     resumo = nomear(registo, tmp_path / "bte", aplicar=True)
+    # o nome é sempre calculado e reportado, mesmo para os que ficam por
+    # confirmar (ver PR #35, achado nº5) — só a ESCRITA fica condicionada
     assert [n for _, n in resumo["nomes"]] == NOMES_ESPERADOS
-    assert resumo["por_estado"]["nomeado"] == 6
+    # 3 sem aviso são escritos logo; os 3 com sigla derivada por heurística
+    # ficam por confirmar em vez de serem escritos sem revisão humana
+    assert resumo["por_estado"]["nomeado"] == 3
+    assert resumo["por_estado"]["por_confirmar"] == 3
 
 
 @pytest.mark.parametrize("nome", NOMES_ESPERADOS)
@@ -177,7 +182,10 @@ def test_documento_novo_recebe_o_ordinal_seguinte(registo_com_recolha, tmp_path)
 def test_simulacao_nao_escreve_nada(registo_com_recolha):
     registo, tmp_path = registo_com_recolha
     resumo = nomear(registo, tmp_path / "bte", aplicar=False)
-    assert resumo["por_estado"]["por_nomear"] == 6
+    # sem --aplicar nada é escrito, quer o motivo seja a simulação (por_nomear)
+    # quer seja um aviso por confirmar (por_confirmar tem sempre prioridade)
+    assert resumo["por_estado"]["por_nomear"] == 3
+    assert resumo["por_estado"]["por_confirmar"] == 3
     assert not list((tmp_path / "bte").rglob("*.pdf")) if (tmp_path / "bte").exists() else True
 
 
@@ -185,8 +193,21 @@ def test_segunda_corrida_nao_reescreve(registo_com_recolha):
     registo, tmp_path = registo_com_recolha
     nomear(registo, tmp_path / "bte", aplicar=True)
     resumo = nomear(Registo.carregar(registo.caminho), tmp_path / "bte", aplicar=True)
-    assert resumo["por_estado"]["ja_existente"] == 6
+    # os 3 já escritos ficam confirmados por sha256; os 3 por confirmar
+    # continuam por confirmar — nunca é feita uma segunda tentativa de escrita
+    assert resumo["por_estado"]["ja_existente"] == 3
+    assert resumo["por_estado"]["por_confirmar"] == 3
     assert "nomeado" not in resumo["por_estado"]
+
+
+def test_aceitar_heuristicas_escreve_mesmo_com_aviso(registo_com_recolha):
+    registo, tmp_path = registo_com_recolha
+    resumo = nomear(registo, tmp_path / "bte", aplicar=True,
+                    aceitar_heuristicas=True)
+    assert resumo["por_estado"]["nomeado"] == 6
+    assert "por_confirmar" not in resumo["por_estado"]
+    # os avisos continuam a ser reportados — só a escrita deixa de ser bloqueada
+    assert len(resumo["avisos"]) >= 3
 
 
 def test_destino_ocupado_por_outro_conteudo_e_conflito(registo_com_recolha):
@@ -211,7 +232,10 @@ def test_portarias_ficam_fora_da_pasta_que_o_pipeline_le(registo_com_recolha):
         "outorgantes": "", "descarga": {"estado": "descarregado", "sha256": "z",
                                         "caminho": str(tmp_path / "interim" /
                                                        "2026" / "31" / "00260057.pdf")}}
-    nomear(registo, tmp_path / "bte", aplicar=True)
+    # aceitar_heuristicas=True: este teste verifica isolamento de pastas
+    # (extensões vs. convenções), não a confirmação de siglas — ver o teste
+    # dedicado test_aceitar_heuristicas_escreve_mesmo_com_aviso
+    nomear(registo, tmp_path / "bte", aplicar=True, aceitar_heuristicas=True)
     pasta_pipeline = tmp_path / "bte" / "bte_2026"
     assert (pasta_pipeline / "extensoes" / "26_PE_001_BTE_31_ANX_SNY.pdf").exists()
     assert len(sorted(pasta_pipeline.glob("*.pdf"))) == 6   # o glob do pipeline

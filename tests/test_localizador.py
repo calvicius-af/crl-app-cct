@@ -15,6 +15,15 @@ def test_interpretar_doc_id():
     assert "emarp" in tokens and "sintap" in tokens
 
 
+@pytest.mark.parametrize("familia", ["PR", "PE", "AV", "AA"])
+def test_interpretar_doc_id_aceita_qualquer_familia_de_duas_letras(familia):
+    """cct.nomeacao nomeia extensões/avisos/adesões com PE/AV/AA, não só PR
+    (ver TOKEN_FAMILIA em cct/nomeacao.py) — o localizador tem de os aceitar."""
+    ano, bte, tokens = interpretar_doc_id(f"26_{familia}_001_BTE_31_ANX_SNY")
+    assert (ano, bte) == (26, 31)
+    assert tokens == ["anx", "sny"]
+
+
 def test_subtokens_camel_case():
     assert _subtokens("AguasRibatejo") == ["aguas", "ribatejo"]
     assert _subtokens("STAL") == ["stal"]

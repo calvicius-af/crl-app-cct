@@ -19,10 +19,11 @@ import argparse
 import re
 import shutil
 import time
-import unicodedata
 from pathlib import Path
 
-from .recolha import RAIZ, REGISTO_OMISSAO, Registo, sha256_ficheiro
+from .localizador import _sem_acentos
+from .recolha import (INTERVALO_PERSISTENCIA, RAIZ, REGISTO_OMISSAO, Registo,
+                      sha256_ficheiro)
 
 DESTINO_OMISSAO = RAIZ / "data" / "raw" / "bte"
 
@@ -57,11 +58,6 @@ RE_ENTRE_TRACOS = re.compile(r"[-–—]\s*([^-–—,;()]{2,30}?)\s*(?=[-–—
 RE_PARTES_TITULO = re.compile(
     r"\bentre\s+(?:a|o|as|os)?\s*(?P<a>.+?)\s+e\s+(?:a|o|as|os)\s+(?P<b>.+?)\s*$",
     re.IGNORECASE | re.DOTALL)
-
-
-def _sem_acentos(s: str) -> str:
-    return "".join(c for c in unicodedata.normalize("NFD", str(s or ""))
-                   if unicodedata.category(c) != "Mn")
 
 
 def _e_sigla(token: str) -> bool:
@@ -238,8 +234,18 @@ def carregar_siglas(caminho: Path) -> dict[str, str]:
 
 def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
            tabela: dict[str, str] | None = None,
-           familias=("convencao", "extensao", "aviso", "adesao")) -> dict:
-    """Atribui nomes e, com `aplicar=True`, copia os PDFs para o destino."""
+           familias=("convencao", "extensao", "aviso", "adesao"),
+           aceitar_heuristicas: bool = False) -> dict:
+    """Atribui nomes e, com `aplicar=True`, copia os PDFs para o destino.
+
+    Um documento cujo nome tenha avisos de `nome_documento()` (sigla
+    derivada por heurística, outorgante em falta, nome do título, nome
+    encurtado) fica em estado `por_confirmar` e **não é escrito**, mesmo com
+    `aplicar=True` — a confirmação humana que a spec promete tem de acontecer
+    antes de o ficheiro existir e o ordinal ficar permanente, não depois.
+    `aceitar_heuristicas=True` desliga esta proteção, para quem decide
+    conscientemente aceitar o risco (ex.: uma corrida em lote já revista).
+    """
     resumo = {"ordinais_novos": atribuir_ordinais(registo, familias),
               "por_estado": {}, "avisos": [], "problemas": [], "nomes": []}
 
@@ -252,54 +258,66 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
     entradas.sort(key=lambda e: (e.get("ano") or 0, e.get("num_bte") or 0,
                                  (e.get("nomeacao") or {}).get("ordinal") or 0))
     vistos: dict[tuple, list[str]] = {}
+    escritos = 0
 
-    for e in entradas:
-        nomeacao = e.setdefault("nomeacao", {})
-        origem = Path((e.get("descarga") or {}).get("caminho", ""))
-        if not origem.exists():
-            resumo["problemas"].append(f"{e['chave']}: PDF recolhido não encontrado "
-                                       f"({origem})")
-            contar("sem_origem")
-            continue
-        nome, avisos = nome_documento(e, nomeacao["ordinal"], tabela)
-        partes = "_".join(nome.split("_")[5:])
-        vistos.setdefault((e.get("ano"), partes), []).append(nome)
-        if len(vistos[(e.get("ano"), partes)]) > 1:
-            avisos.append("outro documento do mesmo par de outorgantes neste ano: "
-                          + ", ".join(vistos[(e.get("ano"), partes)][:-1]))
-        subpasta = SUBPASTA_FAMILIA.get(e["familia"], "")
-        pasta = destino / f"bte_{e['ano']}" / subpasta if subpasta \
-            else destino / f"bte_{e['ano']}"
-        alvo = pasta / f"{nome}.pdf"
-        nomeacao.update({"doc_id": nome, "caminho": str(alvo), "avisos": avisos})
-        resumo["nomes"].append((e["chave"], nome))
-        resumo["avisos"].extend(f"{nome}: {a}" for a in avisos)
+    try:
+        for e in entradas:
+            nomeacao = e.setdefault("nomeacao", {})
+            origem = Path((e.get("descarga") or {}).get("caminho", ""))
+            if not origem.exists():
+                resumo["problemas"].append(f"{e['chave']}: PDF recolhido não encontrado "
+                                           f"({origem})")
+                contar("sem_origem")
+                continue
+            nome, avisos = nome_documento(e, nomeacao["ordinal"], tabela)
+            avisos_heuristica = list(avisos)   # antes do aviso de par repetido, abaixo —
+                                               # esse é informativo, não indica nome errado
+            partes = "_".join(nome.split("_")[5:])
+            vistos.setdefault((e.get("ano"), partes), []).append(nome)
+            if len(vistos[(e.get("ano"), partes)]) > 1:
+                avisos.append("outro documento do mesmo par de outorgantes neste ano: "
+                              + ", ".join(vistos[(e.get("ano"), partes)][:-1]))
+            subpasta = SUBPASTA_FAMILIA.get(e["familia"], "")
+            pasta = destino / f"bte_{e['ano']}" / subpasta if subpasta \
+                else destino / f"bte_{e['ano']}"
+            alvo = pasta / f"{nome}.pdf"
+            nomeacao.update({"doc_id": nome, "caminho": str(alvo), "avisos": avisos})
+            resumo["nomes"].append((e["chave"], nome))
+            resumo["avisos"].extend(f"{nome}: {a}" for a in avisos)
 
-        if alvo.exists():
-            if sha256_ficheiro(alvo) == (e.get("descarga") or {}).get("sha256"):
-                nomeacao["estado"] = "ja_existente"
-                contar("ja_existente")
-            else:
-                nomeacao["estado"] = "conflito"
-                resumo["problemas"].append(
-                    f"{nome}: já existe um ficheiro diferente no destino — não foi escrito")
-                contar("conflito")
-            continue
+            if alvo.exists():
+                if sha256_ficheiro(alvo) == (e.get("descarga") or {}).get("sha256"):
+                    nomeacao["estado"] = "ja_existente"
+                    contar("ja_existente")
+                else:
+                    nomeacao["estado"] = "conflito"
+                    resumo["problemas"].append(
+                        f"{nome}: já existe um ficheiro diferente no destino — não foi escrito")
+                    contar("conflito")
+                continue
 
-        if not aplicar:
-            nomeacao["estado"] = "por_nomear"
-            contar("por_nomear")
-            continue
+            if avisos_heuristica and not aceitar_heuristicas:
+                nomeacao["estado"] = "por_confirmar"
+                contar("por_confirmar")
+                continue
 
-        pasta.mkdir(parents=True, exist_ok=True)
-        temp = alvo.with_suffix(".pdf.part")
-        shutil.copyfile(origem, temp)
-        temp.replace(alvo)
-        nomeacao.update({"estado": "nomeado",
-                         "data": time.strftime("%Y-%m-%dT%H:%M:%S")})
-        contar("nomeado")
+            if not aplicar:
+                nomeacao["estado"] = "por_nomear"
+                contar("por_nomear")
+                continue
 
-    registo.guardar()
+            pasta.mkdir(parents=True, exist_ok=True)
+            temp = alvo.with_suffix(".pdf.part")
+            shutil.copyfile(origem, temp)
+            temp.replace(alvo)
+            nomeacao.update({"estado": "nomeado",
+                             "data": time.strftime("%Y-%m-%dT%H:%M:%S")})
+            contar("nomeado")
+            escritos += 1
+            if escritos % INTERVALO_PERSISTENCIA == 0:
+                registo.guardar()
+    finally:
+        registo.guardar()
     return resumo
 
 
@@ -310,6 +328,9 @@ def texto_resumo(resumo: dict, *, aplicar: bool) -> str:
         linhas.append(f"    {estado}: {n}")
     if not aplicar and resumo["por_estado"].get("por_nomear"):
         linhas.append("  (simulação — repetir com --aplicar para escrever)")
+    if resumo["por_estado"].get("por_confirmar"):
+        linhas.append("  (siglas por confirmar — corrigir com --siglas, ou aceitar "
+                      "conscientemente o risco com --aceitar-heuristicas)")
     if resumo["avisos"]:
         linhas.append(f"  a confirmar ({len(resumo['avisos'])}):")
         linhas.extend(f"    {a}" for a in resumo["avisos"])
@@ -329,6 +350,10 @@ def main(argv=None):
     p.add_argument("--familias", default="convencao,extensao,aviso,adesao")
     p.add_argument("--aplicar", action="store_true",
                    help="escreve mesmo (por omissão só simula)")
+    p.add_argument("--aceitar-heuristicas", action="store_true",
+                   help="escreve mesmo os documentos com sigla derivada por "
+                        "heurística, sem esperar por confirmação humana "
+                        "(--siglas) — usar com critério")
     args = p.parse_args(argv)
 
     registo = Registo.carregar(Path(args.registo))
@@ -338,7 +363,8 @@ def main(argv=None):
     tabela = carregar_siglas(Path(args.siglas)) if args.siglas else None
     resumo = nomear(registo, Path(args.destino), aplicar=args.aplicar,
                     tabela=tabela,
-                    familias=tuple(f.strip() for f in args.familias.split(",") if f.strip()))
+                    familias=tuple(f.strip() for f in args.familias.split(",") if f.strip()),
+                    aceitar_heuristicas=args.aceitar_heuristicas)
     print(texto_resumo(resumo, aplicar=args.aplicar))
     return 1 if resumo["problemas"] else 0
 

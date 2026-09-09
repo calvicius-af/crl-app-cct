@@ -2,6 +2,7 @@
 
 doc.json  — estrutura hierárquica de uma convenção, com offsets sobre doc.txt
 anotacoes.json — codificações propostas, com confiança e método
+registo_bte.jsonl — uma linha por documento adquirido (cct/recolha.py)
 """
 from jsonschema import validate
 
@@ -72,9 +73,48 @@ ANOTACOES_SCHEMA = {
 }
 
 
+ESTADOS_DESCARGA = ["descarregado", "ja_existente", "inalterado", "falhado",
+                    "ignorado", "por_descarregar"]
+ESTADOS_NOMEACAO = ["nomeado", "ja_existente", "por_nomear", "por_confirmar",
+                    "conflito", "sem_origem"]
+
+# Deliberadamente permissivo: uma entrada é uma linha de registo_bte.jsonl,
+# escrita e relida entre corridas (às vezes de anos diferentes do código), por
+# isso só se exige o que o resto do pipeline realmente lê para não falhar
+# (ver PR #35, achado nº10) — "chave" identifica o documento; "ano"/"num_bte",
+# quando presentes, têm de ser inteiros (não strings nem outra coisa), porque
+# cct/nomeacao.py faz int(entrada.get("ano") or 0) sem validar de novo.
+REGISTO_SCHEMA = {
+    "type": "object",
+    "required": ["chave"],
+    "properties": {
+        "chave": {"type": "string", "minLength": 1},
+        "ano": {"type": ["integer", "null"]},
+        "num_bte": {"type": ["integer", "null"]},
+        "descarga": {
+            "type": "object",
+            "properties": {
+                "estado": {"enum": ESTADOS_DESCARGA},
+            },
+        },
+        "nomeacao": {
+            "type": "object",
+            "properties": {
+                "ordinal": {"type": ["integer", "null"], "minimum": 1},
+                "estado": {"enum": ESTADOS_NOMEACAO},
+            },
+        },
+    },
+}
+
+
 def validar_doc(doc: dict) -> None:
     validate(doc, DOC_SCHEMA)
 
 
 def validar_anotacoes(anotacoes: dict) -> None:
     validate(anotacoes, ANOTACOES_SCHEMA)
+
+
+def validar_registo(entrada: dict) -> None:
+    validate(entrada, REGISTO_SCHEMA)

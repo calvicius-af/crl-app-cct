@@ -69,9 +69,9 @@ não por boa vontade.
   `bte.dgcp.mtsss.gov.pt`. Nesse caso a equipa continua a depositar os PDFs à mão em
   `data/interim/recolha/<ano>/<nº>/`, e só corre a nomeação — que é offline. O
   proxy do sistema é respeitado (`HTTPS_PROXY`).
-- O registo (`data/registo/registo_bte.jsonl`) passa a ser o único ficheiro que a
-  aplicação escreve dentro de `data/` fora de `interim/`. É deliberado: perder o registo
-  perde os ordinais atribuídos.
+- O registo (`data/registo/registo_bte.jsonl`) e os PDFs nomeados em `data/raw/bte/`
+  passam a ser as duas escritas que a aplicação faz dentro de `data/` fora de
+  `interim/`. É deliberado: perder o registo perde os ordinais atribuídos.
 - Os testes não dependem da rede: o transporte é injetado como função.
 
 ## Revisitar quando

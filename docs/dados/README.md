@@ -158,10 +158,11 @@ nomeação.
 ### O registo (`data/registo/registo_bte.jsonl`)
 
 Uma linha JSON por documento, com a proveniência (índice, tipo, código IRCT,
-outorgantes), o estado da descarga e o nome atribuído. **É o único ficheiro que a
-aplicação escreve dentro de `data/` fora de `interim/`, e não deve ser apagado**: é ele
-que guarda os números sequenciais já atribuídos. Apagá-lo faz a numeração recomeçar em 1
-e produz nomes diferentes para os mesmos documentos.
+outorgantes), o estado da descarga e o nome atribuído. Junto com os PDFs nomeados em
+`data/raw/bte/` (passo 2 acima), é uma das duas escritas que a aquisição faz fora de
+`data/interim/`. **Não deve ser apagado**: é ele que guarda os números sequenciais já
+atribuídos. Apagá-lo faz a numeração recomeçar em 1 e produz nomes diferentes para os
+mesmos documentos.
 
 ### Siglas dos outorgantes
 

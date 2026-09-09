@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 
 from cct import recolha
-from cct.recolha import (ErroRede, Registo, familia, ler_indice, recolher,
-                         validar_url)
+from cct.recolha import (ErroRede, Registo, _nome_seguro, descarregar_item,
+                         familia, ler_indice, recolher, validar_url)
 
 CABECALHO = [
     "ANO", "ID:", "TITULO DO DOCUMENTO:", "TIPO DE DOCUMENTO:",
@@ -277,10 +277,152 @@ def test_erro_404_nao_e_repetido_nem_escreve(ambiente):
     assert "HTTP 404" in resumo["problemas"][0]
 
 
+# ----------------------------------------- persistência periódica do registo
+
+def test_registo_persiste_periodicamente_nao_so_no_fim(ambiente, monkeypatch):
+    """Ver PR #35, achado nº6: o registo não pode ficar só à espera do fim
+    da corrida para ser gravado — senão uma interrupção a meio perde tudo."""
+    indice, registo, interim = ambiente
+    monkeypatch.setattr(recolha, "INTERVALO_PERSISTENCIA", 2)
+
+    gravacoes = []
+    original = registo.guardar
+
+    def guardar_e_contar():
+        original()
+        gravacoes.append(len(Registo.carregar(registo.caminho).entradas))
+
+    registo.guardar = guardar_e_contar
+    recolher([indice], interim, registo, rede=True, abridor=AbridorFalso(), pausa=0)
+
+    # 6 documentos válidos, intervalo=2 → pelo menos 3 gravações intermédias
+    # (a última coincide com a gravação final do `finally`)
+    assert len(gravacoes) >= 3
+
+
+def test_interrupcao_a_meio_nao_perde_o_que_ja_foi_descarregado(ambiente, monkeypatch):
+    monkeypatch.setattr(recolha, "INTERVALO_PERSISTENCIA", 2)
+    indice, registo, interim = ambiente
+
+    class AbridorComFalha(AbridorFalso):
+        def __init__(self):
+            super().__init__()
+            self.chamadas = 0
+
+        def __call__(self, url, cabecalhos=None):
+            self.chamadas += 1
+            if self.chamadas > 3:
+                raise RuntimeError("falha simulada a meio da corrida")
+            return super().__call__(url, cabecalhos)
+
+    with pytest.raises(RuntimeError):
+        recolher([indice], interim, registo, rede=True,
+                abridor=AbridorComFalha(), pausa=0)
+
+    # apesar da excepção não tratada, o `finally` já gravou o que foi feito
+    relido = Registo.carregar(registo.caminho)
+    descarregados = [e for e in relido.entradas.values()
+                     if (e.get("descarga") or {}).get("estado") == "descarregado"]
+    assert len(descarregados) >= 2
+
+    # e uma corrida seguinte não repete os pedidos já bem sucedidos
+    resumo2 = recolher([indice], interim, relido, rede=True,
+                       abridor=AbridorFalso(), pausa=0)
+    assert resumo2["pedidos_de_rede"] < 6
+
+
 def test_nao_ficam_ficheiros_temporarios(ambiente):
     indice, registo, interim = ambiente
     recolher([indice], interim, registo, rede=True, abridor=AbridorFalso(), pausa=0)
     assert not list(interim.rglob("*.part"))
+
+
+# ------------------------------------------------------- travessia de diretório
+
+@pytest.mark.parametrize("bruto,esperado", [
+    ("../../../../tmp/evil.pdf", "evil.pdf"),        # neutralizado: só o nome sobra
+    ("../../../etc/passwd", "passwd"),
+    ("/etc/passwd", "passwd"),
+    ("00260057.pdf", "00260057.pdf"),                # caso normal, sem alteração
+])
+def test_nome_seguro_neutraliza_travessia_para_o_nome_simples(bruto, esperado):
+    assert _nome_seguro(bruto) == esperado
+
+
+@pytest.mark.parametrize("bruto", ["..", ".", ""])
+def test_nome_seguro_recusa_o_que_nao_sobra_nome_nenhum(bruto):
+    if bruto == "":
+        assert _nome_seguro(bruto) == ""    # ausência de valor é válida (RF opcional)
+    else:
+        with pytest.raises(ValueError):
+            _nome_seguro(bruto)
+
+
+def test_indice_com_ficheiro_de_travessia_e_neutralizado_nao_escreve_fora_do_destino(
+        ambiente):
+    indice, registo, interim = ambiente
+    # injecta um valor de travessia diretamente na folha, como viria de uma
+    # célula corrompida ou adulterada do índice
+    import openpyxl
+    wb = openpyxl.load_workbook(indice)
+    ws = wb.active
+    for row in ws.iter_rows(min_row=2):
+        if row[20].value == "00260057.pdf":            # coluna "Página (criado)"
+            row[20].value = "../../../../../../tmp/evil_travessia.pdf"
+            row[21].value = f"{URL}/00260057.pdf"       # URL continua válido
+            break
+    wb.save(indice)
+
+    resumo = recolher([indice], interim, registo, rede=True,
+                      abridor=AbridorFalso(), pausa=0)
+
+    # os 6 documentos continuam a ser processados — a travessia foi apenas
+    # reduzida ao nome simples "evil_travessia.pdf", dentro do destino certo
+    assert resumo["pedidos_de_rede"] == 6
+    assert resumo["por_estado"].get("descarregado", 0) == 6
+    alvo = interim / "2026" / "31" / "evil_travessia.pdf"
+    assert alvo.exists()
+    # nada foi escrito fora de data/interim/recolha
+    for caminho in interim.rglob("*"):
+        assert interim.resolve() in caminho.resolve().parents or caminho == interim
+    # em particular, nada foi escrito para fora do sistema de ficheiros de ensaio
+    assert not (interim.parent.parent / "evil_travessia.pdf").exists()
+
+
+def test_descarregar_item_recusa_caminho_fora_do_destino_mesmo_sem_completar(
+        ambiente):
+    """Cinto-e-suspensórios: mesmo chamando a função directamente, sem passar
+    por _completar()/_nome_seguro(), o caminho de escrita nunca escapa do
+    destino."""
+    _indice, registo, interim = ambiente
+    item = {"chave": "x", "ano": 2026, "num_bte": 31,
+           "ficheiro": "../../../../evil.pdf",
+           "url": f"{URL}/00260057.pdf"}
+    with pytest.raises(ValueError, match="fora de"):
+        descarregar_item(item, interim, registo, abridor=AbridorFalso())
+
+
+# --------------------------------------------------- validação do registo
+
+def test_registo_carrega_ignorando_linha_invalida(ambiente, capsys):
+    """Ver PR #35, achado nº10: uma linha malformada não pode contaminar
+    o resto do registo nem propagar valores errados para cct.nomeacao."""
+    indice, registo, interim = ambiente
+    recolher([indice], interim, registo, rede=True, abridor=AbridorFalso(), pausa=0)
+
+    with open(registo.caminho, "a", encoding="utf-8") as f:
+        f.write('{"chave": "invalida/sem/ano", "ano": "não é um número"}\n')
+        f.write("isto nem sequer é JSON\n")
+        f.write('{"num_bte": 31}\n')             # sem "chave" — required
+
+    capsys.readouterr()  # limpa o que já foi impresso
+    relido = Registo.carregar(registo.caminho)
+    saida = capsys.readouterr().out
+    assert saida.count("AVISO —") == 3
+    assert "invalida/sem/ano" not in relido.entradas
+    # as entradas válidas (incluindo a "ignorada" por família fora de âmbito)
+    # continuam todas presentes — só as 3 linhas injectadas foram rejeitadas
+    assert len(relido.entradas) == len(LINHAS)
 
 
 def test_registo_sobrevive_a_uma_ida_ao_disco(ambiente):
