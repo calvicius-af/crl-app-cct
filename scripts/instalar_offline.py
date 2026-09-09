@@ -14,6 +14,7 @@ Uso por linha de comandos:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -23,6 +24,14 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 WHEELS = RAIZ / "vendor" / "wheels"
 VENV = RAIZ / ".venv"
+
+sys.path.insert(0, str(RAIZ))
+from cct.proveniencia import sha256
+from scripts.preparar_pacote_offline import pacotes_de_requirements
+
+# Só o mapeamento módulo -> pacote, que não está em lado nenhum senão aqui: os
+# nomes a instalar vêm de requirements.txt (ver pacotes_de_requirements), para
+# não haver duas listas a divergir uma da outra.
 MODULOS = [("pdfplumber", "pdfplumber"), ("openpyxl", "openpyxl"),
            ("yaml", "pyyaml"), ("jsonschema", "jsonschema")]
 
@@ -64,6 +73,39 @@ def verificar_pre_requisitos() -> None:
     print(f"  ✓ {n} bibliotecas em vendor/wheels/ ({mb:.0f} MB)")
 
 
+def verificar_integridade() -> None:
+    """Confere os SHA-256 das wheels contra o manifesto, antes de instalar.
+
+    A cópia entre a máquina que preparou o pacote e a estação passa por uma
+    partilha de rede ou por uma pen: um ficheiro truncado ou alterado pelo
+    caminho é exactamente o que o manifesto existe para apanhar. Sem esta
+    verificação, o manifesto só serviria se alguém decidisse compará-lo à mão.
+    """
+    print("== Integridade das bibliotecas")
+    manifesto = WHEELS / "manifesto.json"
+    if not manifesto.is_file():
+        print("  · sem manifesto.json — integridade não verificada "
+              "(pacote preparado por uma versão anterior do preparador)")
+        return
+    try:
+        dados = json.loads(manifesto.read_text(encoding="utf-8"))
+        registos = dados["wheels"]
+    except (ValueError, KeyError, OSError):
+        parar("o manifesto.json está ilegível ou incompleto",
+              "voltar a copiar a pasta vendor/wheels/ a partir da origem")
+
+    for registo in registos:
+        caminho = WHEELS / registo["ficheiro"]
+        if not caminho.is_file():
+            parar(f"falta a biblioteca {registo['ficheiro']}",
+                  "a cópia de vendor/wheels/ está incompleta — repeti-la")
+        if sha256(caminho) != registo["sha256"]:
+            parar(f"a biblioteca {registo['ficheiro']} não corresponde ao manifesto",
+                  "o ficheiro alterou-se ou corrompeu-se na cópia — repetir a "
+                  "cópia de vendor/wheels/ a partir da origem")
+    print(f"  ✓ {len(registos)} ficheiro(s) conferidos contra o manifesto")
+
+
 def criar_venv(refazer: bool) -> None:
     print("== Ambiente isolado (.venv)")
     if VENV.exists():
@@ -87,13 +129,13 @@ def criar_venv(refazer: bool) -> None:
 
 def instalar() -> None:
     print("== Instalação das bibliotecas (sem rede)")
-    # As quatro dependências diretas. Não se usa o requirements.txt porque
-    # esse ficheiro inclui o pytest, que só faz parte do pacote offline se
-    # tiver sido pedido com --incluir-testes; pedi-lo sem ele estar presente
+    # As dependências vêm de requirements.txt, a fonte de verdade única. O
+    # pytest só se pede quando a wheel correspondente está presente: entra no
+    # pacote offline apenas com --incluir-testes, e pedi-lo sem ele lá estar
     # faria o pip falhar sem necessidade.
-    pacotes = [nome for _, nome in MODULOS]
-    if any(WHEELS.glob("pytest-*.whl")):
-        pacotes.append("pytest")
+    incluir_testes = bool(list(WHEELS.glob("pytest-*.whl")))
+    pacotes = pacotes_de_requirements(incluir_testes)
+    if incluir_testes:
         print("  · o pacote inclui o pytest (suite de testes disponível)")
     comando = [
         str(python_do_venv()), "-m", "pip", "install",
@@ -126,8 +168,8 @@ def confirmar() -> int:
         print(r.stdout)
         parar("as bibliotecas instalaram mas não carregam",
               "correr o diagnóstico e enviar o resultado: "
-              ".venv\\Scripts\\python -m cct.doctor")
-    print("  ✓ as quatro bibliotecas carregam")
+              f"{python_do_venv()} -m cct.doctor")
+    print(f"  ✓ as {len(MODULOS)} bibliotecas carregam")
 
     print()
     print("Instalado. A partir daqui:")
@@ -149,6 +191,7 @@ def main() -> int:
     print(f"Pasta do projeto: {RAIZ}")
     print()
     verificar_pre_requisitos()
+    verificar_integridade()
     criar_venv(args.refazer)
     instalar()
     return confirmar()

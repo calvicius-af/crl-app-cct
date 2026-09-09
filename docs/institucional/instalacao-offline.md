@@ -41,6 +41,13 @@ Isto descarrega para `vendor/wheels/` as bibliotecas necessárias para Windows
 `MANIFESTO.txt` (legível, com os hashes SHA-256 de cada ficheiro) e
 `manifesto.json` (o mesmo, para leitura automática).
 
+As dependências vêm de `requirements.txt`, que é a única lista a manter: acrescentar
+lá uma biblioteca chega para que ela passe a entrar no pacote offline.
+
+**A pasta `vendor/wheels/` é recriada de raiz a cada corrida.** É deliberado: se as
+wheels novas ficassem ao lado das antigas, a instalação na estação poderia escolher uma
+versão que já não é a pretendida, sem aviso nenhum.
+
 Espaço ocupado: cerca de 25 MB por versão de Python coberta.
 
 Para incluir também o `pytest`, e assim poder correr a suite de testes na
@@ -62,8 +69,9 @@ python scripts/preparar_pacote_offline.py --alvos macosx_11_0_arm64:311
    incluindo a pasta `vendor/wheels/`.
 2. Duplo clique em `scripts/instalar_offline.bat` (Windows) ou
    `scripts/instalar_offline.command` (macOS).
-3. A janela mostra a verificação prévia, a instalação e a confirmação final.
-   Ao terminar com "Instalado", está pronta.
+3. A janela mostra a verificação prévia, a conferência dos hashes contra o
+   manifesto, a instalação e a confirmação final. Ao terminar com "Instalado",
+   está pronta.
 4. Abrir a aplicação com duplo clique em `scripts/AppCCT.bat`.
 
 O instalador chama o `pip` com a opção `--no-index`, que o impede de contactar
@@ -85,15 +93,22 @@ pacote foi preparado para uma versão de Python diferente da que a estação tem
 Confirmar a versão na estação com `python -V` e voltar a correr o preparador
 com o alvo certo, por exemplo `--alvos win_amd64:312`.
 
+**"a biblioteca X não corresponde ao manifesto"** ou **"falta a biblioteca X"**
+— a cópia de `vendor/wheels/` ficou incompleta ou corrompeu-se pelo caminho. Repetir
+a cópia a partir da origem. O instalador confere isto antes de instalar seja o que
+for, precisamente para que o problema apareça aqui e não mais tarde.
+
 **"esta máquina tem Python X, que é antigo"** — a estação precisa de Python
 3.11 ou superior. É a única coisa que continua a depender de uma instalação
 autorizada; o instalador oficial do python.org é um ficheiro único e não
 requer acesso ao proxy depois de descarregado.
 
-Em qualquer outro caso, correr o diagnóstico e guardar o resultado:
+Em qualquer outro caso, correr o diagnóstico e guardar o resultado, usando o
+`python` que está dentro do `.venv` criado:
 
 ```
-.venv\Scripts\python -m cct.doctor
+.venv\Scripts\python -m cct.doctor      (Windows)
+.venv/bin/python -m cct.doctor           (macOS)
 ```
 
 ## 6. Actualizar a aplicação mais tarde
@@ -102,8 +117,9 @@ Alterações ao código da aplicação não exigem repetir nada disto: substitui
 pasta do projeto (ou faz-se `git pull`) e o `.venv` existente continua a servir.
 
 Só é preciso voltar a correr o preparador quando as dependências mudarem, o que
-está registado em `requirements.txt`. Nesse caso, na estação, correr o
-instalador com `--refazer`.
+está registado em `requirements.txt`. Nesse caso, correr o preparador de novo (a
+pasta `vendor/wheels/` é recriada de raiz, sem restos da versão anterior), copiar a
+pasta para a partilha, e na estação correr o instalador com `--refazer`.
 
 ## 7. O que isto significa para a segurança
 
@@ -114,9 +130,11 @@ passa a ser zero. Os pontos que uma auditoria interna tenderá a perguntar:
 1. **Origem das bibliotecas.** As mesmas do PyPI oficial, todas com licença
    permissiva (MIT, Apache-2.0, BSD, MIT-CMU), listadas em
    [requisitos-tecnicos.md](requisitos-tecnicos.md) §3.
-2. **Integridade.** O `MANIFESTO.txt` regista o SHA-256 de cada ficheiro. Uma
-   wheel alterada entre a preparação e a instalação é detetável comparando os
-   hashes.
+2. **Integridade.** O `MANIFESTO.txt` regista o SHA-256 de cada ficheiro, e o
+   `manifesto.json` guarda o mesmo em formato lido pela máquina. O instalador
+   confere todos os hashes automaticamente antes de instalar: uma wheel alterada
+   ou truncada entre a preparação e a instalação faz o procedimento parar, com o
+   nome do ficheiro.
 3. **Momento da descarga.** Uma vez, numa máquina identificada, e não em cada
    estação.
 4. **Ausência de tráfego posterior.** A aplicação não faz pedidos de rede em

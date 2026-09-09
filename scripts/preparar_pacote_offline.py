@@ -15,15 +15,17 @@ Depois de correr, ver vendor/wheels/MANIFESTO.txt.
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
+import re
+import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 DESTINO = RAIZ / "vendor" / "wheels"
+
+sys.path.insert(0, str(RAIZ))
+from cct.proveniencia import agora_utc, escrever_manifesto as escrever_json, sha256
 
 # Alvos por omissão: as estações do CRL são Windows 64 bits; as versões de
 # Python cobertas são as suportadas pelo projeto (3.11+). Cobrir várias
@@ -34,11 +36,46 @@ ALVOS_OMISSAO = [
     ("win_amd64", "313"),
 ]
 
-# As quatro dependências diretas, alinhadas com requirements.txt. O pip
-# resolve e traz também as dependências indirectas (pdfminer.six, Pillow,
-# pypdfium2, et-xmlfile, attrs, referencing, rpds-py).
-PACOTES = ["pdfplumber>=0.11", "openpyxl>=3.1", "pyyaml>=6.0", "jsonschema>=4.0"]
-PACOTES_TESTES = ["pytest>=8.0"]
+# Nome do pacote de testes tal como aparece em requirements.txt. Só entra no
+# pacote offline com --incluir-testes.
+PACOTE_TESTES = "pytest"
+
+# Separa "pdfplumber>=0.11" em nome e resto, para reconhecer o pytest sem
+# depender da versão declarada.
+_NOME_PACOTE = re.compile(r"^[A-Za-z0-9._-]+")
+
+
+def parar(mensagem: str, solucao: str) -> None:
+    """Termina com o mesmo formato de erro que o instalador usa."""
+    raise SystemExit(f"\nPAROU AQUI: {mensagem}\n  → {solucao}")
+
+
+def pacotes_de_requirements(incluir_testes: bool) -> list[str]:
+    """Lê requirements.txt: uma só fonte de verdade para as dependências.
+
+    O pytest é a única exclusão condicional — está no requirements.txt porque
+    é preciso para desenvolver, mas só faz sentido no pacote offline quando a
+    estação vai correr a suite de testes.
+    """
+    ficheiro = RAIZ / "requirements.txt"
+    if not ficheiro.is_file():
+        parar(f"não encontrei {ficheiro}",
+              "correr o script a partir de uma cópia completa do projeto")
+
+    pacotes = []
+    for linha in ficheiro.read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if not linha or linha.startswith("#"):
+            continue
+        nome = _NOME_PACOTE.match(linha)
+        if nome and nome.group(0).lower() == PACOTE_TESTES and not incluir_testes:
+            continue
+        pacotes.append(linha)
+
+    if not pacotes:
+        parar("requirements.txt não declara nenhuma dependência",
+              "confirmar que o ficheiro não foi esvaziado por engano")
+    return pacotes
 
 
 def _analisar_alvo(texto: str) -> tuple[str, str]:
@@ -52,7 +89,14 @@ def _analisar_alvo(texto: str) -> tuple[str, str]:
 
 
 def descarregar(alvos: list[tuple[str, str]], pacotes: list[str]) -> None:
-    DESTINO.mkdir(parents=True, exist_ok=True)
+    # A pasta é recriada de raiz: acrescentar wheels a uma pasta já povoada
+    # deixaria lá versões antigas, e o instalador (que pede os pacotes pelo
+    # nome, sem versão) poderia resolver para a errada, sem aviso nenhum.
+    if DESTINO.exists():
+        print(f"== A limpar {DESTINO.relative_to(RAIZ)} (recriada a cada corrida)")
+        shutil.rmtree(DESTINO)
+    DESTINO.mkdir(parents=True)
+
     for plataforma, versao in alvos:
         legivel = f"{plataforma}, Python {versao[0]}.{versao[1:]}"
         print(f"== A descarregar para {legivel}")
@@ -61,6 +105,13 @@ def descarregar(alvos: list[tuple[str, str]], pacotes: list[str]) -> None:
             "--only-binary=:all:",
             "--platform", plataforma,
             "--python-version", versao,
+            # --abi e --implementation são obrigatórios aqui: sem eles o pip
+            # filtra as wheels pelo ABI do interpretador que corre ESTE script,
+            # não pelo da versão pedida. Um script corrido em 3.12 traria
+            # wheels cp312 para o alvo 3.11, e a falha só apareceria na
+            # estação, longe da causa.
+            "--abi", f"cp{versao}",
+            "--implementation", "cp",
             "--dest", str(DESTINO),
             *pacotes,
         ]
@@ -80,33 +131,41 @@ def descarregar(alvos: list[tuple[str, str]], pacotes: list[str]) -> None:
 
 
 def escrever_manifesto(alvos: list[tuple[str, str]]) -> Path:
-    """Regista o que ficou na pasta, com hashes, para conferência posterior."""
+    """Regista o que ficou na pasta, com hashes, para conferência posterior.
+
+    O `manifesto.json` é lido por scripts/instalar_offline.py antes de
+    instalar; o `MANIFESTO.txt` existe para leitura humana e auditoria. Os
+    dois são escritos de forma atómica, para que uma interrupção não deixe um
+    manifesto parcial que pareça íntegro.
+    """
     wheels = sorted(DESTINO.glob("*.whl"))
+    gerado = agora_utc()
+    registo = [{"ficheiro": w.name, "sha256": sha256(w),
+                "bytes": w.stat().st_size} for w in wheels]
+
     linhas = [
         "MANIFESTO DO PACOTE OFFLINE — AppCCT",
-        f"Gerado em {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
+        f"Gerado em {gerado}",
         f"Alvos: {', '.join(f'{p}/py{v}' for p, v in alvos)}",
         f"Ficheiros: {len(wheels)}  "
-        f"({sum(w.stat().st_size for w in wheels) / 1e6:.1f} MB)",
+        f"({sum(w['bytes'] for w in registo) / 1e6:.1f} MB)",
         "",
         "SHA-256                                                           "
         "  ficheiro",
     ]
-    registo = []
-    for wheel in wheels:
-        digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-        linhas.append(f"{digest}  {wheel.name}")
-        registo.append({"ficheiro": wheel.name, "sha256": digest,
-                        "bytes": wheel.stat().st_size})
+    linhas += [f"{w['sha256']}  {w['ficheiro']}" for w in registo]
 
     manifesto = DESTINO / "MANIFESTO.txt"
-    manifesto.write_text("\n".join(linhas) + "\n", encoding="utf-8")
-    (DESTINO / "manifesto.json").write_text(
-        json.dumps({"gerado": datetime.now(timezone.utc).isoformat(
-            timespec="seconds"),
-            "alvos": [f"{p}/py{v}" for p, v in alvos],
-            "wheels": registo}, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8")
+    temporario = manifesto.with_suffix(".txt.tmp")
+    temporario.write_text("\n".join(linhas) + "\n", encoding="utf-8")
+    temporario.replace(manifesto)
+
+    escrever_json(DESTINO / "manifesto.json", {
+        "schema_version": 1,
+        "gerado": gerado,
+        "alvos": [f"{p}/py{v}" for p, v in alvos],
+        "wheels": registo,
+    })
     return manifesto
 
 
@@ -122,9 +181,26 @@ def main() -> int:
 
     alvos = ALVOS_OMISSAO
     if args.alvos:
-        alvos = [_analisar_alvo(t.strip()) for t in args.alvos.split(",") if t.strip()]
+        try:
+            alvos = [_analisar_alvo(t.strip())
+                     for t in args.alvos.split(",") if t.strip()]
+        except ValueError as erro:
+            parar(str(erro),
+                  "usar o formato plataforma:versão, separando vários por "
+                  "vírgulas, por exemplo --alvos win_amd64:311,win_amd64:312")
+        if not alvos:
+            parar("--alvos ficou vazio depois de separar por vírgulas",
+                  "indicar pelo menos um alvo, por exemplo win_amd64:311")
+    else:
+        print("Sem --alvos: a gerar só para Windows 64 bits (Python 3.11 a 3.13).")
+        print("Para estações macOS, repetir com "
+              "--alvos macosx_11_0_arm64:311 (Apple Silicon) ou "
+              "macosx_10_9_x86_64:311 (Intel).")
+        print()
 
-    pacotes = PACOTES + (PACOTES_TESTES if args.incluir_testes else [])
+    pacotes = pacotes_de_requirements(args.incluir_testes)
+    print(f"Dependências lidas de requirements.txt: {', '.join(pacotes)}")
+    print()
     descarregar(alvos, pacotes)
     manifesto = escrever_manifesto(alvos)
 
