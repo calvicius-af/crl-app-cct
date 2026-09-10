@@ -54,7 +54,18 @@ python -m venv .venv
 .venv/bin/python -m cct.doctor                        # verifica o ambiente, em português
 ```
 
-Para instalação sem acesso à internet e para o resto dos requisitos de sistema, ver
+**Em rede fechada** (o caso das estações do CRL, onde o proxy bloqueia o pip): as
+bibliotecas preparam-se uma vez numa máquina com acesso e instalam-se sem qualquer pedido
+de rede.
+
+```bash
+python scripts/preparar_pacote_offline.py   # máquina com internet, uma vez
+scripts/instalar_offline.bat                # em cada estação (macOS: .command)
+```
+
+O procedimento completo, incluindo o que fazer quando falha, está em
+[docs/institucional/instalacao-offline.md](docs/institucional/instalacao-offline.md). O
+resto dos requisitos de sistema está em
 [docs/institucional/requisitos-tecnicos.md](docs/institucional/requisitos-tecnicos.md).
 
 ## Utilização
@@ -101,7 +112,7 @@ cct/            código-fonte da aplicação
 tests/          testes pytest: unidade, integração, corpus e formatos
 codebooks/      os temas de codificação, em YAML: configuração, não código
 examples/       dois casos completos, PDF → TXT → QDPX (versionados)
-scripts/        lançadores da aplicação gráfica
+scripts/        lançadores da aplicação gráfica e instalação offline
 docs/
   arquitetura/  como o sistema funciona
   adr/          porque é assim — registo das decisões tomadas
@@ -116,7 +127,8 @@ issues/         o que está partido ou em falta
 ```
 
 Não versionadas, mas presentes numa instalação de trabalho: `data/` (fontes),
-`results/` (saídas), `vendor/` (software de terceiros consultado) e `archive/`
+`results/` (saídas), `vendor/` (bibliotecas para instalação offline e software
+de terceiros consultado) e `archive/`
 (versões anteriores do projeto). Porquê, e como repor:
 [docs/dados/README.md](docs/dados/README.md) e
 [ADR-0009](docs/adr/0009-layout-do-repositorio.md). O ciclo de vida de fontes, caches,

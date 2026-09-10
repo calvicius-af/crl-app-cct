@@ -44,10 +44,13 @@ Instalação (com acesso pip/proxy autorizado, uma única vez):
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 ```
-Em redes fechadas: o pip suporta instalação a partir de uma pasta local de
-wheels (`pip download -r requirements.txt -d wheels/` numa máquina com
-acesso; `pip install --no-index --find-links wheels/ -r requirements.txt`
-na estação).
+Em redes fechadas (instalação sem qualquer pedido ao proxy): o projeto traz
+os dois passos automatizados — `scripts/preparar_pacote_offline.py` numa
+máquina com acesso, que guarda as wheels e os respetivos SHA-256 em
+`vendor/wheels/`, e `scripts/instalar_offline.bat` na estação, que instala a
+partir dessa pasta com `--no-index`. Procedimento, conferência de integridade
+e resolução de problemas em
+[instalacao-offline.md](instalacao-offline.md).
 
 ## 4. Dados e segurança
 - Entradas: PDFs públicos do BTE, exports Excel/QDC do MaxQDA (dados já

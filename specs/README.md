@@ -35,6 +35,7 @@ ver [ADR-0011](../docs/adr/0011-fluxo-spec-driven.md). O espaço está preparado
 | # | Spec | Estado |
 |---|---|---|
 | [0001](0001-recolha-e-nomeacao-do-bte.md) | Recolha automática do BTE e nomeação dos ficheiros | Implementada |
+| [0002](0002-instalacao-offline.md) | Instalação em estações sem acesso à internet | Implementada |
 
 ## Ideias por especificar
 
