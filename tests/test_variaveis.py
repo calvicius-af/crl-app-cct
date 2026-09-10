@@ -8,6 +8,24 @@ from cct.variaveis import carregar_variaveis, subtipo_pipeline, procurar
 XLSX = Path(__file__).parent.parent / "data" / "raw" / "maxqda" / "VariaveisDocumento2025.xlsx"
 
 
+def test_procurar_nao_cruza_nomes_truncados_a_meio_de_palavra():
+    """Ver PR #35, achado nº4: um nome do MaxQDA truncado a meio de uma sigla
+    ('...EMARP_SIN') não pode cruzar com uma convenção diferente que por
+    coincidência começa pelas mesmas letras ('...EMARP_SINALCO')."""
+    variaveis = [{"nome_maxqda": "25_PR_016_BTE_04_EMARP_SIN", "subtipo": "x"}]
+    assert procurar(variaveis, "25_PR_016_BTE_04_EMARP_SINALCO") is None
+
+
+def test_procurar_aceita_truncagem_numa_fronteira_de_token():
+    variaveis = [{"nome_maxqda": "25_PR_016_BTE_04_EMARP", "subtipo": "x"}]
+    assert procurar(variaveis, "25_PR_016_BTE_04_EMARP_SINTAP") is not None
+
+
+def test_procurar_aceita_correspondencia_exacta():
+    variaveis = [{"nome_maxqda": "25_PR_016_BTE_04_EMARP_SINTAP", "subtipo": "x"}]
+    assert procurar(variaveis, "25_PR_016_BTE_04_EMARP_SINTAP") is not None
+
+
 def test_subtipo_pipeline():
     assert subtipo_pipeline("Revisão Parcial", "Alt. salarial e outras") == "revisao_parcial"
     assert subtipo_pipeline("Revisão Parcial",

@@ -16,6 +16,7 @@ dois casos reais — texto extraído, projeto MaxQDA e instruções para obter o
 ## O que faz, em quatro passos
 
 ```
+índice do BTE  →  0. AQUISIÇÃO  descarrega os PDFs e dá-lhes o nome do esquema (opcional)
 PDF do BTE  →  1. EXTRAÇÃO      texto + estrutura (capítulo, cláusula, número, alínea)
             →  2. CODIFICAÇÃO   codebook do tema → cláusulas candidatas
             →  3. DIACRONIA     o que mudou face à versão anterior
@@ -27,8 +28,9 @@ Detalhe em [docs/arquitetura/arquitetura.md](docs/arquitetura/arquitetura.md).
 
 ## Estado
 
-Fases 0 a 5 concluídas, com uma suite automática executada no CI em Linux e macOS,
-Python 3.11 e 3.12. Em uso real: o corpus de 2025
+Fases 0 a 5 concluídas, mais a aquisição do corpus
+([SPEC-0001](specs/0001-recolha-e-nomeacao-do-bte.md)), com uma suite automática
+executada no CI em Linux e macOS, Python 3.11 e 3.12. Em uso real: o corpus de 2025
 (89 convenções do tema 4.8, proteção de dados) foi processado e revisto por peritas em
 cinco rondas sucessivas.
 
@@ -36,8 +38,8 @@ Qualidade medida contra codificação humana: cobertura 0,88, precisão 0,57 —
 `AUTO` só existe para códigos com precisão medida ≥ 0,85. Os números, e o que significam,
 estão em [docs/validacao/](docs/validacao/README.md).
 
-Por fazer: recolha automática do BTE, numeração de cláusulas por extenso, análise de
-remissões entre documentos, prova com um segundo tema. Ver [specs/](specs/README.md) e
+Por fazer: numeração de cláusulas por extenso, análise de remissões entre documentos,
+prova com um segundo tema. Ver [specs/](specs/README.md) e
 [issues/](issues/README.md).
 
 ## Instalação
@@ -71,6 +73,14 @@ resto dos requisitos de sistema está em
 **Com interface gráfica** (a via normal): duplo clique em `scripts/AppCCT.command`
 (macOS) ou `scripts/AppCCT.bat` (Windows). Os campos aparecem pré-preenchidos; basta
 carregar em *Correr pipeline*.
+
+**Encher a pasta de PDFs a partir dos índices do BTE** (opcional — a única parte que usa
+a rede, e só com autorização explícita):
+
+```bash
+python -m cct.aquisicao --indices data/raw/indices                       # simula
+python -m cct.aquisicao --indices data/raw/indices --confirmar-rede --aplicar
+```
 
 **Por linha de comandos** — a corrida completa de um tema:
 
@@ -139,15 +149,22 @@ porquê antes de mexer:
 
 ## Privacidade e funcionamento offline
 
-A aplicação corre localmente. A instalação base não faz pedidos de rede em operação. Há
-duas exceções opcionais a preparar antes de usar numa rede fechada: o Docling pode
-descarregar modelos na primeira execução, e a camada semântica, se ativada, fala com um
-modelo de linguagem em
-`localhost` (por exemplo, LM Studio) — dentro da própria máquina, nunca para o exterior.
-Os modelos do Docling podem ser pré-instalados para funcionamento offline. O código da
-camada semântica recusa URLs que não sejam de loopback e essa camada está desligada por omissão
-([ADR-0006](docs/adr/0006-semantica-llm-local-desligada-por-omissao.md),
-[ADR-0012](docs/adr/0012-modelos-locais-obrigatorios.md)).
+A aplicação corre inteiramente na máquina local. A instalação base não faz pedidos de
+rede em operação. Há três exceções, todas opcionais, todas desligadas por omissão e
+confinadas a um módulo:
+
+- **Docling** (extrator alternativo): pode descarregar modelos na primeira execução;
+  pré-instalável para funcionamento offline em rede fechada.
+- **camada semântica**: fala com um modelo de linguagem em `localhost` (por exemplo, LM
+  Studio) — dentro da própria máquina, nunca para o exterior; o código recusa URLs que
+  não sejam de loopback ([ADR-0006](docs/adr/0006-semantica-llm-local-desligada-por-omissao.md),
+  [ADR-0012](docs/adr/0012-modelos-locais-obrigatorios.md)).
+- **recolha do BTE**: descarrega documentos públicos de `bte.dgcp.mtsss.gov.pt`, só com
+  `--confirmar-rede`, só a partir das ligações que constam dos índices fornecidos pela
+  DGERT, e só para anfitriões de uma lista fechada
+  ([ADR-0015](docs/adr/0015-recolha-em-rede-desligada-por-omissao.md)).
+
+Em nenhum dos casos são enviados dados do CRL para o exterior.
 
 ## Licença e citação
 

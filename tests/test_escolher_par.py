@@ -1,7 +1,7 @@
 """Testes da seleção automática de pares para comparação diacrónica."""
 import pytest
 
-from cct.comparar import escolher_par
+from cct.comparar import _ano, escolher_par
 
 # candidatos: (nome, nº de caracteres do texto extraído)
 
@@ -57,3 +57,29 @@ def test_anterior_sem_ano_no_nome():
 def test_sem_candidato_2025_falha():
     with pytest.raises(ValueError):
         escolher_par([("2021_X.pdf", 50000), ("2023_X.pdf", 50000)])
+
+
+@pytest.mark.parametrize("nome,esperado", [
+    ("26_PR_003_BTE_31_ACRAL_CESP", 2026),
+    ("26_PE_001_BTE_31_ANX_SNY", 2026),        # esquema novo, família não-PR
+    ("25_PR_016_BTE_04_EMARP_SINTAP_TXT", 2025),
+])
+def test_ano_reconhece_o_esquema_da_aquisicao_automatica(nome, esperado):
+    """cct.nomeacao produz nomes AA_XX_NNN_BTE_NN_...; _ano() tem de os
+    reconhecer, ou cct.comparar --pasta falha em qualquer corpus adquirido
+    automaticamente (ver PR #35, achado nº2)."""
+    assert _ano(nome) == esperado
+
+
+def test_escolhe_par_com_nomes_do_esquema_novo():
+    # escolher_par() só procura candidatos "de 2025" (ver o seu docstring) —
+    # limitação pré-existente, fora do âmbito desta correção; o teste usa por
+    # isso um nome do esquema novo com ano 2025 para exercitar só o que este
+    # PR mudou: _ano() reconhecer o esquema AA_XX_NNN_BTE_NN.
+    candidatos = [
+        ("2023_BTE_15_ACRAL_CESP.pdf", 90000),
+        ("25_PR_003_BTE_04_ACRAL_CESP.pdf", 100000),   # completo 2025, esquema novo
+    ]
+    novo, antigo, _ = escolher_par(candidatos)
+    assert novo == "25_PR_003_BTE_04_ACRAL_CESP.pdf"
+    assert antigo == "2023_BTE_15_ACRAL_CESP.pdf"

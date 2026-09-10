@@ -34,15 +34,14 @@ ver [ADR-0011](../docs/adr/0011-fluxo-spec-driven.md). O espaço está preparado
 
 | # | Spec | Estado |
 |---|---|---|
-| 0002 | [Instalação em estações sem acesso à internet](0002-instalacao-offline.md) | Implementada |
+| [0001](0001-recolha-e-nomeacao-do-bte.md) | Recolha automática do BTE e nomeação dos ficheiros | Implementada |
+| [0002](0002-instalacao-offline.md) | Instalação em estações sem acesso à internet | Implementada |
 
 ## Ideias por especificar
 
 Trabalho identificado nas fases 0-5 e ainda por fazer — cada uma destas linhas será uma
 spec quando chegar a sua vez:
 
-- **Recolha automática do BTE**: descarregar os números do boletim a partir de
-  `bte.gep.msess.gov.pt` em vez de os copiar à mão.
 - **Numeração por extenso**: o extrator já reconhece cabeçalhos como "cláusula décima
   segunda"; falta convertê-los para número canónico na comparação diacrónica
   ([ISSUE-0001](../issues/0001-numeracao-por-extenso.md)).

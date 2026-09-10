@@ -28,7 +28,10 @@ Recebe PDFs de convenções coletivas do BTE e produz:
 ```
 Projeto_CRL_AppCCT/                ← corre os comandos SEMPRE a partir daqui
 ├── data/
+│   ├── registo/
+│   │   └── registo_bte.jsonl      ← registo da recolha — NÃO APAGAR
 │   └── raw/
+│       ├── indices/               ← índices .xlsx do BTE, para a recolha automática
 │       ├── bte/
 │       │   └── bte_2026/          ← PDFs das convenções, UM POR CONVENÇÃO
 │       │       ├── 26_PR_001_BTE_01_AHP_SITESE.pdf
@@ -44,6 +47,27 @@ Projeto_CRL_AppCCT/                ← corre os comandos SEMPRE a partir daqui
 ├── codebooks/                     ← um YAML por tema (ver prompts-codebooks.md)
 └── results/                       ← é aqui que aparecem os resultados
 ```
+
+### 2.1 Encher a pasta automaticamente (recolha do BTE)
+
+Se a DGERT enviou os ficheiros-índice do boletim (`BTE31_2026.xlsx` e afins), não é
+preciso descarregar nem renomear nada à mão:
+
+1. Copiar os índices para `data/raw/indices/`.
+2. Na app gráfica, carregar em **"Recolher do BTE…"** — a aplicação pergunta se pode
+   ligar-se à internet. Responder *Não* faz uma simulação, que mostra o que seria
+   descarregado sem descarregar nada.
+3. Por linha de comandos, o mesmo:
+
+```bash
+python -m cct.aquisicao --indices data/raw/indices                       # simulação
+python -m cct.aquisicao --indices data/raw/indices --confirmar-rede --aplicar
+```
+
+Os PDFs aparecem em `data/raw/bte/bte_<ano>/` já com o nome certo, e o relatório da
+corrida fica em `results/aquisicao/`. **Ler sempre a lista "a confirmar"**: são as siglas
+que a aplicação teve de inventar e os documentos com vários outorgantes do mesmo lado.
+Correr uma segunda vez não descarrega nem reescreve nada.
 
 ### Regras de nomes (importante!)
 - **PDFs das convenções**: `AA_PR_NNN_BTE_NN_Partes_Sindicato.pdf`

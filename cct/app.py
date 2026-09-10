@@ -52,6 +52,11 @@ class AppCCT(tk.Tk):
               lambda: self._dir(self.v_pdfs),
               "um PDF por convenção (ex.: data/raw/bte/bte_2026)")
 
+        self.v_indices = tk.StringVar()
+        campo("Índices do BTE", self.v_indices,
+              lambda: self._dir(self.v_indices),
+              "pasta com os .xlsx da DGERT, para a recolha automática")
+
         ttk.Label(frm, text="Tema (codebook) *").grid(row=linha, column=0, sticky="w", pady=3)
         self.v_codebook = tk.StringVar()
         self.cb_codebook = ttk.Combobox(frm, textvariable=self.v_codebook, state="readonly")
@@ -83,6 +88,8 @@ class AppCCT(tk.Tk):
         botoes.grid(row=linha, column=0, columnspan=3, pady=8, sticky="ew")
         self.b_correr = ttk.Button(botoes, text="▶  Correr pipeline", command=self._correr)
         self.b_correr.pack(side="left")
+        ttk.Button(botoes, text="Recolher do BTE…",
+                   command=self._recolher).pack(side="left", padx=8)
         ttk.Button(botoes, text="Comparar versões (pasta)…",
                    command=self._comparar).pack(side="left", padx=8)
         ttk.Button(botoes, text="Verificar instalação",
@@ -100,6 +107,7 @@ class AppCCT(tk.Tk):
         self.cb_codebook["values"] = [str(y.relative_to(RAIZ)) for y in yamls]
         if yamls:
             self.v_codebook.set(str(yamls[0].relative_to(RAIZ)))
+        self.v_indices.set(str(DADOS / "indices"))
         pastas = sorted((DADOS / "bte").glob("bte_*"))
         if pastas:
             self.v_pdfs.set(str(pastas[-1]))
@@ -184,6 +192,30 @@ class AppCCT(tk.Tk):
             args += ["--pasta-versoes", self.v_versoes.get()]
         if self.v_semantica.get():
             args += ["--semantica"]
+        self._lancar(args)
+
+    def _recolher(self):
+        """Recolha do BTE + nomeação. É a única ação que liga à internet."""
+        indices = Path(self.v_indices.get() or (DADOS / "indices"))
+        if not indices.exists() or not list(indices.glob("*.xlsx")):
+            messagebox.showwarning(
+                "Sem índices",
+                f"Não há ficheiros .xlsx em\n{indices}\n\n"
+                "A recolha lê a lista de documentos dos índices que a DGERT "
+                "fornece por número do BTE.")
+            return
+        autorizar = messagebox.askyesno(
+            "Ligar à internet?",
+            "A recolha vai descarregar os documentos listados nos índices a "
+            "partir de bte.dgcp.mtsss.gov.pt.\n\n"
+            "É a única parte da aplicação que usa a rede, e só descarrega "
+            "documentos públicos do Boletim do Trabalho e Emprego.\n\n"
+            "Sim — descarregar e renomear.\n"
+            "Não — apenas simular e mostrar o que seria feito.")
+        args = ["cct.aquisicao", "--indices", str(indices),
+                "--destino", str(DADOS / "bte")]
+        if autorizar:
+            args += ["--confirmar-rede", "--aplicar"]
         self._lancar(args)
 
     def _comparar(self):

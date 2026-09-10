@@ -46,6 +46,7 @@ seguir*.
 | [0012](0012-modelos-locais-obrigatorios.md) | Modelos locais obrigatórios; remover backend externo Claude CLI | Aceite |
 | [0013](0013-anonimizacao-dos-exemplos-publicados.md) | Anonimização dos exemplos publicados e exclusão dos PDFs originais | Aceite |
 | [0014](0014-ciclo-de-vida-dos-artefactos-locais.md) | Ciclo de vida de caches, corridas e artefactos humanos fora do Git | Aceite |
+| [0015](0015-recolha-em-rede-desligada-por-omissao.md) | Recolha do BTE isolada num módulo, com a rede desligada por omissão | Aceite |
 
 Os dez primeiros foram escritos **retroativamente**, em agosto de 2026, a partir do
 histórico do desenvolvimento (fases 0 a 5, entre janeiro e julho de 2026). Registam

@@ -74,6 +74,19 @@ def verificar() -> int:
         ok("data/raw/textos_consolidados/ presente (comparações diacrónicas ativas)")
     else:
         print("  · sem data/raw/textos_consolidados/ (comparações diacrónicas inativas)")
+    indices = sorted((dados / "indices").glob("*.xlsx")) \
+        if (dados / "indices").is_dir() else []
+    if indices:
+        ok(f"data/raw/indices/ com {len(indices)} índice(s) do BTE "
+           f"(recolha automática disponível)")
+    else:
+        print("  · sem data/raw/indices/*.xlsx — a recolha automática do BTE "
+              "não tem o que ler (docs/dados/README.md §Índices)")
+    registo = raiz / "data" / "registo" / "registo_bte.jsonl"
+    if registo.exists():
+        n = sum(1 for l in registo.read_text(encoding="utf-8").splitlines() if l.strip())
+        ok(f"registo da recolha com {n} documento(s) "
+           "(guarda os ordinais atribuídos — não apagar)")
     if (raiz / "examples").is_dir():
         n = len([d for d in (raiz / "examples").iterdir() if d.is_dir()])
         ok(f"examples/ com {n} exemplo(s) completo(s) (PDF → TXT → QDPX)")
@@ -84,6 +97,13 @@ def verificar() -> int:
         ok("docling instalado (tabelas de anexos e layouts difíceis)")
     except ImportError:
         print("  · docling não instalado (só afeta a opção --extrator docling)")
+
+    print("== Rede (opcional — só a recolha do BTE, ADR-0015)")
+    import os as _os
+    if _os.environ.get("CCT_RECOLHA_REDE") == "1":
+        print("  · CCT_RECOLHA_REDE=1: a recolha está autorizada a ligar-se ao BTE")
+    else:
+        print("  · desligada por omissão (a recolha só liga com --confirmar-rede)")
 
     print("== LM Studio (opcional, camada semântica)")
     try:
