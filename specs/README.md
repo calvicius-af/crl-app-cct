@@ -34,7 +34,7 @@ ver [ADR-0011](../docs/adr/0011-fluxo-spec-driven.md). O espaço está preparado
 
 | # | Spec | Estado |
 |---|---|---|
-| — | *(ainda nenhuma)* | — |
+| 0002 | [Instalação em estações sem acesso à internet](0002-instalacao-offline.md) | Implementada |
 
 ## Ideias por especificar
 
