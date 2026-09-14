@@ -52,14 +52,14 @@ def verificar() -> int:
         n = len(list((raiz / "codebooks").glob("*.yaml")))
         ok(f"codebooks/ com {n} tema(s)")
     else:
-        falha("não há codebooks", "ver docs/operacao/PROMPTS_CODEBOOKS.md")
+        falha("não há codebooks", "ver docs/operacao/prompts-codebooks.md")
     pastas_bte = sorted((dados / "bte").glob("bte_*"))
     if pastas_bte:
         ok("pastas de PDFs: " + ", ".join(p.name for p in pastas_bte))
     else:
         falha("não existe data/raw/bte/bte_<ano>/ com PDFs",
               "criar a pasta e copiar os PDFs "
-              "(ver docs/operacao/GUIA_OPERACAO.md §2 e docs/dados/README.md)")
+              "(ver docs/operacao/guia-operacao.md §2 e docs/dados/README.md)")
     variaveis = sorted((dados / "maxqda").glob("VariaveisDocumento*.xlsx"))
     if variaveis:
         ok(f"variáveis do MaxQDA: {variaveis[-1].name}")
