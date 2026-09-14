@@ -3,6 +3,7 @@ dependências além do Python standard).
 
 Uso: python -m cct.app
 """
+import os
 import queue
 import subprocess
 import sys
@@ -158,9 +159,20 @@ class AppCCT(tk.Tk):
 
         def trabalho():
             try:
+                # As mensagens do pipeline usam símbolos fora da tabela de
+                # caracteres por omissão do Windows (cp1252, ex.: ✓ ✗ →). Sem
+                # forçar UTF-8 aqui, o processo filho rebenta com
+                # UnicodeEncodeError ao escrever para este pipe (que, ao
+                # contrário de uma consola, não tem o tratamento especial do
+                # Windows para Unicode) — foi o que aconteceu em estações do
+                # CRL com a codificação regional portuguesa.
+                env = os.environ.copy()
+                env["PYTHONUTF8"] = "1"
+                env["PYTHONIOENCODING"] = "utf-8"
                 p = subprocess.Popen([sys.executable, "-u", "-m", *argumentos],
                                      cwd=str(RAIZ), stdout=subprocess.PIPE,
-                                     stderr=subprocess.STDOUT, text=True)
+                                     stderr=subprocess.STDOUT, text=True,
+                                     encoding="utf-8", errors="replace", env=env)
                 self.processo = p
                 for linha in p.stdout:
                     self.fila.put(linha)
