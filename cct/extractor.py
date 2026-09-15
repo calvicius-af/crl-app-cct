@@ -27,8 +27,18 @@ _ORDINAL = (r"(?:primeir|segund|terceir|quart|quint|sext|s[eé]tim|oitav|non"
             r"|sexag[eé]sim|sept?uag[eé]sim|octog[eé]sim|nonag[eé]sim"
             r"|cent[eé]sim)[oa]")
 _UNICO = r"[úu]nic[oa]"
-# "12.ª", "16.ª-A", "décima segunda", "único"
-_NUMERACAO = (rf"\d+\.?[ªº]?(?:-[A-Z])?|{_UNICO}"
+# designadores de posição, em vez de número: nas revisões parciais o BTE abre
+# com "Cláusula prévia Âmbito de revisão", que fixa o que a revisão altera.
+# Lista fechada, pela mesma razão que levou a restringir os ordinais: com
+# "qualquer palavra" a seguir, o título do CAPÍTULO XV do AguasNorte
+# ("Cláusula geral e transitória") voltava a virar uma cláusula vazia.
+# O guarda final exige fim de linha ou uma maiúscula a seguir (o título da
+# cláusula): sem ele, "previa" sem acento é a forma verbal de "prever" e uma
+# linha de prosa passaria a cabeçalho. O (?-i:…) é preciso porque o grupo da
+# numeração é aplicado dentro de (?i:…), que tornaria [A-ZÀ-Ú] inútil
+_DESIGNADOR = r"(?:pr[ée]vi[oa]|preliminar)(?=\s*$|\s+(?-i:[A-ZÀ-Ú«(]))"
+# "12.ª", "16.ª-A", "décima segunda", "único", "prévia"
+_NUMERACAO = (rf"\d+\.?[ªº]?(?:-[A-Z])?|{_UNICO}|{_DESIGNADOR}"
               rf"|{_ORDINAL}(?:\s+{_ORDINAL})?")
 # a palavra-chave tem de vir capitalizada: no BTE os cabeçalhos são
 # "Cláusula 1.ª" ou "CLÁUSULA 1.ª", nunca minúsculos. Com IGNORECASE, uma

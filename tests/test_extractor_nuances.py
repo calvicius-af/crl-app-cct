@@ -178,3 +178,57 @@ def test_cabecalho_em_maiusculas_continua_a_contar():
                         ("ARTIGO 5.º\nObjeto\n1- Define o objeto.\n", "artigo")]:
         doc, _ = estruturar(texto, "t")
         assert [n["tipo"] for n in doc["nos"] if n["tipo"] == tipo] == [tipo]
+
+
+# ---------- designadores de posição (ISSUE #40) ----------
+
+def test_clausula_previa_e_um_cabecalho():
+    # AEVP/FESAHT, BTE 31/2026 (revisão parcial): a convenção abre com
+    # "Cláusula prévia", que fixa o âmbito da revisão. Sem a reconhecer, o
+    # título e os três números eram absorvidos pelo preâmbulo
+    texto = ("Cláusula prévia Âmbito de revisão\n"
+             "1- O presente contrato coletivo revê parcialmente o anterior.\n"
+             "2- O presente CCT aplica-se aos trabalhadores da associação.\n"
+             "3- Nas matérias não alteradas mantém-se a redação anterior.\n")
+    doc, _ = estruturar(texto, "t")
+    cl = [n for n in doc["nos"] if n["tipo"] == "clausula"]
+    assert [n["rotulo"] for n in cl] == ["Cláusula prévia - Âmbito de revisão"]
+
+
+def test_clausula_previa_subsegmenta_os_numeros():
+    # a subsegmentação só atua sobre nós já classificados como cláusula/artigo,
+    # portanto é consequência direta do reconhecimento — e é o que a
+    # codificação temática precisa para marcar cada número
+    texto = ("Cláusula prévia Âmbito de revisão\n"
+             "1- O presente contrato coletivo revê parcialmente o anterior.\n"
+             "2- O presente CCT aplica-se aos trabalhadores da associação.\n"
+             "3- Nas matérias não alteradas mantém-se a redação anterior.\n")
+    doc, _ = estruturar(texto, "t")
+    par = [n for n in doc["nos"] if n["tipo"] == "paragrafo"]
+    assert len(par) == 3
+
+
+def test_designadores_aceites_e_recusados():
+    from cct.extractor import RE_ARTIGO, RE_CLAUSULA
+    assert RE_CLAUSULA.match("Cláusula prévia")
+    assert RE_CLAUSULA.match("CLÁUSULA PRÉVIA")
+    assert RE_CLAUSULA.match("Cláusula preliminar Objeto")
+    assert RE_ARTIGO.match("Artigo preliminar")
+    # sem acento continua a passar: nos cabeçalhos em maiúsculas o BTE nem
+    # sempre o escreve, e é a mesma tolerância já dada a "CLAUSULA"
+    assert RE_CLAUSULA.match("CLAUSULA PREVIA")
+    # o contraponto: a lista é fechada, e o guarda trava prosa
+    assert not RE_CLAUSULA.match("Cláusula geral e transitória")
+    assert not RE_CLAUSULA.match("Cláusula final")
+    assert not RE_CLAUSULA.match("Cláusula previa o pagamento de um subsídio.")
+
+
+def test_prosa_com_previa_nao_rouba_o_corpo_da_clausula():
+    # o caso que o guarda evita: a linha de prosa ficaria como cabeçalho e
+    # levaria consigo o resto do texto da cláusula real
+    texto = ("Cláusula 3.ª\nSubsídio de refeição\n"
+             "1- O valor é atualizado anualmente.\n"
+             "Cláusula previa o pagamento em duodécimos, o que se mantém.\n")
+    doc, _ = estruturar(texto, "t")
+    cl = [n for n in doc["nos"] if n["tipo"] == "clausula"]
+    assert [n["rotulo"] for n in cl] == ["Cláusula 3.ª - Subsídio de refeição"]
