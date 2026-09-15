@@ -11,6 +11,8 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from cct.subprocesso import ambiente_utf8
+
 RAIZ = Path(__file__).resolve().parent.parent      # raiz do repositório
 DADOS = RAIZ / "data" / "raw"
 RESULTADOS = RAIZ / "results"
@@ -158,9 +160,14 @@ class AppCCT(tk.Tk):
 
         def trabalho():
             try:
+                # encoding/errors e ambiente_utf8: a saída vai por um pipe,
+                # e sem isto o processo filho codifica-a na região da máquina
+                # (cp1252 no Windows português), rebentando no primeiro ✓ ou →
                 p = subprocess.Popen([sys.executable, "-u", "-m", *argumentos],
                                      cwd=str(RAIZ), stdout=subprocess.PIPE,
-                                     stderr=subprocess.STDOUT, text=True)
+                                     stderr=subprocess.STDOUT, text=True,
+                                     encoding="utf-8", errors="replace",
+                                     env=ambiente_utf8())
                 self.processo = p
                 for linha in p.stdout:
                     self.fila.put(linha)
