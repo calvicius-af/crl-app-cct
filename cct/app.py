@@ -11,6 +11,8 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from cct.subprocesso import ambiente_utf8
+
 RAIZ = Path(__file__).resolve().parent.parent      # raiz do repositório
 DADOS = RAIZ / "data" / "raw"
 RESULTADOS = RAIZ / "results"
@@ -158,9 +160,19 @@ class AppCCT(tk.Tk):
 
         def trabalho():
             try:
+                # As mensagens do pipeline usam símbolos fora da tabela de
+                # caracteres por omissão do Windows (cp1252, ex.: ✓ ✗ →). Sem
+                # forçar UTF-8 aqui, o processo filho rebenta com
+                # UnicodeEncodeError ao escrever para este pipe (que, ao
+                # contrário de uma consola, não tem o tratamento especial do
+                # Windows para Unicode) — foi o que aconteceu em estações do
+                # CRL com a codificação regional portuguesa. Ver ISSUE-0007 e
+                # tests/test_subprocesso_utf8.py.
                 p = subprocess.Popen([sys.executable, "-u", "-m", *argumentos],
                                      cwd=str(RAIZ), stdout=subprocess.PIPE,
-                                     stderr=subprocess.STDOUT, text=True)
+                                     stderr=subprocess.STDOUT, text=True,
+                                     encoding="utf-8", errors="replace",
+                                     env=ambiente_utf8())
                 self.processo = p
                 for linha in p.stdout:
                     self.fila.put(linha)
