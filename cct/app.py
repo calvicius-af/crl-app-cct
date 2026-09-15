@@ -3,7 +3,6 @@ dependências além do Python standard).
 
 Uso: python -m cct.app
 """
-import os
 import queue
 import subprocess
 import sys
@@ -11,6 +10,8 @@ import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
+
+from cct.subprocesso import ambiente_utf8
 
 RAIZ = Path(__file__).resolve().parent.parent      # raiz do repositório
 DADOS = RAIZ / "data" / "raw"
@@ -165,14 +166,13 @@ class AppCCT(tk.Tk):
                 # UnicodeEncodeError ao escrever para este pipe (que, ao
                 # contrário de uma consola, não tem o tratamento especial do
                 # Windows para Unicode) — foi o que aconteceu em estações do
-                # CRL com a codificação regional portuguesa.
-                env = os.environ.copy()
-                env["PYTHONUTF8"] = "1"
-                env["PYTHONIOENCODING"] = "utf-8"
+                # CRL com a codificação regional portuguesa. Ver ISSUE-0007 e
+                # tests/test_subprocesso_utf8.py.
                 p = subprocess.Popen([sys.executable, "-u", "-m", *argumentos],
                                      cwd=str(RAIZ), stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT, text=True,
-                                     encoding="utf-8", errors="replace", env=env)
+                                     encoding="utf-8", errors="replace",
+                                     env=ambiente_utf8())
                 self.processo = p
                 for linha in p.stdout:
                     self.fila.put(linha)
