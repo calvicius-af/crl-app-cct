@@ -169,8 +169,20 @@ mesmos documentos.
 O nome usa a sigla de cada lado da mesa. Quando a sigla está declarada no nome do
 outorgante — `… - ACRAL`, `(AEVP)`, `FESAHT - Federação…` — é usada tal e qual. Quando
 não está, é derivada das palavras distintivas (`Sindicato Nacional dos Motoristas` →
-`Motoristas`) e **assinalada no relatório para confirmação humana**. Para fixar os casos
-que a equipa quer decididos de uma vez por todas:
+`Motoristas`) e **assinalada no relatório para confirmação humana**. Quando há mais do
+que um outorgante do mesmo lado (patronal ou sindical), é sempre o primeiro da lista que
+entra no nome — o aviso fica no relatório para confirmação, mas não há escolha a fazer
+entre outorgantes.
+
+O `siglas.csv` **não é um ficheiro do repositório**: é conhecimento da equipa (que
+entidade usa que sigla), escrito localmente por quem opera a recolha, tal como os
+próprios índices do BTE em `data/raw/indices/`. Não existe um `siglas.csv` "oficial" para
+copiar; o ponto de partida é o modelo abaixo, com o formato esperado (`nome;sigla`, uma
+entidade por linha, cabeçalho opcional):
+
+[`siglas.exemplo.csv`](../operacao/siglas.exemplo.csv)
+
+Para fixar os casos que a equipa quer decididos de uma vez por todas:
 
 ```bash
 python -m cct.nomeacao --siglas siglas.csv --aplicar     # ficheiro 'nome;sigla' por linha
