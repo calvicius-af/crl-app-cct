@@ -19,10 +19,11 @@ import re
 from pathlib import Path
 
 from . import ambito as mod_ambito
-from .nomeacao import (ESQUEMA_OMISSAO, FAMILIAS_PROCESSAVEIS, PASTA_FAMILIA,
-                       PASTA_FAMILIA_DESCONHECIDA, carregar_siglas,
-                       nome_documento, separar_outorgantes, sequencial_bte,
-                       tipo_normalizado)
+from .nomeacao import (ESQUEMA_OMISSAO, FAMILIAS_COM_AMBITO,
+                       FAMILIAS_PROCESSAVEIS, FAMILIAS_SO_METADADO,
+                       PASTA_FAMILIA, PASTA_FAMILIA_DESCONHECIDA,
+                       carregar_siglas, nome_documento, separar_outorgantes,
+                       sequencial_bte, tipo_normalizado)
 from .recolha import INDICES_OMISSAO, RAIZ, familia, ler_indice
 
 # Colunas produzidas pelo script. A ordem é a do documento de gestão documental.
@@ -32,7 +33,7 @@ COLUNAS_AUTOMATICAS = [
     "cod_irct", "acto_negociacao", "bte_numero", "bte_data",
     "pagina_inicio", "pagina_fim",
     "n_outorgantes", "outorgantes", "relacao", "relacao_alvo",
-    "altera_estruturado", "altera_por_resolver",
+    "avisos_projeto", "altera_estruturado", "altera_por_resolver",
     "vide_em_vigor", "materias_detectadas", "sectores_a_classificar",
     "url_fonte", "titulo", "estado", "avisos",
 ]
@@ -209,12 +210,23 @@ def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,
                                                    item.get("titulo", ""))
         materias, sectores = separar_sectores(item.get("sectores", ""))
         estruturado, por_resolver = separar_alteracoes(item.get("altera", ""))
-        amb, amb_origem, _ = mod_ambito.classificar(
+        amb, amb_origem, _ = mod_ambito.classificar_com_ine(
             patronais[0] if patronais else item.get("titulo", ""),
             item.get("tipo", ""), vocabulario_ambito)
         p_ini, p_fim = paginas(item.get("ficheiro", ""))
         fam = item.get("familia") or familia(item.get("tipo", "")) or ""
-        pasta = PASTA_FAMILIA.get(fam, PASTA_FAMILIA_DESCONHECIDA)
+        if fam in FAMILIAS_SO_METADADO:
+            # Um aviso de projeto de portaria não tem ficheiro próprio: o que
+            # interessa dele — que houve projeto, e quando — vai para a coluna
+            # `avisos_projeto` da portaria que se lhe seguir. A linha de
+            # catálogo fica, porque o aviso existiu e apagá-lo era perder um
+            # facto; o que não fica é o PDF.
+            destino = ""
+        else:
+            pasta = PASTA_FAMILIA.get(fam, PASTA_FAMILIA_DESCONHECIDA)
+            if fam in FAMILIAS_COM_AMBITO:
+                pasta = f"{pasta}/{amb}"
+            destino = f"1_fontes/irct/{pasta}/{nome}.pdf"
         # Processável é quem passa nas duas peneiras: a família certa (uma
         # portaria não tem articulado para codificar) e o âmbito que a aplicação
         # sabe ler (a Administração Pública ainda não).
@@ -222,7 +234,7 @@ def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,
         rel, rel_alvo = relacao(fam, estruturado, por_resolver)
         saida.append({
             "nome_canonico": nome,
-            "ficheiro_destino": f"1_fontes/irct/{pasta}/{amb}/{nome}.pdf",
+            "ficheiro_destino": destino,
             "ficheiro_origem": item.get("ficheiro", ""),
             "ano": item.get("ano") or "",
             "seq_anual": sequencial_bte(item) or "",
@@ -241,6 +253,8 @@ def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,
             "outorgantes": "; ".join(patronais + sindicais),
             "relacao": rel,
             "relacao_alvo": rel_alvo,
+            "avisos_projeto": "",        # preenchido em ligar_avisos()
+
             "altera_estruturado": "; ".join(
                 f"{a['tipo']}.{a['data']}.{a['seq']}/{a['ano']}" for a in estruturado),
             "altera_por_resolver": "; ".join(por_resolver),
@@ -249,11 +263,38 @@ def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,
             "sectores_a_classificar": "; ".join(sectores),
             "url_fonte": item.get("url", ""),
             "titulo": item.get("titulo", ""),
-            "estado": "recolhido" if processavel else "nao_processavel",
+            "estado": ("metadado" if fam in FAMILIAS_SO_METADADO
+                       else "recolhido" if processavel else "nao_processavel"),
             "avisos": " | ".join(avisos),
             **{c: "" for c in COLUNAS_EQUIPA},
         })
     return saida
+
+
+def ligar_avisos(linhas_catalogo: list[dict]) -> list[dict]:
+    """Passa os avisos de projeto para a coluna da portaria correspondente.
+
+    Um aviso de projeto de portaria de extensão e a portaria que dele resulta
+    apontam para a mesma convenção. É por aí que se ligam: mesmo `relacao_alvo`,
+    e o aviso tem de ser anterior. Quando a portaria ainda não saiu, o aviso
+    fica sem destino — é um facto sobre o ano, não um erro, e a linha do aviso
+    mantém-se no catálogo para o registar.
+    """
+    avisos: dict[str, list[dict]] = {}
+    for l in linhas_catalogo:
+        if l.get("familia") in FAMILIAS_SO_METADADO and l.get("relacao_alvo"):
+            avisos.setdefault(l["relacao_alvo"], []).append(l)
+    if not avisos:
+        return linhas_catalogo
+    for l in linhas_catalogo:
+        if l.get("familia") != "extensao":
+            continue
+        candidatos = avisos.get(l.get("relacao_alvo", ""), [])
+        anteriores = [a for a in candidatos
+                      if str(a.get("bte_data", "")) <= str(l.get("bte_data", ""))]
+        l["avisos_projeto"] = "; ".join(
+            f"{a['seq_anual']}/{a['ano']} ({a['bte_data']})" for a in anteriores)
+    return linhas_catalogo
 
 
 def fundir(novas: list[dict], anterior: Path | None) -> list[dict]:
@@ -328,8 +369,9 @@ def main(argv=None):
            else mod_ambito.carregar_vocabulario())
 
     saida = Path(args.saida)
-    catalogo = fundir(linhas(itens, tabela_siglas=tabela or None,
-                             vocabulario_ambito=voc, esquema=args.esquema), saida)
+    catalogo = fundir(ligar_avisos(
+        linhas(itens, tabela_siglas=tabela or None, vocabulario_ambito=voc,
+               esquema=args.esquema)), saida)
     escrever(catalogo, saida)
 
     print(f"== Catálogo: {len(catalogo)} documentos → {saida}")

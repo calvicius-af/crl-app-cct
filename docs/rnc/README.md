@@ -1,7 +1,7 @@
 # RNC — Como organizamos e nomeamos os ficheiros
 
 Relatório da Negociação Coletiva · Centro de Relações Laborais
-**Versão 3.2 · 16 de setembro de 2026** · substitui `README.Estrutura_RNC_2027.docx` (v2.1),
+**Versão 3.3 · 16 de setembro de 2026** · substitui `README.Estrutura_RNC_2027.docx` (v2.1),
 `README_Estrutura_RNC_2026.md` (v1) e as secções 2–3 do `SOP_Gestao_Documental_RNC_2026.docx` (v1.0)
 
 > **O que muda na v3.0.** A v2.1 descrevia a convenção assumindo uma ferramenta
@@ -74,7 +74,8 @@ faz, e resolver três coisas que ficaram por decidir. Está tudo fechado.
 | 5 | Sectores misturados com matérias, «decisão de equipa» | **Separados por omissão.** O que a aplicação não reconhece vai para `sectores_a_classificar`, nunca é assumido | [§7-b](#b-sectores-e-matérias-no-mesmo-campo) |
 | 6 | `siglas_organizacoes.csv` com 2 401 organizações | **2 403, com a origem de cada sigla declarada.** As 1 017 que o script inventou não são carregadas enquanto ninguém as vir | [§8](#8-vocabulários-controlados) |
 | 7 | Siglas ambíguas resolvidas à mão, caso a caso | **Resolvidas por regra, automaticamente.** 391 conflitos, zero duplicados à saída, resultado independente de quem corre o script | [§5.5-b](#55-os-casos-que-o-script-não-resolve-sozinho), [ADR-0017](../adr/0017-regra-de-desambiguacao-de-siglas.md) |
-| 9 | Portarias de extensão e acordos de adesão sem tratamento próprio | **Cada família na sua pasta**, e só as convenções entram no pipeline. As adesões passam a ser recolhidas por omissão, o que não eram | [§5.7](#57-portarias-de-extensão-acordos-de-adesão-e-avisos), [ADR-0018](../adr/0018-familias-documentais-em-pastas-separadas.md) |
+| 10 | Nada sobre as entidades do sector público | **Lista do INE importada como sinal**, com duas camadas. Não decide: propõe, e propõe SPE — nunca APU — para as empresas públicas reclassificadas | [§5.2-bis](#52-bis-a-lista-do-ine-e-o-que-ela-não-diz), [ADR-0019](../adr/0019-lista-do-ine-como-sinal-de-ambito.md) |
+| 9 | Portarias de extensão e acordos de adesão sem tratamento próprio | **Cada família na sua pasta**, e só as convenções entram no pipeline. As adesões passam a ser recolhidas por omissão, o que não eram | [§5.7](#57-portarias-de-extensão-e-acordos-de-adesão), [ADR-0018](../adr/0018-familias-documentais-em-pastas-separadas.md) |
 | 8 | O número sequencial era atribuído pelo CRL | **É o da DGCP (ex-GEP).** Decisão da coordenação, que substitui a da SPEC-0001: compatibilizar ao máximo com os códigos já existentes | [§5.1-bis](#51-bis-de-onde-vem-o-número-sequencial) |
 
 O que se mantém da v2.1, e porque funcionava: as três regras do resumo; a
@@ -101,9 +102,8 @@ RNC_Dados_2026/
 │   ├── bte_completo/            boletins inteiros em PDF
 │   ├── irct/                    ★ PDF individuais, já renomeados — ver §5.7
 │   │   ├── convencoes/          PRI/ SPE/ APU/   ← o pipeline lê daqui
-│   │   ├── extensoes/           PRI/ SPE/        portarias de extensão
-│   │   ├── adesoes/             PRI/ SPE/        acordos de adesão
-│   │   └── avisos/              PRI/ SPE/        projetos, denúncias, caducidades
+│   │   ├── portarias_extensao/
+│   │   └── acordos_adesao/      (avisos: só metadado, sem pasta — §5.7)
 │   └── externas/                DGERT, DGAEP, CITE, INE, RAA/RAM, Eurofound
 ├── 2_processamento/             saídas automáticas da AppCCT
 │   ├── texto/                   .txt e doc.json extraídos do PDF
@@ -169,7 +169,7 @@ base nunca muda — mudam a extensão e a pasta.
 5. **Só a família `convencoes/` atravessa as fases 2 a 8.** As portarias de
    extensão, os acordos de adesão e os avisos param na fase 1: são recolhidos,
    nomeados e catalogados, e ficam disponíveis para consulta e para contagem —
-   mas não são extraídos nem codificados. O porquê está em [§5.7](#57-portarias-de-extensão-acordos-de-adesão-e-avisos).
+   mas não são extraídos nem codificados. O porquê está em [§5.7](#57-portarias-de-extensão-e-acordos-de-adesão).
 6. **Cada corrida da aplicação deixa um `manifest.json`** com o comando, o
    *commit*, as versões, os *hashes* das entradas e saídas, as contagens e os
    problemas. É o que responde, meses depois, a «como é que isto foi produzido?».
@@ -277,11 +277,14 @@ público empresarial», mas lê-se como «público». Essa ambiguidade custou ca
 vias, pela ordem da fiabilidade:
 
 1. **Vocabulário** — `vocabularios/empregadores_ambito.csv`, lista editável de
-   empregadores conhecidos. Tem prioridade sobre tudo.
-2. **Regra** — tipo `ACEP` → APU; nome com `, EPE` / `, EM` / «Empresa
+   empregadores conhecidos. Tem prioridade sobre tudo, e é a única via que
+   decide sem aviso.
+2. **Lista do INE** — as entidades do sector institucional S.13. Propõe, não
+   decide: ver [§5.2-bis](#52-bis-a-lista-do-ine-e-o-que-ela-não-diz).
+3. **Regra** — tipo `ACEP` → APU; nome com `, EPE` / `, EM` / «Empresa
    Municipal» → SPE; município, câmara, freguesia, universidade, politécnico,
    direção-geral → APU.
-3. **Omissão** — PRI, marcado como `omissao`.
+4. **Omissão** — PRI, marcado como `omissao`.
 
 Tudo o que a *regra* classifique como SPE ou APU sai com aviso e fica por rever.
 **A aplicação nunca decide um APU em silêncio** — um falso APU retira um
@@ -299,7 +302,63 @@ documento do pipeline sem ninguém dar por isso. O catálogo regista, na coluna
 
 Assim «não conseguimos processar isto» deixa de ser uma nota num documento e
 passa a ser a estrutura das pastas. O âmbito é o segundo eixo da arrumação; o
-primeiro é a família documental, em [§5.7](#57-portarias-de-extensão-acordos-de-adesão-e-avisos).
+primeiro é a família documental, em [§5.7](#57-portarias-de-extensão-e-acordos-de-adesão).
+
+### 5.2-bis A lista do INE, e o que ela não diz
+
+O INE publica todos os anos as **Entidades do Setor Institucional das
+Administrações Públicas** — 4 241 entidades em 2025, em doze subsectores do S.13
+nos termos do SEC 2010. É oficial, é datada e é exaustiva. Está importada em
+`vocabularios/entidades_administracao_publica.csv`.
+
+**Mas responde a outra pergunta, e é preciso saber qual.** O INE classifica por
+*contas nacionais*: uma entidade está em S.13 se for produtor não mercantil, o
+que se decide pelo teste dos 50% de cobertura dos custos por receitas de
+mercado. O RNC classifica por *regime laboral*: APU são as entidades cujos
+trabalhadores estão sob a LTFP e cujos IRCT vão para a DGAEP, e por isso não
+saem no BTE.
+
+Os critérios divergem nos dois sentidos. Verificado sobre a lista de 2025:
+
+| Entidade | Em S.13? | Âmbito no RNC |
+|---|---|---|
+| Metropolitano de Lisboa, E.P.E. | **sim** | SPE — trabalhadores sob o Código do Trabalho, AE no BTE |
+| Rádio e Televisão de Portugal, S.A. | **sim** | SPE |
+| Infraestruturas de Portugal, S.A. | **sim** | SPE |
+| TUB — Transportes Urbanos de Braga, E.M. | **sim** | SPE |
+| CP, Carris, EPAL, Águas de Portugal | **não** | SPE — passam o teste de mercado |
+| Empresa Metropolitana de Estacionamento da Maia, E.M. | **não** | SPE, e foi processada do BTE 31/2026 |
+
+Se a lista decidisse, **174 entidades saíam do pipeline como falsos APU** — o
+modo de falha que o §5.2 identifica, e o mais caro de todos, porque não se nota.
+
+#### Como é usada: duas camadas, e sempre com aviso
+
+| Camada | Quem | Propõe |
+|---|---|---|
+| `APU` | 4 067 entidades **sem** forma jurídica empresarial: municípios, freguesias, órgãos regionais, serviços e fundos autónomos, fundos de segurança social | APU |
+| `SPE_PROVAVEL` | 174 entidades **com** forma jurídica empresarial (`, E.P.E.`, `, E.M.`, `, S.A.`, `Lda`) — empresas públicas reclassificadas em contas nacionais | **SPE**, nunca APU |
+
+Na ordem de decisão do [§5.2](#52-o-âmbito--e-porque-tem-de-estar-no-nome), a
+lista entra em **segundo** lugar: depois do vocabulário da equipa, antes da
+regra. E **toda a proposta vinda dela sai com aviso**, mesmo quando acerta,
+porque o critério dela não é o do RNC. O catálogo regista `ambito_origem=ine`.
+
+**A ausência da lista não significa nada.** A CP e a Carris não estão lá e são
+SPE. Cair fora da lista devolve a decisão à regra, não a «privado confirmado».
+
+Regera-se com:
+
+```bash
+python scripts/construir_entidades_publicas.py \
+    1_fontes/externas/Entidades_S13_2025.pdf --ano 2025
+```
+
+> **O que continua a fazer falta.** Uma lista do lado da **DGAEP**, com as
+> entidades cujos trabalhadores estão sob a LTFP. Essa responderia à pergunta
+> certa. Enquanto não existir, as 174 entidades com forma empresarial são o
+> material de trabalho da [tarefa 4](#10-o-que-falta-fazer): revê-las uma vez
+> fixa-as no `empregadores_ambito.csv`, que ganha sempre à lista do INE.
 
 ### 5.3 O código IRCT é estável — e porquê
 
@@ -511,7 +570,7 @@ a atual. As anteriores levam data e estão em `9_arquivo/`.
 
 ---
 
-### 5.7 Portarias de extensão, acordos de adesão e avisos
+### 5.7 Portarias de extensão e acordos de adesão
 
 O BTE publica quatro coisas diferentes sob o mesmo guarda-chuva dos IRCT. As três
 últimas referem-se sempre a uma convenção concreta, mas **não são convenções**.
@@ -533,15 +592,27 @@ fosse uma revisão.
 
 ```text
 1_fontes/irct/
-├── convencoes/  PRI/ SPE/ APU/   ← o pipeline lê daqui, e só daqui
-├── extensoes/   PRI/ SPE/
-├── adesoes/     PRI/ SPE/
-└── avisos/      PRI/ SPE/
+├── convencoes/          PRI/ SPE/ APU/   ← o pipeline lê daqui, e só daqui
+├── portarias_extensao/
+└── acordos_adesao/
 ```
 
 A família vem antes do âmbito porque é a distinção que decide **o que se faz**
-com o documento; o âmbito decide **se se consegue** fazer. São quatro níveis, o
-máximo que a regra de higiene 5 admite — e é onde ela se gasta.
+com o documento; o âmbito decide **se se consegue** fazer.
+
+**O âmbito só subdivide as convenções.** Numa portaria e num acordo de adesão
+não serve para nada: o que o âmbito decide é se o documento entra no pipeline, e
+nenhum destes entra. Subdividi-los era criar pastas que ninguém usaria para
+responder a pergunta nenhuma. O âmbito continua no nome de todos os ficheiros,
+onde é útil para procurar.
+
+**Os avisos não têm pasta.** Um aviso de projeto de portaria de extensão anuncia
+uma portaria que virá a seguir; guardar o PDF do anúncio ao lado do PDF da
+portaria é guardar duas vezes a mesma informação. O que interessa — que houve
+projeto, e quando — vai para a coluna `avisos_projeto` da portaria, ligada pela
+convenção a que ambos se referem. **A linha de catálogo do aviso mantém-se**,
+com `estado=metadado`: o aviso existiu, e apagá-lo era perder um facto. O que
+não se guarda é o ficheiro.
 
 Um tipo que o vocabulário não conheça vai para `por_classificar/` e aparece no
 relatório. Não é silenciado, mas também não é adivinhado.
@@ -553,10 +624,10 @@ São recolhidas, nomeadas e catalogadas — e ficam disponíveis para consulta e
 para contagem, que é o que o relatório precisa delas. A coluna `processavel` do
 catálogo cruza as duas peneiras:
 
-| | família `convencao` | outra família |
-|---|---|---|
-| **âmbito PRI ou SPE** | processável | recolhido, não processado |
-| **âmbito APU** | recolhido, não processado | recolhido, não processado |
+| | família `convencao` | portaria ou adesão | aviso |
+|---|---|---|---|
+| **âmbito PRI ou SPE** | processável | recolhido, não processado | só metadado |
+| **âmbito APU** | recolhido, não processado | recolhido, não processado | só metadado |
 
 E o pipeline **recusa-se a correr** se encontrar na pasta de entrada um ficheiro
 cujo nome declare outra família, dizendo para onde apontar. Não avisa e
@@ -676,12 +747,13 @@ python -m cct.catalogo \
     --siglas vocabularios/siglas_organizacoes.csv
 ```
 
-**Colunas produzidas automaticamente** (29):
+**Colunas produzidas automaticamente** (30):
 
 `nome_canonico` · `ficheiro_destino` · `ficheiro_origem` · `ano` · `seq_anual` ·
 `tipo_documento` · `familia` · `processavel` · `ambito` · `ambito_origem` ·
 `cod_irct` · `acto_negociacao` · `bte_numero` · `bte_data` · `pagina_inicio` ·
 `pagina_fim` · `n_outorgantes` · `outorgantes` · `relacao` · `relacao_alvo` ·
+`avisos_projeto` ·
 `altera_estruturado` · `altera_por_resolver` · `vide_em_vigor` ·
 `materias_detectadas` · `sectores_a_classificar` · `url_fonte` · `titulo` ·
 `estado` · `avisos`
@@ -776,7 +848,15 @@ versionados com o código. Na árvore do RNC vivem em
 | `empregadores_ambito.csv` | empregadores com âmbito conhecido (PRI/SPE/APU) | semente com 10 entradas — a completar |
 | `tipos_documento.csv` | CCT, CCT-ALT, AE, AE-ALT, AE-ALT-RECT, ACT, ACEP, PE, AA, DA… | produzido |
 | `estados.csv` | recolhido → extraído → pré-codificado → empacotado → em validação → validado → integrado → exportado | produzido |
+| `entidades_administracao_publica.csv` | 4 241 entidades do sector institucional S.13 (INE, 2025), em duas camadas de sinal — ver §5.2-bis | produzido |
 | `temas.csv` | crosswalk roteiro ↔ macro temas europeus ↔ codebook | **incompleto** — ver §6 e §10 |
+
+O `entidades_administracao_publica.csv` regera-se do PDF anual do INE:
+
+```bash
+python scripts/construir_entidades_publicas.py \
+    1_fontes/externas/Entidades_S13_2025.pdf --ano 2025
+```
 
 Os três primeiros regeram-se do export da DGERT:
 
@@ -901,7 +981,7 @@ começar o ciclo**. Só a tarefa 2 depende de informação que não temos.
 | 1 | **Completar o `temas.csv`** a partir do `plano_transicao_livro_codigos_europeu.xlsx` | Sem ele, `4_temas/` não se gera e a transição europeia não tem onde assentar | 1 dia | `4_temas/` |
 | 2 | **Obter a tabela de famílias do `COD: (IRCT)` da DGCP (ex-GEP)** — ou inferir os dígitos em falta de boletins que tragam um ACT e uma portaria de extensão | Só estão verificados os dígitos `2` e `4`. Sem os restantes, esses documentos ficam sem ligação ao registo da DGERT. A aplicação não adivinha: deixa a coluna vazia | ½ dia se a tabela existir; 1 dia por inferência | ligação ao registo para ACT, PE, AA e decisões arbitrais |
 | 3 | **Verificar as portarias de extensão e os acordos de adesão com dados reais** — um boletim que os traga. Confirmar onde a DGERT põe a convenção estendida, e se o `COD: (IRCT)` de uma portaria é o da convenção ou próprio | A leitura da relação está implementada e testada contra um índice de ensaio, não contra dados reais. Se o `COD:` for próprio, a ligação portaria↔convenção passa a depender só da coluna de relação | ½ dia | contagem de cobertura por extensão |
-| 4 | **Completar o `empregadores_ambito.csv`** — passagem sobre os acordos de empresa dos últimos 2–3 anos | Sem isto, empresas públicas entram como PRI por omissão e contaminam qualquer leitura por âmbito | 1–2 dias | leitura por âmbito |
+| 4 | **Rever as 174 entidades com forma empresarial em S.13** e fixá-las no `empregadores_ambito.csv` | É a lista exata dos casos ambíguos: empresas públicas reclassificadas em contas nacionais, que o INE não distingue e que a aplicação propõe como SPE sem confirmar | 1 dia, com a lista já feita | leitura por âmbito |
 | 5 | **Decidir se os sectores passam a CAE/NACE** | A separação já está feita; falta decidir o vocabulário de destino. Afeta a ligação a NACE prevista no modelo europeu | ½ dia + decisão de equipa | análise sectorial |
 | 6 | **Rever as 391 siglas desambiguadas** e promover as de origem `recurso` que forem boas | A regra garante que não há duplicados, não que a sigla escolhida é a que a equipa preferia. Rever uma vez fixa-a para sempre | 1 dia | nada — a regra já desbloqueou a nomeação em lote |
 | 7 | **Migrar o ciclo anterior** para a nova estrutura | Ver a tabela de correspondência abaixo | 2–3 dias | — |
@@ -940,6 +1020,7 @@ Tudo dentro da aplicação, tudo com testes que correm no CI em Linux e macOS.
 | `python -m cct.catalogo` | Escreve o `catalogo_irct_AAAA.csv` |
 | `python -m cct.aquisicao` | Encadeia recolha + nomeação, com relatório único |
 | `python scripts/construir_vocabularios.py` | Reconstrói os vocabulários do export da DGERT |
+| `python scripts/construir_entidades_publicas.py` | Lê a lista anual do INE das entidades do sector S.13 |
 | `python -m cct.pipeline_tema` | Extração, pré-codificação, diacronia, triagem → QDPX |
 | `python -m cct.doctor` | Diz o que falta no ambiente, em português |
 
@@ -1002,6 +1083,8 @@ indicado, pelo que a tabela da equipa vem antes da tabela gerada.
 | Duas corridas do construtor dão o mesmo vocabulário | sim, byte a byte |
 | Sectores/matérias separados | 14/14, sem perda de itens |
 | Famílias no BTE 31/2026 | 14 convenções; 0 portarias, 0 adesões, 0 avisos |
+| Entidades lidas da lista do INE de 2025 | 4 241 — 4 067 com sinal APU, 174 com sinal SPE |
+| Empresas públicas em S.13 que continuam processáveis | verificado para o Metropolitano de Lisboa, a RTP, as Infraestruturas de Portugal e o TUB |
 | Portarias, adesões e avisos | verificados contra índice de ensaio, **não contra dados reais** — tarefa 3 do §10 |
 | O pipeline recusa um ficheiro que não é convenção | sim, com mensagem a dizer para onde apontar |
 

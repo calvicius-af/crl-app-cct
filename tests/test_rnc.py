@@ -503,6 +503,20 @@ LINHAS_NAO_CONVENCAO = [
 ]
 
 
+def _itens_de(*linhas_indice, pasta=None):
+    """Lê um índice de ensaio feito só com as linhas indicadas."""
+    import tempfile
+
+    global LINHAS
+    originais = LINHAS
+    destino = Path(pasta or tempfile.mkdtemp())
+    try:
+        LINHAS = list(linhas_indice)
+        return ler_indice(escrever_indice_tecnico(destino, "BTE33_2026.xlsx"))
+    finally:
+        LINHAS = originais
+
+
 @pytest.fixture()
 def itens_mistos(tmp_path):
     global LINHAS
@@ -534,9 +548,30 @@ def test_cada_familia_vai_para_a_sua_pasta(itens_mistos):
     destinos = {l["tipo_documento"]: l["ficheiro_destino"]
                 for l in catalogo.linhas(itens_mistos)}
     assert destinos["CCT"].startswith("1_fontes/irct/convencoes/PRI/")
-    assert destinos["PE"].startswith("1_fontes/irct/extensoes/PRI/")
-    assert destinos["AA"].startswith("1_fontes/irct/adesoes/PRI/")
-    assert destinos["AVISO"].startswith("1_fontes/irct/avisos/PRI/")
+    assert destinos["PE"].startswith("1_fontes/irct/portarias_extensao/")
+    assert destinos["AA"].startswith("1_fontes/irct/acordos_adesao/")
+    assert destinos["AVISO"] == "", "um aviso não tem ficheiro — é metadado"
+
+
+def test_so_as_convencoes_se_subdividem_por_ambito(itens_mistos):
+    """Numa portaria o âmbito não decide nada: nenhuma entra no pipeline."""
+    destinos = {l["tipo_documento"]: l["ficheiro_destino"]
+                for l in catalogo.linhas(itens_mistos)}
+    assert destinos["PE"].count("/") == 3, destinos["PE"]
+    assert destinos["CCT"].count("/") == 4, destinos["CCT"]
+    assert "/PRI/" not in destinos["PE"] and "/SPE/" not in destinos["PE"]
+
+
+def test_o_aviso_fica_como_metadado_da_portaria():
+    """«Registados apenas em metadados das portarias», sem perder a linha."""
+    base = dict(LINHAS_NAO_CONVENCAO[0])          # a portaria
+    aviso = dict(LINHAS_NAO_CONVENCAO[2], altera=base["altera"])
+    linhas = catalogo.ligar_avisos(catalogo.linhas(_itens_de(base, aviso)))
+    portaria = next(l for l in linhas if l["familia"] == "extensao")
+    linha_aviso = next(l for l in linhas if l["familia"] == "aviso")
+    assert portaria["avisos_projeto"], "a portaria tem de saber que houve projeto"
+    assert linha_aviso["ficheiro_destino"] == ""
+    assert linha_aviso["estado"] == "metadado", "a linha fica; o PDF é que não"
 
 
 def test_so_as_convencoes_sao_processaveis(itens_mistos):
@@ -596,3 +631,102 @@ def test_o_pipeline_recusa_o_que_nao_e_convencao(tmp_path, monkeypatch):
     assert "não são convenções" in mensagem
     assert "_PE_" in mensagem
     assert "convencoes" in mensagem, "a mensagem tem de dizer para onde apontar"
+
+
+# ------------------------ a lista do INE como sinal, não como autoridade (ADR-0019)
+
+INE = [
+    # entidades com forma empresarial em S.13: empresas públicas reclassificadas
+    ("Metropolitano de Lisboa, E.P.E.", "SPE_PROVAVEL", "S.13112"),
+    ("Rádio e Televisão de Portugal, S.A.", "SPE_PROVAVEL", "S.13112"),
+    ("TUB - Empresa de Transportes Urbanos de Braga, E.M.", "SPE_PROVAVEL", "S.131324"),
+    # administração pública em sentido estrito
+    ("Município de Vila Real", "APU", "S.131322"),
+    ("União das freguesias de Real, Dume e Semelhe", "APU", "S.131323"),
+    ("Instituto Nacional de Estatística", "APU", "S.13111"),
+]
+
+
+@pytest.fixture()
+def tabela_ine(tmp_path):
+    caminho = tmp_path / "ine.csv"
+    linhas = ["nome;sinal;subsetor;subsetor_nome;forma_empresarial;fonte;ano"]
+    linhas += [f"{n};{s};{sub};x;{'sim' if s == 'SPE_PROVAVEL' else 'nao'};"
+               f"INE S.13 2025;2025" for n, s, sub in INE]
+    caminho.write_text("\n".join(linhas) + "\n", encoding="utf-8")
+    return ambito.carregar_entidades_publicas(caminho)
+
+
+def test_uma_empresa_publica_em_s13_nao_e_apu(tabela_ine):
+    """O erro que esta lista podia causar, e que não pode causar.
+
+    O Metropolitano de Lisboa está em S.13 por critério de contas nacionais,
+    mas os seus trabalhadores estão sob o Código do Trabalho e o seu acordo de
+    empresa sai no BTE. Classificá-lo APU retirava-o do pipeline em silêncio.
+    """
+    for nome in ("Metropolitano de Lisboa, E.P.E.",
+                 "Rádio e Televisão de Portugal, S.A.",
+                 "TUB - Empresa de Transportes Urbanos de Braga, E.M."):
+        amb, origem, aviso = ambito.classificar_com_ine(
+            nome, "AE", {}, tabela_ine)
+        assert amb == "SPE", nome
+        assert ambito.processavel(amb), f"{nome} tem de continuar processável"
+        assert origem == "ine" and aviso
+
+
+def test_municipios_e_freguesias_sao_apu(tabela_ine):
+    for nome in ("Município de Vila Real",
+                 "União das freguesias de Real, Dume e Semelhe"):
+        amb, origem, aviso = ambito.classificar_com_ine(nome, "ACEP", {}, tabela_ine)
+        assert (amb, origem) == ("APU", "ine"), nome
+        assert not ambito.processavel(amb)
+        assert aviso, "mesmo quando acerta, a lista não decide em silêncio"
+
+
+def test_a_lista_do_ine_nunca_decide_sem_aviso(tabela_ine):
+    """O critério do INE não é o do RNC: toda a proposta dela é para confirmar."""
+    for nome, _sinal, _sub in INE:
+        _amb, origem, aviso = ambito.classificar_com_ine(nome, "", {}, tabela_ine)
+        assert origem == "ine" and aviso and "confirmado" in aviso
+
+
+def test_o_vocabulario_da_equipa_ganha_a_lista_do_ine(tabela_ine):
+    voc = {"metropolitano de lisboa, e.p.e.": "APU"}
+    assert ambito.classificar_com_ine(
+        "Metropolitano de Lisboa, E.P.E.", "AE", voc, tabela_ine) == (
+        "APU", "vocabulario", None)
+
+
+def test_ausencia_da_lista_nao_diz_nada(tabela_ine):
+    """A CP, a Carris e a EPAL são SPE e não estão em S.13 — passam o teste de
+    mercado. Cair fora da lista não pode significar «privado confirmado»."""
+    amb, origem, aviso = ambito.classificar_com_ine(
+        "CP - Comboios de Portugal, E.P.E.", "AE", {}, tabela_ine)
+    assert origem != "ine"
+    assert amb == "SPE", "apanhado pela regra da forma jurídica, não pela lista"
+
+
+def test_nomes_curtos_nao_encaixam_por_acaso(tmp_path):
+    """Com 4 241 entidades, uma chave curta encaixa dentro de outro nome."""
+    caminho = tmp_path / "ine.csv"
+    caminho.write_text("nome;sinal;subsetor;subsetor_nome;forma_empresarial;fonte;ano\n"
+                       "Maia;APU;S.131322;x;nao;INE;2025\n"
+                       "Município da Maia;APU;S.131322;x;nao;INE;2025\n",
+                       encoding="utf-8")
+    tabela = ambito.carregar_entidades_publicas(caminho)
+    assert "maia" not in tabela, "chave demasiado curta para ser segura"
+    assert "municipio da maia" in tabela
+
+
+def test_a_lista_versionada_carrega_e_distingue_os_dois_sinais():
+    caminho = (Path(__file__).resolve().parent.parent / "vocabularios"
+               / "entidades_administracao_publica.csv")
+    if not caminho.exists():
+        pytest.skip("vocabulário não construído neste ambiente")
+    tabela = ambito.carregar_entidades_publicas(caminho)
+    assert len(tabela) > 4000
+    ambitos = {a for a, _sub in tabela.values()}
+    assert ambitos == {"APU", "SPE"}, \
+        "as duas camadas têm de sobreviver ao ficheiro"
+    metro = [v for k, v in tabela.items() if "metropolitano de lisboa" in k]
+    assert metro and metro[0][0] == "SPE"

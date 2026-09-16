@@ -15,6 +15,7 @@ ficheiro, referenciado, não copiado.
 | `empregadores_ambito.csv` | empregadores com âmbito conhecido (PRI/SPE/APU) | não — escrito à mão |
 | `tipos_documento.csv` | o universo de tipos do BTE, com a família e se altera outro documento | não |
 | `estados.csv` | os estados por que um documento passa, com quem o move e quando | não |
+| `entidades_administracao_publica.csv` | 4 241 entidades do sector institucional S.13 (INE), em duas camadas de sinal | sim |
 | `temas.csv` | crosswalk roteiro ↔ macro temas europeus ↔ codebook | não — **incompleto** |
 
 ## Regerar os três primeiros
@@ -46,6 +47,26 @@ Diz de onde veio cada sigla, e é o que impede que um palpite passe por facto:
 **As de origem `recurso` não são carregadas** pela bandeira `--siglas`. Ficam no
 ficheiro para se ver o que falta. Promovem-se editando a coluna para `equipa`,
 depois de alguém as ter visto e decidido.
+
+## A lista do INE não decide o âmbito
+
+`entidades_administracao_publica.csv` vem da lista anual do INE das entidades do
+sector institucional S.13 (SEC 2010). **Responde a outra pergunta:** o INE
+classifica por contas nacionais, o RNC por regime laboral.
+
+O Metropolitano de Lisboa, E.P.E., a RTP e as Infraestruturas de Portugal estão
+em S.13 — e são SPE para o RNC, processáveis. A CP, a Carris e a EPAL não estão
+em S.13 — e são SPE na mesma. Por isso:
+
+- uma entrada com forma jurídica empresarial propõe **SPE**, nunca APU;
+- toda a proposta vinda da lista sai **com aviso**, mesmo quando acerta;
+- **a ausência da lista não significa nada.**
+
+```bash
+python scripts/construir_entidades_publicas.py Entidades_S13_2025.pdf --ano 2025
+```
+
+Contexto: [ADR-0019](../docs/adr/0019-lista-do-ine-como-sinal-de-ambito.md).
 
 ## Siglas sem duplicados
 

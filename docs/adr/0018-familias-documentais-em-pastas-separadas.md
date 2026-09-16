@@ -104,3 +104,36 @@ Também quando a aplicação souber processar portarias de extensão. O interess
 analítico existe — o âmbito de uma extensão diz a quem a convenção passou a
 aplicar-se, que é matéria de cobertura — mas é outro tipo de extração, não o
 articulado por cláusula.
+
+---
+
+## Alteração de 2026-09-16, decidida pela coordenação
+
+A decisão de fundo mantém-se: a família é um eixo da árvore, e só as convenções
+entram no pipeline. Três pormenores da forma mudaram, depois de a coordenação a
+discutir com a equipa.
+
+1. **Os nomes das pastas passam a ser explícitos:** `portarias_extensao/` e
+   `acordos_adesao/`, em vez de `extensoes/` e `adesoes/`.
+2. **O âmbito deixa de subdividir estas duas pastas.** O que o âmbito decide é
+   se o documento entra no pipeline, e nenhuma portaria ou adesão entra.
+   Subdividi-las era criar pastas que ninguém usaria para responder a pergunta
+   nenhuma. O âmbito continua a subdividir `convencoes/`, e continua no nome de
+   todos os ficheiros.
+3. **Os avisos deixam de ter pasta.** Um aviso de projeto de portaria de
+   extensão anuncia uma portaria que virá a seguir; guardar o PDF do anúncio ao
+   lado do PDF da portaria é guardar duas vezes a mesma informação. O que
+   interessa — que houve projeto, e quando — passa para a coluna
+   `avisos_projeto` da portaria. A linha de catálogo do aviso mantém-se, com
+   `estado=metadado`: o aviso existiu, e apagá-lo era perder um facto.
+
+A árvore fica:
+
+```text
+1_fontes/irct/
+├── convencoes/          PRI/ SPE/ APU/   ← o pipeline lê daqui, e só daqui
+├── portarias_extensao/
+└── acordos_adesao/
+```
+
+Três níveis onde eram quatro, o que devolve folga à regra de higiene 5.

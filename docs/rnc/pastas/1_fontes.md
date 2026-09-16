@@ -17,11 +17,15 @@ depois por **âmbito**:
 ```text
 1_fontes/irct/convencoes/PRI/2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2.pdf
 1_fontes/irct/convencoes/SPE/2026_SPE_387_AE-ALT-RECT_47109_BTE_31_CARRISTUR-ASPTC.pdf
-1_fontes/irct/convencoes/APU/…   ← recolhido e catalogado; NÃO processado (âmbito)
-1_fontes/irct/extensoes/PRI/…    ← portarias de extensão; NÃO processadas (família)
-1_fontes/irct/adesoes/PRI/…      ← acordos de adesão
-1_fontes/irct/avisos/PRI/…       ← projetos de portaria, denúncias, caducidades
+1_fontes/irct/convencoes/APU/…      ← recolhido e catalogado; NÃO processado (âmbito)
+1_fontes/irct/portarias_extensao/…  ← NÃO processadas (família); sem âmbito
+1_fontes/irct/acordos_adesao/…      ← idem
 ```
+
+O âmbito só subdivide `convencoes/`: numa portaria não decide nada, porque
+nenhuma portaria entra no pipeline. **Os avisos de projeto de portaria não têm
+ficheiro aqui** — ficam como metadado da portaria correspondente, na coluna
+`avisos_projeto` do catálogo.
 
 Só `convencoes/` entra no pipeline temático. Uma portaria de extensão refere-se
 a uma convenção mas não é uma: não tem o articulado que a codificação procura, e
@@ -30,7 +34,7 @@ codificá-la como se tivesse dá números errados sem dar erro. Ver
 
 Índices: `2026_BTE_31_indice.xlsx`. Boletins completos: `2026_BTE_31.pdf`.
 Fontes externas mantêm o nome de origem, com a data de recolha à frente:
-`20260916_dgert_data-export.xlsx`.
+`20260916_dgert_data-export.xlsx`, `20260916_ine_entidades_s13_2025.pdf`.
 
 ## Quem escreve e quem lê
 Escreve a aplicação, na fase 1, e mais ninguém. Lê a aplicação — mas só de

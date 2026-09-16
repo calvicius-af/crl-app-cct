@@ -6,6 +6,7 @@
 - **Decisões relacionadas:** [ADR-0016](../docs/adr/0016-esquema-de-nomes-do-rnc.md),
   [ADR-0017](../docs/adr/0017-regra-de-desambiguacao-de-siglas.md),
   [ADR-0018](../docs/adr/0018-familias-documentais-em-pastas-separadas.md),
+  [ADR-0019](../docs/adr/0019-lista-do-ine-como-sinal-de-ambito.md),
   [ADR-0015](../docs/adr/0015-recolha-em-rede-desligada-por-omissao.md),
   [ADR-0004](../docs/adr/0004-fases-desacopladas-por-ficheiros.md),
   [ADR-0009](../docs/adr/0009-layout-do-repositorio.md)
@@ -151,6 +152,17 @@ mantida com aviso, não apagada.
 - [x] Uma portaria sem outorgantes é nomeada a partir do título.
 - [x] `pipeline_tema` recusa-se a correr se a pasta de entrada tiver um ficheiro
       de outra família, e a mensagem diz para onde apontar.
+- [x] O âmbito subdivide `convencoes/` e não as portarias nem as adesões.
+- [x] Um aviso de projeto não tem ficheiro, mas mantém linha de catálogo com
+      `estado=metadado`, e passa para a coluna `avisos_projeto` da portaria.
+- [x] Uma entidade com forma jurídica empresarial na lista do INE é proposta
+      como **SPE** e continua processável — verificado pelo nome para o
+      Metropolitano de Lisboa, a RTP e o TUB.
+- [x] Um município ou freguesia da lista do INE é proposto como APU.
+- [x] Nenhuma proposta vinda da lista do INE passa sem aviso.
+- [x] O vocabulário da equipa ganha à lista do INE.
+- [x] A ausência da lista do INE não é tratada como «privado confirmado».
+- [x] Um nome curto da lista do INE não encaixa por acaso dentro de outro.
 
 ## Plano de verificação
 
@@ -175,6 +187,7 @@ mantida com aviso, não apagada.
 |---|---|
 | Um terceiro dialeto de índice voltar a devolver zero linhas em silêncio | Um cabeçalho desconhecido deixa a coluna vazia e o problema aparece no relatório; a leitura é por nome normalizado, não por posição |
 | Uma sigla derivada pelo script entrar num nome como se fosse confirmada | A origem de cada sigla é declarada no vocabulário; as de origem `recurso` não são carregadas, e a nomeação recusa-se a escrever o ficheiro |
+| A lista do INE retirar do pipeline empresas públicas processáveis | As entradas com forma jurídica empresarial propõem SPE e nunca APU; os casos-armadilha estão fixados por nome em teste (ADR-0019) |
 | Uma portaria de extensão ser codificada como convenção | Família em pasta própria, coluna `processavel` no catálogo, e recusa do pipeline coberta por teste (ADR-0018) |
 | A leitura da relação portaria↔convenção estar errada | Está testada contra um índice de ensaio, não contra dados reais: fica assinalado no §5.7 do README do RNC e é a tarefa 3 do §10 |
 | Um falso APU retirar um documento do pipeline sem ninguém dar por isso | A regra nunca decide APU em silêncio: sai sempre com aviso e `ambito_origem=regra` no catálogo |

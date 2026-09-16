@@ -51,25 +51,36 @@ TOKEN_FAMILIA = {"convencao": "PR", "extensao": "PE",
 SUBPASTA_FAMILIA = {"convencao": "", "extensao": "extensoes",
                     "aviso": "extensoes", "adesao": "extensoes"}
 
-# Esquema RNC: cada família tem a sua pasta, e dentro dela o âmbito. Uma
-# portaria de extensão e um acordo de adesão referem-se a uma convenção
-# concreta, mas são actos de natureza diferente — a portaria é do Governo, a
-# adesão é de uma parte — e nenhum dos dois tem o articulado que a codificação
-# temática pressupõe. Juntá-los às convenções faria com que fossem codificados
-# como se fossem uma, e isso não dá erro: dá números errados.
+# Esquema RNC: cada família tem a sua pasta. Uma portaria de extensão e um
+# acordo de adesão referem-se a uma convenção concreta, mas são actos de
+# natureza diferente — a portaria é do Governo, a adesão é de uma parte — e
+# nenhum dos dois tem o articulado que a codificação temática pressupõe.
+# Juntá-los às convenções faria com que fossem codificados como se fossem uma,
+# e isso não dá erro: dá números errados.
 #
-#   1_fontes/irct/convencoes/PRI/    ← o pipeline lê daqui
-#   1_fontes/irct/extensoes/PRI/
-#   1_fontes/irct/adesoes/PRI/
-#   1_fontes/irct/avisos/PRI/
+#   1_fontes/irct/convencoes/PRI|SPE|APU/   ← o pipeline lê daqui
+#   1_fontes/irct/portarias_extensao/
+#   1_fontes/irct/acordos_adesao/
 #
-# Ver docs/rnc/README.md §5.7 e ADR-0018.
-PASTA_FAMILIA = {"convencao": "convencoes", "extensao": "extensoes",
-                 "adesao": "adesoes", "aviso": "avisos"}
+# O âmbito só subdivide as convenções. Numa portaria e num acordo de adesão não
+# serve para nada: o que o âmbito decide é se o documento entra no pipeline, e
+# nenhum destes entra. Subdividi-los era criar pastas que ninguém usaria para
+# responder a pergunta nenhuma. Ver ADR-0018 e docs/rnc/README.md §5.7.
+PASTA_FAMILIA = {"convencao": "convencoes", "extensao": "portarias_extensao",
+                 "adesao": "acordos_adesao"}
 PASTA_FAMILIA_DESCONHECIDA = "por_classificar"
 
-# As famílias que o pipeline temático sabe processar. É a convenção e o que a
-# substitui; tudo o resto é contexto, não corpus.
+# Famílias em que o âmbito ainda subdivide a pasta.
+FAMILIAS_COM_AMBITO = frozenset({"convencao"})
+
+# Famílias que não têm pasta nenhuma: existem só como metadado de outro
+# documento. O aviso de projeto de portaria de extensão anuncia uma portaria
+# que virá a seguir; guardar o PDF do anúncio ao lado do PDF da portaria é
+# guardar duas vezes a mesma informação, e a que interessa — que houve projeto,
+# e quando — cabe numa coluna. A linha de catálogo mantém-se: o que não se
+# guarda é o ficheiro.
+FAMILIAS_SO_METADADO = frozenset({"aviso"})
+
 FAMILIAS_PROCESSAVEIS = frozenset({"convencao"})
 
 ESTADOS_COM_FICHEIRO = {"descarregado", "ja_existente", "inalterado"}
@@ -273,7 +284,7 @@ def _nome_rnc(entrada: dict, ordinal: int, tabela: dict[str, str] | None,
 
     patronais, _sindicais = separar_outorgantes(entrada.get("outorgantes", ""),
                                                 entrada.get("titulo", ""))
-    amb, origem, aviso_amb = mod_ambito.classificar(
+    amb, origem, aviso_amb = mod_ambito.classificar_com_ine(
         patronais[0] if patronais else entrada.get("titulo", ""),
         entrada.get("tipo", ""), vocabulario_ambito)
     if aviso_amb:
@@ -474,7 +485,9 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
 
     entradas = [e for e in registo.entradas.values()
                 if e.get("familia") in familias
-                and (e.get("descarga") or {}).get("estado") in ESTADOS_COM_FICHEIRO]
+                and (e.get("descarga") or {}).get("estado") in ESTADOS_COM_FICHEIRO
+                and not (esquema == "rnc"
+                         and e.get("familia") in FAMILIAS_SO_METADADO)]
     entradas.sort(key=lambda e: (e.get("ano") or 0, e.get("num_bte") or 0,
                                  (e.get("nomeacao") or {}).get("ordinal") or 0))
     vistos: dict[tuple, list[str]] = {}
@@ -501,10 +514,11 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
                 avisos.append("outro documento do mesmo par de outorgantes neste ano: "
                               + ", ".join(vistos[(e.get("ano"), partes)][:-1]))
             if esquema == "rnc":
+                fam = e.get("familia")
                 pasta = (destino / f"bte_{e['ano']}"
-                         / PASTA_FAMILIA.get(e.get("familia"),
-                                             PASTA_FAMILIA_DESCONHECIDA)
-                         / nomeacao.get("ambito", mod_ambito.OMISSAO))
+                         / PASTA_FAMILIA.get(fam, PASTA_FAMILIA_DESCONHECIDA))
+                if fam in FAMILIAS_COM_AMBITO:
+                    pasta = pasta / nomeacao.get("ambito", mod_ambito.OMISSAO)
             else:
                 subpasta = SUBPASTA_FAMILIA.get(e["familia"], "")
                 pasta = destino / f"bte_{e['ano']}" / subpasta if subpasta \
