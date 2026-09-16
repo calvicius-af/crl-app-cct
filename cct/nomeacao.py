@@ -21,11 +21,27 @@ import shutil
 import time
 from pathlib import Path
 
+from . import ambito as mod_ambito
 from .localizador import _sem_acentos
 from .recolha import (INTERVALO_PERSISTENCIA, RAIZ, REGISTO_OMISSAO, Registo,
                       sha256_ficheiro)
 
 DESTINO_OMISSAO = RAIZ / "data" / "raw" / "bte"
+
+# Os dois esquemas de nome que convivem no corpus. Ver ADR-0016.
+#
+#   pipeline  26_PR_003_BTE_31_ACRAL_CESP            o de 2025, ainda em uso
+#   rnc       2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2
+#
+# O `rnc` é o do documento de gestão documental do Relatório da Negociação
+# Coletiva, com um acrescento: o `_BTE_{NN}`, que o esquema publicado não tinha.
+# Custa sete caracteres e é o que permite voltar do ficheiro ao boletim sem
+# consultar o catálogo — e é o que `cct/localizador.py` e `cct/comparar.py`
+# leem para emparelhar versões. Ver docs/rnc/README.md §5.1.
+ESQUEMAS = ("pipeline", "rnc")
+ESQUEMA_OMISSAO = "pipeline"
+
+MAX_SIGLAS_RNC = 3     # as restantes ficam em "+N"
 
 TOKEN_FAMILIA = {"convencao": "PR", "extensao": "PE",
                  "aviso": "AV", "adesao": "AA"}
@@ -36,6 +52,7 @@ ESTADOS_COM_FICHEIRO = {"descarregado", "ja_existente", "inalterado"}
 
 MAX_NOME = 63          # limite de nome de documento do MaxQDA (RF-21)
 MAX_SIGLA = 20
+MIN_CHAVE_PARCIAL = 12   # ver a nota em sigla(), sobre correspondência parcial
 
 # Palavras que não entram numa sigla derivada por recurso.
 LIGACOES = {"de", "do", "da", "dos", "das", "e", "em", "a", "o", "as", "os",
@@ -107,9 +124,16 @@ def sigla(nome: str, tabela: dict[str, str] | None = None) -> tuple[str, str | N
         chave = _sem_acentos(nome).lower()
         if chave in tabela:
             return tabela[chave], None
-        for k, v in tabela.items():                    # correspondência parcial
-            if k and k in chave:
-                return v, None
+        # Correspondência parcial, para apanhar as variações de pontuação e os
+        # «e outros» que o índice acrescenta. Só com chaves longas, e ganha a
+        # mais longa: com uma tabela de milhares de entradas, uma chave curta
+        # encaixa por acaso dentro de meio registo e atribui a sigla errada em
+        # silêncio — que é precisamente o erro que a tabela existe para evitar.
+        melhor = max((k for k in tabela
+                      if len(k) >= MIN_CHAVE_PARCIAL and k in chave),
+                     key=len, default=None)
+        if melhor:
+            return tabela[melhor], None
     for regex in (RE_PARENTESES, RE_FIM_APOS_TRACO, RE_INICIO_ANTES_TRACO,
                   RE_ENTRE_TRACOS):
         for m in regex.finditer(nome):
@@ -150,9 +174,117 @@ def separar_outorgantes(outorgantes: str, titulo: str = "") -> tuple[list[str], 
     return patronais, sindicais
 
 
+def sequencial_bte(entrada: dict) -> int | None:
+    """O «377» de `ID: 377/2026` — a posição do documento na série anual do BTE.
+
+    É o que o esquema RNC usa como número sequencial, em vez do ordinal interno
+    da aplicação: é o número pelo qual o documento é citado no próprio boletim e
+    nas cadeias de alteração (`CCT-ALT.20250708.321/2025`), pelo que é o único
+    que permite ligar um ficheiro ao que o índice diz sobre ele.
+    """
+    bruto = str(entrada.get("id_dgert") or "").strip()
+    m = re.match(r"^\s*(\d+)\s*/\s*(\d{4})\s*$", bruto)
+    if m:
+        return int(m.group(1))
+    return int(m.group(0)) if (m := re.match(r"^\d+$", bruto)) else None
+
+
+def tipo_normalizado(tipo: str) -> str:
+    """`CCT-ALT-RECT` a partir do que vier no índice; `SEMTIPO` se vier vazio."""
+    limpo = re.sub(r"[^A-Z0-9-]", "", _sem_acentos(tipo or "").upper())
+    limpo = re.sub(r"-{2,}", "-", limpo).strip("-")
+    return limpo or "SEMTIPO"
+
+
+def siglas_outorgantes(entrada: dict, tabela: dict[str, str] | None = None,
+                       maximo: int = MAX_SIGLAS_RNC) -> tuple[list[str], int, list[str]]:
+    """Siglas dos outorgantes, pela ordem do índice, e quantos ficaram de fora.
+
+    O índice do BTE lista o lado patronal primeiro, o que dá a ordem natural
+    «empregador-sindicatos» que a equipa usa para procurar. Ao contrário do
+    esquema antigo, não se escolhe um de cada lado: levam-se os primeiros
+    `maximo` e conta-se o resto.
+    """
+    avisos: list[str] = []
+    nomes = [n.strip() for n in re.split(r"[;\n]", entrada.get("outorgantes") or "")
+             if n.strip()]
+    if not nomes:
+        nomes = _partes_do_titulo(entrada.get("titulo", ""))
+        if nomes:
+            avisos.append("outorgantes lidos do título — confirmar")
+    if not nomes:
+        return [], 0, avisos + ["sem outorgantes no índice nem no título"]
+    escolhidas: list[str] = []
+    for nome in nomes[:maximo]:
+        s, aviso = sigla(nome, tabela)
+        if aviso:
+            avisos.append(aviso)
+        if s:
+            escolhidas.append(s)
+    return escolhidas, max(0, len(nomes) - len(escolhidas)), avisos
+
+
+def _nome_rnc(entrada: dict, ordinal: int, tabela: dict[str, str] | None,
+              vocabulario_ambito: dict[str, str] | None) -> tuple[str, list[str]]:
+    """{ANO}_{AMBITO}_{SEQ}_{TIPO}_{CODIRCT}_BTE_{NN}_{SIGLAS}"""
+    avisos: list[str] = []
+    ano = int(entrada.get("ano") or 0)
+    num_bte = int(entrada.get("num_bte") or 0)
+
+    seq = sequencial_bte(entrada)
+    if seq is None:
+        seq = ordinal
+        avisos.append("sem «ID: nnn/aaaa» no índice — usado o ordinal interno "
+                      f"({ordinal}); o número não corresponde ao do boletim")
+
+    tipo = tipo_normalizado(entrada.get("tipo"))
+    if tipo == "SEMTIPO":
+        avisos.append("tipo de documento vazio no índice — confirmar")
+
+    cod = re.sub(r"\D", "", str(entrada.get("cod_irct") or ""))
+    if not cod:
+        cod = "0"
+        avisos.append("sem COD: (IRCT) no índice — a série da convenção fica "
+                      "por identificar")
+
+    patronais, _sindicais = separar_outorgantes(entrada.get("outorgantes", ""),
+                                                entrada.get("titulo", ""))
+    amb, origem, aviso_amb = mod_ambito.classificar(
+        patronais[0] if patronais else entrada.get("titulo", ""),
+        entrada.get("tipo", ""), vocabulario_ambito)
+    if aviso_amb:
+        avisos.append(aviso_amb)
+    entrada.setdefault("nomeacao", {}).update({"ambito": amb,
+                                               "ambito_origem": origem})
+
+    siglas, restantes, avisos_siglas = siglas_outorgantes(entrada, tabela)
+    avisos.extend(avisos_siglas)
+    if not siglas:
+        siglas = [_camel(entrada.get("titulo", ""))]
+        avisos.append("nome derivado do título — confirmar")
+
+    prefixo = f"{ano:04d}_{amb}_{seq:03d}_{tipo}_{cod}_BTE_{num_bte:02d}_"
+    cauda = f"+{restantes}" if restantes else ""
+    nome = prefixo + "-".join(siglas) + cauda
+    if len(nome) > MAX_NOME:            # encurta as siglas, nunca o prefixo
+        folga = MAX_NOME - len(prefixo) - len(cauda) - (len(siglas) - 1)
+        por_sigla = max(3, folga // len(siglas))
+        nome = prefixo + "-".join(s[:por_sigla] for s in siglas) + cauda
+        avisos.append(f"nome encurtado para caber em {MAX_NOME} caracteres")
+    return nome[:MAX_NOME], avisos
+
+
 def nome_documento(entrada: dict, ordinal: int,
-                   tabela: dict[str, str] | None = None) -> tuple[str, list[str]]:
+                   tabela: dict[str, str] | None = None, *,
+                   esquema: str = ESQUEMA_OMISSAO,
+                   vocabulario_ambito: dict[str, str] | None = None
+                   ) -> tuple[str, list[str]]:
     """Compõe o nome (sem extensão) e devolve os avisos que exigem confirmação."""
+    if esquema not in ESQUEMAS:
+        raise ValueError(f"esquema de nome desconhecido: {esquema!r} "
+                         f"(conhecidos: {', '.join(ESQUEMAS)})")
+    if esquema == "rnc":
+        return _nome_rnc(entrada, ordinal, tabela, vocabulario_ambito)
     avisos: list[str] = []
     ano = int(entrada.get("ano") or 0)
     num_bte = int(entrada.get("num_bte") or 0)
@@ -216,26 +348,78 @@ def atribuir_ordinais(registo: Registo, familias=("convencao", "extensao",
     return novos
 
 
+COLUNAS_NOME = ("nome", "nome_completo", "denominacao",
+                "denominacao_da_organizacao", "organizacao")
+COLUNAS_SIGLA = ("sigla", "acronimo", "sigla_canonica")
+COLUNA_ORIGEM = "origem_sigla"
+
+# Uma sigla que o próprio `_camel()` inventou não é uma sigla confirmada: dá
+# «Motoristas» onde a equipa escreveria «SNM». Se entrasse na tabela, calava o
+# aviso de «confirmar» e transformava um palpite num facto. Fica no ficheiro,
+# para se ver o que falta, mas não é carregada — promove-se editando a coluna
+# `origem_sigla` para `equipa` depois de alguém a ter visto.
+ORIGENS_IGNORADAS = frozenset({"recurso"})
+
+
 def carregar_siglas(caminho: Path) -> dict[str, str]:
-    """Tabela opcional de siglas fixadas pela equipa: 'nome;sigla' por linha."""
+    """Tabela de siglas fixadas pela equipa → {nome normalizado: sigla}.
+
+    Aceita dois formatos, para que a mesma bandeira `--siglas` sirva tanto a
+    lista curta que alguém escreve à mão como o `vocabularios/
+    siglas_organizacoes.csv` gerado do registo da DGERT:
+
+    * **sem cabeçalho** — `nome;sigla`, as duas primeiras colunas;
+    * **com cabeçalho** — as colunas são encontradas pelo nome (`denominacao`
+      e `sigla`, entre outros), seja qual for a ordem em que venham.
+
+    Separador `;`, UTF-8 com ou sem BOM. Linhas incompletas são saltadas em
+    silêncio; um ficheiro cujo cabeçalho não tenha nenhuma coluna reconhecível
+    é tratado como sendo do formato sem cabeçalho.
+    """
     import csv
 
     tabela: dict[str, str] = {}
     with open(caminho, encoding="utf-8-sig", newline="") as f:
-        for linha in csv.reader(f, delimiter=";"):
-            if len(linha) < 2 or not linha[0].strip():
-                continue
-            if _sem_acentos(linha[0]).strip().lower() in ("nome", "nome_completo"):
-                continue
-            tabela[_sem_acentos(linha[0]).strip().lower()] = \
-                _limpar_sigla(linha[1])[:MAX_SIGLA]
+        linhas = [l for l in csv.reader(f, delimiter=";") if l and l[0].strip()]
+    if not linhas:
+        return tabela
+
+    i_nome, i_sigla = 0, 1
+    cabecalho = [re.sub(r"[^a-z0-9]+", "_", _sem_acentos(c).strip().lower()).strip("_")
+                 for c in linhas[0]]
+    tem_cabecalho = any(c in COLUNAS_NOME for c in cabecalho)
+    if tem_cabecalho:
+        i_nome = next(i for i, c in enumerate(cabecalho) if c in COLUNAS_NOME)
+        candidatos = [i for i, c in enumerate(cabecalho) if c in COLUNAS_SIGLA]
+        if not candidatos:
+            return tabela
+        i_sigla = candidatos[0]
+        linhas = linhas[1:]
+    i_origem = (cabecalho.index(COLUNA_ORIGEM)
+                if tem_cabecalho and COLUNA_ORIGEM in cabecalho else None)
+
+    for linha in linhas:
+        if max(i_nome, i_sigla) >= len(linha):
+            continue
+        if (i_origem is not None and i_origem < len(linha)
+                and linha[i_origem].strip().lower() in ORIGENS_IGNORADAS):
+            continue
+        nome = _sem_acentos(linha[i_nome]).strip().lower()
+        valor = _limpar_sigla(linha[i_sigla])[:MAX_SIGLA]
+        if not nome or not valor:
+            continue
+        if not tem_cabecalho and nome in COLUNAS_NOME:
+            continue                       # cabeçalho não declarado
+        tabela.setdefault(nome, valor)
     return tabela
 
 
 def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
            tabela: dict[str, str] | None = None,
            familias=("convencao", "extensao", "aviso", "adesao"),
-           aceitar_heuristicas: bool = False) -> dict:
+           aceitar_heuristicas: bool = False,
+           esquema: str = ESQUEMA_OMISSAO,
+           vocabulario_ambito: dict[str, str] | None = None) -> dict:
     """Atribui nomes e, com `aplicar=True`, copia os PDFs para o destino.
 
     Um documento cujo nome tenha avisos de `nome_documento()` (sigla
@@ -245,7 +429,14 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
     antes de o ficheiro existir e o ordinal ficar permanente, não depois.
     `aceitar_heuristicas=True` desliga esta proteção, para quem decide
     conscientemente aceitar o risco (ex.: uma corrida em lote já revista).
+
+    Com `esquema="rnc"` os ficheiros são arrumados em subpastas por âmbito
+    (`PRI/`, `SPE/`, `APU/`), para que «não conseguimos processar isto» deixe de
+    ser uma nota num documento e passe a ser a estrutura das pastas.
     """
+    if esquema not in ESQUEMAS:
+        raise ValueError(f"esquema de nome desconhecido: {esquema!r} "
+                         f"(conhecidos: {', '.join(ESQUEMAS)})")
     resumo = {"ordinais_novos": atribuir_ordinais(registo, familias),
               "por_estado": {}, "avisos": [], "problemas": [], "nomes": []}
 
@@ -269,17 +460,24 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
                                            f"({origem})")
                 contar("sem_origem")
                 continue
-            nome, avisos = nome_documento(e, nomeacao["ordinal"], tabela)
+            nome, avisos = nome_documento(e, nomeacao["ordinal"], tabela,
+                                          esquema=esquema,
+                                          vocabulario_ambito=vocabulario_ambito)
+            nomeacao = e["nomeacao"]      # _nome_rnc pode ter registado o âmbito
             avisos_heuristica = list(avisos)   # antes do aviso de par repetido, abaixo —
                                                # esse é informativo, não indica nome errado
-            partes = "_".join(nome.split("_")[5:])
+            partes = "_".join(nome.split("_")[5 if esquema == "pipeline" else 7:])
             vistos.setdefault((e.get("ano"), partes), []).append(nome)
             if len(vistos[(e.get("ano"), partes)]) > 1:
                 avisos.append("outro documento do mesmo par de outorgantes neste ano: "
                               + ", ".join(vistos[(e.get("ano"), partes)][:-1]))
-            subpasta = SUBPASTA_FAMILIA.get(e["familia"], "")
-            pasta = destino / f"bte_{e['ano']}" / subpasta if subpasta \
-                else destino / f"bte_{e['ano']}"
+            if esquema == "rnc":
+                pasta = destino / f"bte_{e['ano']}" / nomeacao.get("ambito",
+                                                                  mod_ambito.OMISSAO)
+            else:
+                subpasta = SUBPASTA_FAMILIA.get(e["familia"], "")
+                pasta = destino / f"bte_{e['ano']}" / subpasta if subpasta \
+                    else destino / f"bte_{e['ano']}"
             alvo = pasta / f"{nome}.pdf"
             nomeacao.update({"doc_id": nome, "caminho": str(alvo), "avisos": avisos})
             resumo["nomes"].append((e["chave"], nome))
@@ -346,7 +544,15 @@ def main(argv=None):
         description="Renomeia os documentos recolhidos para o esquema do pipeline.")
     p.add_argument("--registo", default=str(REGISTO_OMISSAO))
     p.add_argument("--destino", default=str(DESTINO_OMISSAO))
-    p.add_argument("--siglas", help="CSV opcional 'nome;sigla' com siglas fixadas")
+    p.add_argument("--siglas", action="append", default=[],
+                   help="CSV de siglas fixadas ('nome;sigla', ou o "
+                        "vocabularios/siglas_organizacoes.csv). Repetível: em "
+                        "caso de conflito ganha o primeiro ficheiro indicado.")
+    p.add_argument("--esquema", choices=ESQUEMAS, default=ESQUEMA_OMISSAO,
+                   help="esquema de nome: 'pipeline' (o de 2025) ou 'rnc' "
+                        "(o da gestão documental do RNC)")
+    p.add_argument("--ambitos", help="CSV 'nome;ambito' de empregadores com "
+                                     "âmbito conhecido (só com --esquema rnc)")
     p.add_argument("--familias", default="convencao,extensao,aviso,adesao")
     p.add_argument("--aplicar", action="store_true",
                    help="escreve mesmo (por omissão só simula)")
@@ -360,11 +566,17 @@ def main(argv=None):
     if not registo.entradas:
         raise SystemExit(f"Registo vazio ({args.registo}) — correr primeiro "
                          "python -m cct.recolha")
-    tabela = carregar_siglas(Path(args.siglas)) if args.siglas else None
+    tabela: dict[str, str] = {}
+    for caminho in args.siglas:
+        for nome, s in carregar_siglas(Path(caminho)).items():
+            tabela.setdefault(nome, s)      # o primeiro ficheiro ganha
+    voc_ambito = (mod_ambito.carregar_vocabulario(Path(args.ambitos))
+                  if args.ambitos else mod_ambito.carregar_vocabulario())
     resumo = nomear(registo, Path(args.destino), aplicar=args.aplicar,
-                    tabela=tabela,
+                    tabela=tabela or None,
                     familias=tuple(f.strip() for f in args.familias.split(",") if f.strip()),
-                    aceitar_heuristicas=args.aceitar_heuristicas)
+                    aceitar_heuristicas=args.aceitar_heuristicas,
+                    esquema=args.esquema, vocabulario_ambito=voc_ambito)
     print(texto_resumo(resumo, aplicar=args.aplicar))
     return 1 if resumo["problemas"] else 0
 

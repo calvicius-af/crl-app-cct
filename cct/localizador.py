@@ -10,6 +10,17 @@ extensão, avisos e acordos de adesão (ver TOKEN_FAMILIA em cct/nomeacao.py).
 RE_DOC_ID aceita qualquer sigla de duas letras maiúsculas nessa posição — não
 lista as famílias uma a uma, para não ter de ser revisto sempre que
 cct.nomeacao ganhar uma família nova.
+
+Desde a adoção da convenção de nomes do RNC (ADR-0016) há um segundo esquema,
+com o ano por extenso, o âmbito, o número sequencial do BTE, o tipo tal como
+vem do índice e o código IRCT:
+
+    2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2
+
+`interpretar_doc_id` lê os dois e devolve sempre a mesma coisa — (ano de dois
+dígitos, número do BTE, tokens das partes) — para que nada a jusante tenha de
+saber em que esquema o corpus foi nomeado. Um corpus pode ter os dois à mistura:
+os nomes já atribuídos não se alteram (ver docs/rnc/README.md §5).
 """
 import re
 import unicodedata
@@ -20,6 +31,14 @@ RE_INICIO_CONVENCAO = re.compile(
     r"\s+(entre|celebrado)", re.MULTILINE)
 
 RE_DOC_ID = re.compile(r"^(\d{2})_[A-Z]{2}_\d+_BTE_(\d+)_(.+?)(?:_TXT)?$")
+
+# Esquema RNC: {ANO}_{AMBITO}_{SEQ}_{TIPO}_{CODIRCT}_BTE_{NN}_{SIGLAS}
+# O tipo vem do índice do BTE e pode ter variantes com hífen (CCT-ALT,
+# AE-ALT-RECT); o código IRCT são dígitos; as siglas vêm separadas por hífen e
+# podem terminar em "+N" quando há mais outorgantes do que os que cabem no nome.
+RE_DOC_ID_RNC = re.compile(
+    r"^(\d{4})_(?P<ambito>[A-Z]{3})_(?P<seq>\d+)_(?P<tipo>[A-Z][A-Z-]*)"
+    r"_(?P<cod>\d+)_BTE_(\d+)_(.+?)(?:_TXT)?$")
 
 
 def _sem_acentos(s) -> str:
@@ -44,15 +63,44 @@ def _subtokens(token: str) -> list[str]:
 
 
 def interpretar_doc_id(doc_id: str) -> tuple[int, int, list[str]]:
-    """Devolve (ano_2dig, nº BTE, subtokens das partes)."""
-    m = RE_DOC_ID.match(doc_id.strip())
-    if not m:
-        raise ValueError(f"doc_id não reconhecido: {doc_id}")
-    ano, bte, partes = int(m.group(1)), int(m.group(2)), m.group(3)
+    """Devolve (ano_2dig, nº BTE, subtokens das partes).
+
+    Aceita os dois esquemas de nome. O ano vem sempre com dois dígitos, mesmo
+    quando o nome o traz por extenso, porque é assim que o resto do pipeline o
+    compara — mudar isso obrigaria a rever o cruzamento com as variáveis do
+    MaxQDA, que é o que esta função existe para não partir.
+    """
+    doc_id = doc_id.strip()
+    m = RE_DOC_ID.match(doc_id)
+    if m:
+        ano, bte, partes = int(m.group(1)), int(m.group(2)), m.group(3)
+    else:
+        m = RE_DOC_ID_RNC.match(doc_id)
+        if not m:
+            raise ValueError(f"doc_id não reconhecido: {doc_id}")
+        ano, bte, partes = int(m.group(1)) % 100, int(m.group(6)), m.group(7)
     tokens = []
-    for t in partes.split("_"):
-        tokens.extend(_subtokens(t))
+    for t in re.split(r"[_-]", partes):
+        tokens.extend(_subtokens(re.sub(r"\+\d+$", "", t)))
     return ano, bte, tokens
+
+
+def interpretar_nome_rnc(doc_id: str) -> dict | None:
+    """Metadados que o esquema RNC leva no nome, ou None se for outro esquema.
+
+    Serve para não ter de abrir o catálogo quando só se quer saber o âmbito ou o
+    código IRCT de um ficheiro que se tem à frente. O catálogo continua a ser a
+    fonte de verdade — isto é uma conveniência, não uma segunda fonte.
+    """
+    m = RE_DOC_ID_RNC.match(doc_id.strip())
+    if not m:
+        return None
+    return {"ano": int(m.group(1)), "ambito": m.group("ambito"),
+            "seq": int(m.group("seq")), "tipo": m.group("tipo"),
+            "cod_irct": m.group("cod"), "num_bte": int(m.group(6)),
+            "siglas": [s for s in re.sub(r"\+\d+$", "", m.group(7)).split("-") if s],
+            "outros_outorgantes": int(re.search(r"\+(\d+)$", m.group(7)).group(1))
+            if re.search(r"\+(\d+)$", m.group(7)) else 0}
 
 
 def listar_convencoes(pdf_path: Path) -> list[dict]:

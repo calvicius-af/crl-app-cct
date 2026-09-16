@@ -86,25 +86,47 @@ def sha256_ficheiro(caminho: Path) -> str:
 
 # ------------------------------------------------------------ leitura do índice
 
+# Cabeçalhos do índice, nos dois dialetos que a DGERT distribui:
+#
+#   *rótulo*   — cabeçalhos legíveis, com dois pontos ("TIPO DE DOCUMENTO:",
+#                "COD: (IRCT)", "OUTORGANTE(S):"). É o dialeto de 2025.
+#   *técnico*  — nomes de campo da base ("TipoSubTipoDoc", "CodigoGEPDGERT",
+#                "NomePDF", "URLPDF"). É o que vem nos índices de 2026.
+#
+# Os dois convivem: a normalização de `_norm()` descarta pontuação e acentos, e
+# cada campo interno aceita os aliases dos dois lados. Um índice que só traga um
+# dos dialetos é lido na mesma; um que traga ambos usa a primeira coluna com
+# valor. Ver docs/rnc/README.md, §"Os dois dialetos do índice".
 COLUNAS = {
     "ano": ["ano"],
-    "id_dgert": ["id"],
-    "titulo": ["titulododocumento"],
-    "tipo": ["tipodedocumento"],
-    "volume": ["nvolumedoboletim", "novolumedoboletim"],
-    "num_bte": ["ndoboletim", "nodoboletim"],
-    "data_bte": ["datadoboletim"],
-    "data_distribuicao": ["datadedistribuicaodoboletim"],
-    "pagina": ["paginanaversaoescrita"],
+    "id_dgert": ["id", "iddocumento"],
+    "titulo": ["titulododocumento", "titulo"],
+    "tipo": ["tipodedocumento", "tiposubtipodoc"],
+    "volume": ["nvolumedoboletim", "novolumedoboletim", "nvolumebte"],
+    "num_bte": ["ndoboletim", "nodoboletim", "nbte"],
+    "data_bte": ["datadoboletim", "databte"],
+    "data_distribuicao": ["datadedistribuicaodoboletim", "datadistribuicaobte"],
+    "pagina": ["paginanaversaoescrita", "pagversaoescrita"],
     "cae": ["cae"],
-    "cod_irct": ["codirct"],
-    "sectores": ["sectoresdeactividade", "setoresdeatividade"],
-    "outorgantes": ["outorgantes"],
-    "altera": ["docsalteradosporeste"],
-    "alterado_por": ["docsquealteramestes", "docsquealteramestee", "docsquealterameste"],
-    "url": ["linkparaodocumentocriado", "linkparaodocumento"],
-    "ficheiro": ["paginacriado"],
+    "cod_irct": ["codirct", "codigogepdgert"],
+    "sectores": ["sectoresdeactividade", "setoresdeatividade", "setoresatividade",
+                 "sectoresatividade"],
+    "outorgantes": ["outorgantes", "outorgantes1"],
+    "altera": ["docsalteradosporeste", "docalteradosporeste",
+               "docsalteradosporeste2", "docalteradosporeste2"],
+    "alterado_por": ["docsquealteramestes", "docsquealteramestee",
+                     "docsquealterameste", "docalterameste", "docsalteramestes"],
+    "em_vigor": ["documentosemvigor", "docsemvigor"],
+    "url_em_vigor": ["linkdocemvigor", "linkparaodocumentoemvigor"],
+    "url": ["linkparaodocumentocriado", "linkparaodocumento", "urlpdf"],
+    "ficheiro": ["paginacriado", "nomepdf"],
 }
+
+# Campos em que várias colunas do índice são partes da mesma informação e não
+# alternativas: o índice de 2026 parte a cadeia de alterações em
+# `DocAlteradosPorEste` e `DocAlteradosPorEste2`. Juntam-se em vez de se escolher
+# a primeira — escolher perdia metade da cadeia, em silêncio.
+CAMPOS_ACUMULADOS = frozenset({"altera", "alterado_por"})
 
 
 def _mapa_colunas(cabecalho: list) -> dict[str, list[int]]:
@@ -138,12 +160,12 @@ def ler_indice(xlsx: Path) -> list[dict]:
         for posicao, linha in enumerate(linhas, 1):
             item = {}
             for campo, indices in mapa.items():
-                valor = ""
-                for i in indices:
-                    if i < len(linha) and linha[i] not in (None, ""):
-                        valor = str(linha[i]).strip()
-                        break
-                item[campo] = valor
+                valores = [str(linha[i]).strip() for i in indices
+                           if i < len(linha) and linha[i] not in (None, "")]
+                if campo in CAMPOS_ACUMULADOS:
+                    item[campo] = "; ".join(dict.fromkeys(v for v in valores if v))
+                else:
+                    item[campo] = valores[0] if valores else ""
             if not (item["titulo"] or item["url"]):
                 continue
             item["indice"] = xlsx.name

@@ -95,6 +95,20 @@ python -m cct.pipeline_tema \
 Cada corrida cria também `manifest.json`, com o comando, commit, versões, hashes dos
 inputs/outputs, contagens e problemas encontrados.
 
+**Arrumar e catalogar um número do BTE** no esquema da gestão documental do RNC
+(âmbito no nome, código IRCT, separação PRI/SPE/APU e catálogo anotável):
+
+```bash
+python -m cct.nomeacao --esquema rnc --destino 1_fontes/irct \
+    --siglas vocabularios/siglas_organizacoes.csv \
+    --ambitos vocabularios/empregadores_ambito.csv
+python -m cct.catalogo --indices data/raw/indices \
+    --saida 0_gestao/catalogo/catalogo_irct_2026.csv
+```
+
+A convenção completa — pastas, nomes, catálogo, vocabulários — está em
+[docs/rnc/README.md](docs/rnc/README.md).
+
 Comparar duas versões de uma convenção:
 
 ```bash
@@ -111,12 +125,14 @@ O guia de operação completo, com o que fazer quando algo corre mal, está em
 cct/            código-fonte da aplicação
 tests/          testes pytest: unidade, integração, corpus e formatos
 codebooks/      os temas de codificação, em YAML: configuração, não código
+vocabularios/   listas controladas: siglas, âmbitos, tipos, estados, temas
 examples/       dois casos completos, PDF → TXT → QDPX (versionados)
 scripts/        lançadores da aplicação gráfica e instalação offline
 docs/
   arquitetura/  como o sistema funciona
   adr/          porque é assim — registo das decisões tomadas
   operacao/     como se opera, e como se escrevem codebooks
+  rnc/          gestão documental do Relatório da Negociação Coletiva
   validacao/    os gates, os memos das peritas, as métricas
   dados/        de onde vêm os dados e como repor
   institucional/ requisitos técnicos e proposta ao Instituto de Informática

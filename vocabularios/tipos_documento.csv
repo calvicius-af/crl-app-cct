@@ -1,0 +1,19 @@
+tipo;designacao;familia;altera_outro;observacoes
+CCT;Contrato coletivo de trabalho;convencao;nao;convenção entre associação de empregadores e sindicatos
+CCT-ALT;Contrato coletivo de trabalho - alteração;convencao;sim;
+CCT-RECT;Contrato coletivo de trabalho - retificação;convencao;sim;o campo de outorgantes vem vazio, as partes leem-se do título
+CCT-ALT-RECT;Contrato coletivo de trabalho - retificação de alteração;convencao;sim;idem
+ACT;Acordo coletivo de trabalho;convencao;nao;art. 2.º do Código do Trabalho, vários empregadores; não confundir com o ACT da LTFP
+ACT-ALT;Acordo coletivo de trabalho - alteração;convencao;sim;
+ACTV;Acordo coletivo de trabalho verticalizado;convencao;nao;designação usada em índices antigos
+AE;Acordo de empresa;convencao;nao;um só empregador
+AE-ALT;Acordo de empresa - alteração;convencao;sim;
+AE-RECT;Acordo de empresa - retificação;convencao;sim;outorgantes vazios; leem-se do título
+AE-ALT-RECT;Acordo de empresa - retificação de alteração;convencao;sim;outorgantes vazios; leem-se do título
+ACEP;Acordo coletivo de empregador público;convencao;nao;LTFP, depositado na DGAEP; âmbito APU, não processável
+PE;Portaria de extensão;extensao;nao;estende uma convenção a terceiros
+PCT;Portaria de condições de trabalho;extensao;nao;
+PRT;Portaria de regulamentação do trabalho;extensao;nao;designação histórica
+AA;Acordo de adesão;adesao;nao;adesão de uma parte a convenção existente
+DA;Decisão arbitral;convencao;nao;arbitragem obrigatória ou necessária
+AVISO;Aviso;aviso;nao;aviso de projeto de portaria, denúncia, caducidade
