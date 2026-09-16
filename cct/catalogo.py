@@ -130,22 +130,40 @@ def paginas(ficheiro_origem: str) -> tuple[int | None, int | None]:
     return (ini, fim) if 0 < ini <= fim else (None, None)
 
 
+# Dígitos de família do `COD: (IRCT)` **observados e verificados** por
+# cruzamento do BTE 31/2026 com o registo da DGERT. Não é a tabela de famílias
+# da DGCP (ex-GEP), que não está publicada — é a lista do que se confirmou.
+#
+#   2  contrato coletivo de trabalho     27251 → acto 7251
+#   4  acordo de empresa                 47252 → acto 7252
+#
+# O dígito dos acordos coletivos de trabalho, das portarias de extensão, dos
+# acordos de adesão e das decisões arbitrais **está por determinar**: nenhum
+# aparece no único boletim verificado. Enquanto não estiver, um código que
+# comece por outro dígito é devolvido inteiro — prefere-se não ter a ligação ao
+# registo a ter uma ligação errada. Ver docs/rnc/README.md §5.3 e §10, tarefa 5.
+FAMILIAS_COD_IRCT = {"2": "contrato coletivo de trabalho",
+                     "4": "acordo de empresa"}
+
+
 def acto_negociacao(cod_irct: str) -> str:
     """Do `COD: (IRCT)` para o identificador de acto de negociação da DGERT.
 
     O código que o BTE publica é o identificador do acto de negociação da DGERT
-    com um dígito de família à frente: 27251 → acto 7251 (contrato coletivo),
-    47252 → acto 7252 (acordo de empresa). É esse identificador que é estável
-    entre revisões da mesma convenção, ao longo dos anos — ver §5.3 do README do
-    RNC, onde a verificação está feita e documentada.
+    com um dígito de família à frente. É esse identificador que é estável entre
+    revisões da mesma convenção, ao longo dos anos — a verificação está no §5.3
+    do README do RNC.
 
-    A regra é conservadora: só retira o dígito quando o resto tem quatro
-    dígitos, que é a largura observada dos actos (312 a 7255, sempre com o
-    último a ser 4 dígitos no universo posterior a 1990). Fora disso devolve o
-    código inteiro, para não inventar uma identidade a partir de um palpite.
+    Devolve `""` quando não consegue derivar o acto: um código de cinco
+    algarismos cujo primeiro dígito não é nenhum dos verificados fica sem
+    tradução, e a coluna `cod_irct` do catálogo guarda na mesma o código
+    completo. Uma coluna vazia é um facto; um acto errado é uma junção errada
+    com o registo da DGERT, e essas não se notam.
     """
     cod = re.sub(r"\D", "", str(cod_irct or ""))
-    return cod[1:] if len(cod) == 5 else cod
+    if len(cod) == 5:
+        return cod[1:] if cod[0] in FAMILIAS_COD_IRCT else ""
+    return cod
 
 
 def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,

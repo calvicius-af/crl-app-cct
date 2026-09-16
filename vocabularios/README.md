@@ -9,8 +9,8 @@ ficheiro, referenciado, não copiado.
 
 | Ficheiro | O que é | Gerado? |
 |---|---|---|
-| `siglas_organizacoes.csv` | 2 403 organizações da DGERT com sigla canónica, origem da sigla, tipo, lado e estado | sim |
-| `siglas_ambiguas.csv` | 147 siglas usadas por linhagens diferentes; coluna `resolucao` por preencher | sim |
+| `siglas_organizacoes.csv` | 2 403 organizações com sigla canónica **sem duplicados**, sigla de origem, tipo, lado, concelho e estado | sim |
+| `siglas_ambiguas.csv` | verificação: fica vazio se a regra funcionou. Um valor aqui é um defeito, não um dado | sim |
 | `actos_negociacao.csv` | 1 860 actos de negociação, com o primeiro e o último ano de cada um | sim |
 | `empregadores_ambito.csv` | empregadores com âmbito conhecido (PRI/SPE/APU) | não — escrito à mão |
 | `tipos_documento.csv` | o universo de tipos do BTE, com a família e se altera outro documento | não |
@@ -23,7 +23,13 @@ ficheiro, referenciado, não copiado.
 python scripts/construir_vocabularios.py caminho/para/data-export_….xlsx
 ```
 
-Corre offline e é determinístico: a mesma entrada dá sempre a mesma saída.
+Corre offline e é determinístico: a mesma entrada dá sempre a mesma saída, seja
+quem for a correr o script e por que ordem as organizações apareçam.
+
+**Uma corrida normal não mexe nas siglas já atribuídas.** Lê o vocabulário
+anterior e fixa o que lá está, acrescentando só as organizações novas — pela
+mesma razão por que um nome de ficheiro não muda depois de atribuído. Para
+recalcular tudo é preciso `--reatribuir`, que muda siglas em uso.
 
 ## A coluna `origem_sigla`
 
@@ -33,13 +39,33 @@ Diz de onde veio cada sigla, e é o que impede que um palpite passe por facto:
 - `derivada` — extraída da denominação por um padrão fiável (entre parênteses,
   ou a seguir a um travessão);
 - `recurso` — **inventada pelo script**, em CamelCase das palavras
-  significativas. `Sindicato Nacional dos Motoristas` → `Motoristas`.
+  significativas. `Sindicato Nacional dos Motoristas` → `Motoristas`;
+- qualquer das anteriores com `+desambiguada` — colidia com outra organização e
+  subiu a escada do ADR-0017. A coluna `sigla_base` guarda a original.
 
 **As de origem `recurso` não são carregadas** pela bandeira `--siglas`. Ficam no
 ficheiro para se ver o que falta. Promovem-se editando a coluna para `equipa`,
 depois de alguém as ter visto e decidido.
 
-## A regra
+## Siglas sem duplicados
+
+391 siglas do registo são pedidas por mais do que uma organização diferente.
+Resolvem-se por regra e não caso a caso, para que duas pessoas não decidam de
+maneira diferente e o mesmo sindicato não apareça com dois nomes:
+
+```text
+1. SIGLA                         SNM
+2. SIGLA + palavra distintiva    SNMotoristas
+3. SIGLA + concelho da sede      SNMLisboa
+4. SIGLA + 1.ª e 2.ª palavras
+5. SIGLA + código DGERT          SNM14021       ← garantidamente único
+```
+
+Fica com o degrau 1 a linhagem mais antiga no registo, e só se mexe no que
+colide. O construtor **falha** se sobrar um duplicado. Detalhe e alternativas
+recusadas em [ADR-0017](../docs/adr/0017-regra-de-desambiguacao-de-siglas.md).
+
+## A regra dos vocabulários
 
 Se um valor não está no vocabulário, **não se inventa** — acrescenta-se ao
 vocabulário, com data e responsável. É o que impede que «Teletrabalho»,

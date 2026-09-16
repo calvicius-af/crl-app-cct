@@ -28,6 +28,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
+from cct import siglas as mod_siglas             # noqa: E402
 from cct.localizador import _sem_acentos          # noqa: E402
 from cct.nomeacao import _camel, _limpar_sigla    # noqa: E402
 
@@ -55,8 +56,14 @@ def _ler(ws) -> list[dict]:
     return saida
 
 
-def sigla_canonica(denominacao: str, acronimo: str) -> tuple[str, str]:
-    """Devolve `(sigla, origem)` — `registo`, `derivada` ou `recurso`."""
+def sigla_base(denominacao: str, acronimo: str) -> tuple[str, str]:
+    """A sigla antes de desambiguar. Devolve `(sigla, origem)`.
+
+    `origem` é `registo` (o acrónimo consta do registo da DGERT), `derivada`
+    (extraída da denominação por um padrão fiável) ou `recurso` (inventada pelo
+    script). A desambiguação de duplicados é feita depois, em `cct/siglas.py`,
+    sobre o conjunto todo — não se pode decidir caso a caso.
+    """
     limpo = _limpar_sigla(acronimo or "")
     if limpo and limpo.upper() not in SIGLAS_RECUSADAS and 2 <= len(limpo) <= 20:
         return limpo, "registo"
@@ -68,7 +75,25 @@ def sigla_canonica(denominacao: str, acronimo: str) -> tuple[str, str]:
     return _camel(denominacao), "recurso"
 
 
-def construir(xlsx: Path, saida: Path) -> dict:
+def siglas_fixadas(caminho: Path) -> dict[str, str]:
+    """As siglas já atribuídas → `{(linhagem, sigla_base): sigla}`.
+
+    Uma sigla atribuída não se reatribui, pela mesma razão por que um nome de
+    ficheiro não muda: o que já foi escrito com ela deixaria de corresponder.
+    """
+    if not caminho.exists():
+        return {}
+    fixadas: dict[tuple[str, str], str] = {}
+    with open(caminho, encoding="utf-8-sig", newline="") as f:
+        for linha in csv.DictReader(f, delimiter=";"):
+            lin = mod_siglas.linhagem(linha.get("codigo_dgert", ""))
+            base = linha.get("sigla_base") or linha.get("sigla", "")
+            if lin and base and linha.get("sigla"):
+                fixadas.setdefault((lin, base), linha["sigla"])
+    return fixadas
+
+
+def construir(xlsx: Path, saida: Path, *, reatribuir: bool = False) -> dict:
     import openpyxl
 
     wb = openpyxl.load_workbook(xlsx, read_only=True, data_only=True)
@@ -87,23 +112,46 @@ def construir(xlsx: Path, saida: Path) -> dict:
             denominacao = r.get("Denominação da Organização", "")
             if not denominacao:
                 continue
-            s, origem = sigla_canonica(denominacao, r.get("Acrónimo", ""))
+            s, origem = sigla_base(denominacao, r.get("Acrónimo", ""))
             organizacoes.append({
                 "codigo_dgert": r.get("Código Identificador da Organização", ""),
                 "denominacao": denominacao,
                 "sigla": s,
+                "sigla_base": s,
                 "origem_sigla": origem,
                 "tipo": r.get("Tipo de Organização", ""),
                 "lado": lado,
+                "concelho": (r.get("Concelho da Sede", "") or "").strip(),
+                "distrito": (r.get("Distrito da Sede", "") or "").strip(),
                 "estado_registo": r.get("Ativa ou Extinta", ""),
                 "primeira_atividade": r.get("Data da Primeira Atividade Registada", ""),
                 "ultima_atividade": r.get("Data da Última Atividade Registada", ""),
             })
+
+    # Desambiguação. Tem de ser feita sobre o conjunto todo e por regra: duas
+    # pessoas a decidirem caso a caso produzem duas siglas para o mesmo
+    # sindicato, e a série parte-se. Ver cct/siglas.py e ADR-0017.
+    fixadas = {} if reatribuir else siglas_fixadas(saida / "siglas_organizacoes.csv")
+    resolvidas = mod_siglas.atribuir(organizacoes, fixadas)
+    # Conta-se por reivindicação e não por linha: uma organização que mudou de
+    # nome seis vezes tem seis linhas e uma só sigla, e contá-la seis vezes
+    # daria a impressão de que a regra mexeu em muito mais do que mexeu.
+    desambiguadas = sum(1 for (_lin, base), final in resolvidas.items()
+                        if final != base)
+    for o in organizacoes:
+        chave = (mod_siglas.linhagem(o["codigo_dgert"]), o["sigla_base"])
+        nova = resolvidas.get(chave, o["sigla"])
+        if nova != o["sigla_base"]:
+            o["origem_sigla"] += "+desambiguada"
+        o["sigla"] = nova
+
     organizacoes.sort(key=lambda o: (o["lado"], _sem_acentos(o["denominacao"]).upper()))
     _escrever(saida / "siglas_organizacoes.csv", organizacoes)
     resumo["organizacoes"] = len(organizacoes)
     resumo["sigla_do_registo"] = sum(1 for o in organizacoes
-                                     if o["origem_sigla"] == "registo")
+                                     if o["origem_sigla"].startswith("registo"))
+    resumo["siglas_desambiguadas"] = desambiguadas
+    resumo["siglas_fixadas_do_anterior"] = len(fixadas)
 
     # ------------------------------------------------------ siglas_ambiguas.csv
     #
@@ -116,18 +164,27 @@ def construir(xlsx: Path, saida: Path) -> dict:
         por_sigla[o["sigla"].upper()].append(o)
     ambiguas = []
     for s, grupo in sorted(por_sigla.items()):
-        raizes = {".".join(o["codigo_dgert"].split(".")[:2]) for o in grupo}
+        raizes = {mod_siglas.linhagem(o["codigo_dgert"]) for o in grupo}
         if len(raizes) > 1:
             ambiguas.append({
                 "sigla": s,
                 "n_organizacoes": len(grupo),
                 "n_linhagens": len(raizes),
                 "denominacoes": " | ".join(o["denominacao"] for o in grupo),
-                "resolucao": "",          # preenchido pela equipa
+                "resolucao": "",
             })
     _escrever(saida / "siglas_ambiguas.csv", ambiguas)
     resumo["siglas_distintas"] = len(por_sigla)
     resumo["siglas_ambiguas"] = len(ambiguas)
+    if ambiguas:
+        # Não é um aviso: é uma falha. A regra da escada só termina em
+        # candidatos livres, pelo que um duplicado aqui significa que a regra
+        # tem um defeito — e um duplicado silencioso produz dois ficheiros
+        # diferentes com o mesmo nome.
+        raise SystemExit(
+            f"ERRO — {len(ambiguas)} sigla(s) ainda duplicada(s) depois da "
+            f"desambiguação: {', '.join(a['sigla'] for a in ambiguas[:5])}. "
+            "É um defeito da regra em cct/siglas.py, não dos dados.")
 
     # ----------------------------------------------------- actos_negociacao.csv
     #
@@ -189,9 +246,14 @@ def main(argv=None):
         description="Constrói os vocabulários controlados do registo da DGERT.")
     p.add_argument("export", help="data-export_….xlsx da DGERT")
     p.add_argument("--saida", default=str(RAIZ / "vocabularios"))
+    p.add_argument("--reatribuir", action="store_true",
+                   help="ignora as siglas já atribuídas e recalcula tudo. "
+                        "Muda siglas em uso — usar só quando se sabe que "
+                        "nenhum ficheiro foi ainda nomeado com elas.")
     args = p.parse_args(argv)
 
-    resumo = construir(Path(args.export), Path(args.saida))
+    resumo = construir(Path(args.export), Path(args.saida),
+                       reatribuir=args.reatribuir)
     print("== Vocabulários construídos")
     for k, v in resumo.items():
         print(f"  {k.replace('_', ' ')}: {v}")

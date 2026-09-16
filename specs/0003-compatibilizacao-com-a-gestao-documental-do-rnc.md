@@ -4,6 +4,7 @@
 - **Data:** 2026-09-16
 - **Autoria:** CRL (António Fula)
 - **Decisões relacionadas:** [ADR-0016](../docs/adr/0016-esquema-de-nomes-do-rnc.md),
+  [ADR-0017](../docs/adr/0017-regra-de-desambiguacao-de-siglas.md),
   [ADR-0015](../docs/adr/0015-recolha-em-rede-desligada-por-omissao.md),
   [ADR-0004](../docs/adr/0004-fases-desacopladas-por-ficheiros.md),
   [ADR-0009](../docs/adr/0009-layout-do-repositorio.md)
@@ -123,6 +124,17 @@ mantida com aviso, não apagada.
 - [x] Uma linha que desapareça dos índices é assinalada, não apagada.
 - [x] Uma sigla de origem `recurso` não é carregada pela tabela de siglas.
 - [x] Um esquema de nome desconhecido é recusado com erro explícito.
+- [x] Uma sigla que só uma organização usa não é alterada.
+- [x] Uma sigla pedida por duas linhagens é resolvida pela escada, e fica com o
+      degrau 1 a linhagem de código DGERT mais baixo.
+- [x] O resultado da desambiguação não depende da ordem de chegada das
+      organizações.
+- [x] Gerações da mesma organização partilham a sigla e não são conflito.
+- [x] Uma sigla já atribuída não é reatribuída numa corrida seguinte.
+- [x] A unicidade das siglas ignora maiúsculas.
+- [x] Quando o nome não cabe, encurta-se a base e não o que distingue.
+- [x] O construtor falha, e não avisa, se sobrar um duplicado.
+- [x] Um `COD: (IRCT)` de família não verificada não é traduzido para acto.
 
 ## Plano de verificação
 
@@ -130,7 +142,8 @@ mantida com aviso, não apagada.
   dialeto técnico (reconstruído em `openpyxl` a partir das linhas reais do BTE
   31/2026, para não versionar binários), esquema de nomes nos dois sentidos,
   classificação de âmbito, separação de sectores e da cadeia de alterações,
-  extração de páginas, identidade de acto de negociação, e regeração do catálogo.
+  extração de páginas, identidade de acto de negociação, regra de desambiguação
+  de siglas, e regeração do catálogo.
   Correm offline, sem rede e sem dados locais.
 - **Verificação manual** — correr `python -m cct.catalogo` sobre o
   `BTE31_2026.xlsx` real e conferir os 14 nomes contra o índice publicado.
@@ -148,5 +161,6 @@ mantida com aviso, não apagada.
 | Uma sigla derivada pelo script entrar num nome como se fosse confirmada | A origem de cada sigla é declarada no vocabulário; as de origem `recurso` não são carregadas, e a nomeação recusa-se a escrever o ficheiro |
 | Um falso APU retirar um documento do pipeline sem ninguém dar por isso | A regra nunca decide APU em silêncio: sai sempre com aviso e `ambito_origem=regra` no catálogo |
 | Regerar o catálogo apagar trabalho humano | As cinco colunas da equipa são recuperadas pelo `nome_canonico`, e as linhas órfãs são mantidas com aviso; teste dedicado |
-| O dígito de família do código IRCT não ser o observado para ACT e portarias | A derivação só se aplica a códigos de cinco algarismos, e devolve o código inteiro fora disso; tarefa 5 do §10 do README do RNC |
+| O dígito de família do código IRCT não ser o observado para ACT e portarias | Só se traduzem os dígitos verificados (`2` e `4`); os outros deixam `acto_negociacao` vazio em vez de produzirem uma junção errada. Tarefa 2 do §10 do README do RNC |
+| Duas pessoas atribuírem siglas diferentes à mesma organização | A desambiguação é por regra, determinística e independente da ordem; as siglas atribuídas são fixadas no vocabulário versionado (ADR-0017) |
 | Os dois esquemas de nome divergirem ao ponto de partirem o MaxQDA | Teste que verifica que todo o nome gerado é aceite pelo localizador e cabe em 63 caracteres |

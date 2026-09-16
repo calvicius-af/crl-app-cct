@@ -16,6 +16,7 @@ from cct import ambito, catalogo
 from cct.catalogo import (acto_negociacao, paginas, separar_alteracoes,
                           separar_sectores)
 from cct.localizador import interpretar_doc_id, interpretar_nome_rnc
+from cct.siglas import atribuir, candidatos, linhagem, palavras_distintivas
 from cct.nomeacao import (carregar_siglas, nome_documento, sequencial_bte,
                           siglas_outorgantes, tipo_normalizado)
 from cct.recolha import ler_indice
@@ -369,3 +370,108 @@ def test_siglas_do_repositorio_carregam(tmp_path):
     tabela = carregar_siglas(caminho)
     assert len(tabela) > 1000
     assert all(s and s.isascii() for s in tabela.values())
+
+
+# ------------------------------------------------ a regra das siglas (ADR-0017)
+
+def _org(codigo, denominacao, base, concelho="", ultima="2020-01-01"):
+    return dict(codigo_dgert=codigo, denominacao=denominacao, sigla_base=base,
+                concelho=concelho, ultima_atividade=ultima)
+
+
+def test_a_sigla_que_nao_colide_fica_como_esta():
+    """A regra resolve duplicados; não corrige o registo da DGERT."""
+    orgs = [_org("1.1.0", "SINDICATO DOS PESCADORES DE SETUBAL", "SPS"),
+            _org("5.1.0", "ASSOCIACAO DOS ARMADORES DA PESCA", "ADAPLA")]
+    assert atribuir(orgs) == {("1.1", "SPS"): "SPS", ("5.1", "ADAPLA"): "ADAPLA"}
+
+
+def test_o_duplicado_sobe_a_escada_com_a_palavra_distintiva():
+    """O caso que a coordenação pediu: SNM ocupado → SNMotoristas."""
+    orgs = [_org("1.100.0", "SINDICATO NACIONAL DA MARINHA MERCANTE", "SNM"),
+            _org("1.402.1", "SINDICATO NACIONAL DOS MOTORISTAS", "SNM")]
+    resultado = atribuir(orgs)
+    assert resultado[("1.100", "SNM")] == "SNM"
+    assert resultado[("1.402", "SNM")] == "SNMotoristas"
+
+
+def test_a_linhagem_mais_antiga_fica_com_a_sigla_curta():
+    orgs = [_org("1.402.1", "SINDICATO NACIONAL DOS MOTORISTAS", "SNM"),
+            _org("1.100.0", "SINDICATO NACIONAL DA MARINHA MERCANTE", "SNM")]
+    assert atribuir(orgs)[("1.100", "SNM")] == "SNM", \
+        "1.100 é mais antiga do que 1.402, e chegou em segundo lugar"
+
+
+def test_o_resultado_nao_depende_da_ordem_de_chegada():
+    orgs = [_org("5.1.0", "ASSOCIACAO COMERCIAL DE ESPINHO", "ACE", "ESPINHO"),
+            _org("5.9.0", "ASSOCIACAO COMERCIAL DE ABRANTES", "ACE", "ABRANTES"),
+            _org("1.402.1", "SINDICATO NACIONAL DOS MOTORISTAS", "SNM"),
+            _org("1.100.0", "SINDICATO NACIONAL DA MARINHA", "SNM")]
+    assert atribuir(orgs) == atribuir(list(reversed(orgs)))
+
+
+def test_geracoes_da_mesma_organizacao_nao_sao_conflito():
+    """O SITESE mudou de nome seis vezes e continua a ser o SITESE."""
+    orgs = [_org("1.402.1", "SINDICATO DOS TRABALHADORES DE ESCRITORIO", "SITESE"),
+            _org("1.402.3", "SINDICATO DOS TRABALHADORES E TECNICOS", "SITESE")]
+    assert set(atribuir(orgs).values()) == {"SITESE"}
+
+
+def test_uma_sigla_ja_atribuida_nao_se_reatribui():
+    orgs = [_org("1.100.0", "SINDICATO NACIONAL DA MARINHA MERCANTE", "SNM"),
+            _org("1.402.1", "SINDICATO NACIONAL DOS MOTORISTAS", "SNM")]
+    resultado = atribuir(orgs, fixadas={("1.402", "SNM"): "SNM"})
+    assert resultado[("1.402", "SNM")] == "SNM"
+    assert resultado[("1.100", "SNM")] != "SNM"
+
+
+def test_a_unicidade_ignora_maiusculas():
+    """`SNMotoristas` e `SNMOTORISTAS` são o mesmo ficheiro no Windows."""
+    orgs = [_org("1.1.0", "ALGUMA COISA", "SNMotoristas"),
+            _org("2.1.0", "OUTRA COISA", "SNMOTORISTAS")]
+    siglas = list(atribuir(orgs).values())
+    assert len({s.upper() for s in siglas}) == 2
+
+
+def test_nunca_sobram_duplicados_por_muitos_que_sejam():
+    orgs = [_org(f"{i}.1.0", f"ASSOCIACAO COMERCIAL DE ESPINHO", "ACE", "ESPINHO")
+            for i in range(1, 9)]
+    siglas = list(atribuir(orgs).values())
+    assert len({s.upper() for s in siglas}) == len(orgs)
+
+
+def test_encurta_se_a_base_e_nao_o_que_distingue():
+    """`COMERCIALCONCELHOeir` não diz Oeiras nem se distingue de Oliveira."""
+    orgs = [_org("5.1.0", "ASSOCIACAO COMERCIAL DO CONCELHO DE GONDOMAR",
+                 "COMERCIALCONCELHO", "GONDOMAR"),
+            _org("5.2.0", "ASSOCIACAO COMERCIAL DO CONCELHO DE OEIRAS",
+                 "COMERCIALCONCELHO", "OEIRAS")]
+    valores = atribuir(orgs)
+    assert valores[("5.2", "COMERCIALCONCELHO")].endswith("Oeiras")
+    assert all(len(v) <= 20 for v in valores.values())
+
+
+def test_qualificador_fraco_fica_para_o_fim():
+    assert palavras_distintivas(
+        "ASSOCIACAO COMERCIAL DE ESPINHO E OUTROS CONCELHOS")[0] == "Espinho"
+
+
+def test_a_escada_acaba_sempre_num_candidato_unico():
+    escada = candidatos("ACE", "ASSOCIACAO COMERCIAL DE ESPINHO", "ESPINHO", "5.246.4")
+    assert escada[0] == "ACE"
+    assert "52464" in escada[-1], "o último degrau leva o código DGERT"
+
+
+def test_linhagem():
+    assert linhagem("1.402.1") == linhagem("1.402.3") == "1.402"
+    assert linhagem("1.402.1") != linhagem("5.402.1")
+
+
+# ----------------------------------- o dígito de família do COD: (IRCT)
+
+def test_so_se_traduz_o_codigo_das_familias_verificadas():
+    assert acto_negociacao("27251") == "7251"      # contrato coletivo
+    assert acto_negociacao("47252") == "7252"      # acordo de empresa
+    assert acto_negociacao("37000") == "", \
+        "o dígito dos acordos coletivos está por determinar — não se adivinha"
+    assert acto_negociacao("312") == "312"         # códigos curtos, intactos

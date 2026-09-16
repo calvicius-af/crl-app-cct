@@ -1,7 +1,7 @@
 # RNC — Como organizamos e nomeamos os ficheiros
 
 Relatório da Negociação Coletiva · Centro de Relações Laborais
-**Versão 3.0 · 16 de setembro de 2026** · substitui `README.Estrutura_RNC_2027.docx` (v2.1),
+**Versão 3.1 · 16 de setembro de 2026** · substitui `README.Estrutura_RNC_2027.docx` (v2.1),
 `README_Estrutura_RNC_2026.md` (v1) e as secções 2–3 do `SOP_Gestao_Documental_RNC_2026.docx` (v1.0)
 
 > **O que muda na v3.0.** A v2.1 descrevia a convenção assumindo uma ferramenta
@@ -73,6 +73,8 @@ faz, e resolver três coisas que ficaram por decidir. Está tudo fechado.
 | 4 | Convenção de nome com seis campos | **Sete campos:** entra o `_BTE_{NN}`. Custa sete caracteres e é o que permite voltar do ficheiro ao boletim — e o que a aplicação lê para emparelhar versões | [§5.1](#51-a-regra), [ADR-0016](../adr/0016-esquema-de-nomes-do-rnc.md) |
 | 5 | Sectores misturados com matérias, «decisão de equipa» | **Separados por omissão.** O que a aplicação não reconhece vai para `sectores_a_classificar`, nunca é assumido | [§7-b](#b-sectores-e-matérias-no-mesmo-campo) |
 | 6 | `siglas_organizacoes.csv` com 2 401 organizações | **2 403, com a origem de cada sigla declarada.** As 1 017 que o script inventou não são carregadas enquanto ninguém as vir | [§8](#8-vocabulários-controlados) |
+| 7 | Siglas ambíguas resolvidas à mão, caso a caso | **Resolvidas por regra, automaticamente.** 391 conflitos, zero duplicados à saída, resultado independente de quem corre o script | [§5.5-b](#55-os-casos-que-o-script-não-resolve-sozinho), [ADR-0017](../adr/0017-regra-de-desambiguacao-de-siglas.md) |
+| 8 | O número sequencial era atribuído pelo CRL | **É o da DGCP (ex-GEP).** Decisão da coordenação, que substitui a da SPEC-0001: compatibilizar ao máximo com os códigos já existentes | [§5.1-bis](#51-bis-de-onde-vem-o-número-sequencial) |
 
 O que se mantém da v2.1, e porque funcionava: as três regras do resumo; a
 árvore por fase; o âmbito com três letras; o código IRCT no nome; os temas fora
@@ -219,6 +221,28 @@ acoplava cada fase do pipeline a um ficheiro que pode não estar na máquina.
 mistura — o de 2025 (`26_PR_003_BTE_31_ACRAL_CESP`) e este. A aplicação lê os
 dois e devolve a mesma coisa a quem os consome.
 
+### 5.1-bis De onde vem o número sequencial
+
+**Do `IDDocumento` da DGCP (ex-GEP), sem o ano.** O `377/2026` do índice dá o
+`377` do nome.
+
+Isto substitui a decisão tomada na [SPEC-0001](../../specs/0001-recolha-e-nomeacao-do-bte.md),
+em que o número era atribuído pelo CRL, por um ordinal interno da aplicação. A
+razão da mudança é de compatibilidade, e é a mais importante deste documento a
+seguir ao código IRCT: **os nossos códigos devem coincidir ao máximo com os que
+já existem**. Um número próprio obrigaria a manter uma segunda série, paralela e
+sem correspondência com nada — e o número da DGCP é o que o próprio boletim usa
+para citar o documento, e o que aparece nas cadeias de alteração
+(`CCT-ALT.20250708.321/2025`).
+
+O ordinal interno da aplicação continua a existir, mas só como recurso: quando o
+índice não traz `IDDocumento`, o nome usa-o e **a linha fica marcada
+`por_confirmar`, com o ficheiro por escrever**. Um número que parece da DGCP e
+não é seria pior do que não ter número nenhum.
+
+> Os ficheiros do ciclo de 2025 mantêm os números que têm. A regra aplica-se ao
+> que entra de novo.
+
 ### 5.2 O âmbito — e porque tem de estar no nome
 
 A equipa ainda não consegue processar as convenções da Administração Pública.
@@ -317,12 +341,30 @@ E permite ligar o trabalho do RNC ao registo da DGERT: a coluna
 `acto_negociacao` do catálogo dá o identificador sem o dígito de família, que é
 a chave de junção com `vocabularios/actos_negociacao.csv`.
 
-**O que fica por saber.** O dígito de família está observado para dois valores
-(`2` contrato coletivo, `4` acordo de empresa). Os acordos coletivos de trabalho
-e as portarias de extensão não aparecem no BTE 31/2026, pelo que o seu dígito
-não está verificado. A aplicação é conservadora: só retira o dígito quando o
-código tem exatamente cinco algarismos, e devolve o código inteiro fora disso.
-Confirmar com um boletim que traga um ACT é meio dia de trabalho.
+**O que fica por saber, e é preciso definir: a tabela de famílias da DGCP.**
+
+O dígito à frente do código é uma família de instrumento. Estão **verificados
+dois**, por cruzamento com o registo:
+
+| Dígito | Família | Exemplo |
+|---|---|---|
+| `2` | contrato coletivo de trabalho | 27251 → acto 7251 |
+| `4` | acordo de empresa | 47252 → acto 7252 |
+
+Os dígitos dos **acordos coletivos de trabalho, portarias de extensão, acordos
+de adesão e decisões arbitrais estão por determinar**: nenhum destes tipos
+aparece no único boletim verificado, e a DGCP (ex-GEP) não publica a tabela.
+
+Enquanto não estiver determinada, a aplicação **não adivinha**: um código de
+cinco algarismos cujo primeiro dígito não seja 2 nem 4 sai com a coluna
+`acto_negociacao` **vazia**, e a coluna `cod_irct` guarda na mesma o código
+completo. Uma coluna vazia é um facto visível; um acto errado é uma junção
+errada com o registo da DGERT, e essas não se notam.
+
+Fechar isto é a [tarefa 2 do §10](#10-o-que-falta-fazer). Há dois caminhos: pedir
+a tabela à DGCP, ou recolher três ou quatro boletins que tragam um ACT e uma
+portaria de extensão e inferir os dígitos por cruzamento, como se fez para o 2 e
+o 4.
 
 ### 5.4 Exemplos reais, gerados e testados
 
@@ -371,24 +413,69 @@ estruturada do que uma coluna, mas o ficheiro é nomeado e não fica bloqueado.
 > catálogo: é o que dá a cadeia de alterações completa (`§7-a`) e o que evita
 > reatribuir números. Só deixou de ser *condição* para nomear uma retificação.
 
-**b) Siglas em falta ou ambíguas.** Nem toda a entidade tem sigla óbvia. A
-aplicação consulta primeiro `vocabularios/siglas_organizacoes.csv`, construído
-do registo da DGERT. Quando a entidade não estiver lá — tipicamente empresas em
-acordos de empresa — **acrescenta-se uma linha à tabela e não se inventa no nome
-do ficheiro**. Enquanto não se acrescentar, a aplicação deriva um nome feio
-(`EmpresaMetropolitana`, `APSolutionsGMBH`, `Independe`), marca a linha como
-`por_confirmar` e **não escreve o ficheiro** — a confirmação tem de acontecer
-antes de o nome ficar permanente, não depois.
+**b) Siglas em falta ou ambíguas.** Dois problemas diferentes, com respostas
+diferentes.
 
-Dimensão do problema, medida sobre o export de 16/09/2026: 2 403 organizações,
-1 618 siglas distintas, das quais **147 são usadas por linhagens genuinamente
-diferentes** (as restantes coincidências são entre gerações da mesma
-organização, o que é inofensivo para nomear ficheiros). A lista das 147 está em
-`vocabularios/siglas_ambiguas.csv`, com uma coluna `resolucao` por preencher.
+*Siglas em falta.* Nem toda a entidade tem sigla no registo — tipicamente as
+empresas, em acordos de empresa. A aplicação deriva um nome feio
+(`EmpresaMetropolitana`, `APSolutionsGMBH`), marca a linha como `por_confirmar`
+e **não escreve o ficheiro**. A confirmação tem de acontecer antes de o nome
+ficar permanente, não depois. Resolve-se acrescentando uma linha à tabela da
+equipa; não se inventa no nome do ficheiro.
+
+*Siglas duplicadas.* Este era o caso que exigia decisão humana, e **deixou de
+exigir**. Das 2 403 organizações do registo, **391 siglas são pedidas por mais
+do que uma organização genuinamente diferente**. Decidir caso a caso significa
+que o mesmo sindicato fica `SNM` num ficheiro e `SNMot` noutro, consoante quem
+processou o boletim — e como um nome atribuído não muda, o engano não se
+corrige.
+
+A regra é uma **escada de candidatos**, percorrida por ordem até encontrar um
+livre ([ADR-0017](../adr/0017-regra-de-desambiguacao-de-siglas.md)):
+
+```text
+1. SIGLA                         SNM
+2. SIGLA + palavra distintiva    SNMotoristas
+3. SIGLA + concelho da sede      SNMLisboa
+4. SIGLA + 1.ª e 2.ª palavras
+5. SIGLA + código DGERT          SNM14021       ← garantidamente único
+```
+
+Quatro propriedades fazem com que isto reduza o atrito em vez de o deslocar:
+
+1. **Só mexe no que colide.** Uma sigla que só uma organização usa fica como
+   está. O script resolve duplicados; não corrige o registo da DGERT.
+2. **Quem fica com o degrau 1 é a linhagem mais antiga no registo** — o código
+   DGERT mais baixo. Não é quem chegou primeiro ao script, pelo que duas
+   pessoas, em máquinas diferentes, obtêm o mesmo resultado.
+3. **A unicidade ignora maiúsculas**, porque `SNMotoristas` e `SNMOTORISTAS`
+   são o mesmo ficheiro no Windows e no macOS.
+4. **Uma sigla já atribuída não se reatribui.** O construtor lê o vocabulário
+   anterior e fixa o que lá está; recalcular tudo exige `--reatribuir`.
+
+E o construtor **falha** se sobrar um duplicado — não avisa, falha. A escada só
+termina em candidatos livres, pelo que um duplicado significa um defeito da
+regra, e um duplicado silencioso produz dois ficheiros com o mesmo nome.
+
+> O `SNM` acima ilustra a regra, não é uma saída real: no registo da DGERT o
+> Sindicato Nacional dos Motoristas não tem acrónimo, pelo que a sua sigla de
+> base é `MOTORISTAS` e não colide com ninguém. Exemplos reais da escada, do
+> export de 16/09/2026: `ACE` → `ACEAbrantes`, `AIM` → `AIMoagem`, `AES` →
+> `AESines`, `ACIS` → `ACISBeira`, `AIT` → `AITomate` e `AITLisboa` (duas
+> associações de industriais de tomate, resolvidas em degraus diferentes).
+
+*Gerações não são conflito.* O SITESE mudou de nome seis vezes e continua a ser
+o SITESE. A linhagem lê-se dos dois primeiros componentes do código DGERT
+(`1.402.1` e `1.402.3` são a mesma organização; `1.402.1` e `5.10.0` não são).
+
+Medido sobre o export de 16/09/2026: 2 403 organizações, 2 009 siglas distintas
+à saída, **391 desambiguadas, 0 duplicados**. As mudanças ficam visíveis: a
+coluna `sigla_base` guarda a sigla original e a `origem_sigla` regista que houve
+desambiguação.
 
 > A v2.1 dava 1 009 siglas distintas e 45 ambíguas. A diferença não é uma
 > correção: são contagens de coisas diferentes. Aqui contam-se também as 1 017
-> siglas que o próprio script derivou para as organizações sem acrónimo no
+> siglas que o próprio script fabricou para as organizações sem acrónimo no
 > registo, precisamente para que se veja quantas são e não se confunda um
 > palpite com um facto. Ver [§8](#8-vocabulários-controlados).
 
@@ -588,8 +675,8 @@ versionados com o código. Na árvore do RNC vivem em
 
 | Ficheiro | Conteúdo | Estado |
 |---|---|---|
-| `siglas_organizacoes.csv` | 2 403 organizações da DGERT com sigla canónica, origem da sigla, tipo, lado e estado | produzido |
-| `siglas_ambiguas.csv` | 147 siglas usadas por linhagens diferentes, com coluna `resolucao` por preencher | produzido, por decidir |
+| `siglas_organizacoes.csv` | 2 403 organizações com sigla canónica **sem duplicados**, sigla de origem, tipo, lado, concelho e estado | produzido |
+| `siglas_ambiguas.csv` | verificação: fica **vazio** se a regra do ADR-0017 funcionou. Um valor aqui é um defeito | produzido |
 | `actos_negociacao.csv` | 1 860 actos de negociação, com o primeiro e o último ano de cada um | produzido |
 | `empregadores_ambito.csv` | empregadores com âmbito conhecido (PRI/SPE/APU) | semente com 10 entradas — a completar |
 | `tipos_documento.csv` | CCT, CCT-ALT, AE, AE-ALT, AE-ALT-RECT, ACT, ACEP, PE, AA, DA… | produzido |
@@ -602,6 +689,11 @@ Os três primeiros regeram-se do export da DGERT:
 python scripts/construir_vocabularios.py 1_fontes/externas/data-export_….xlsx
 ```
 
+Uma corrida normal **não mexe nas siglas já atribuídas**: lê o vocabulário
+anterior e fixa o que lá está, acrescentando só as organizações novas. Para
+recalcular tudo é preciso `--reatribuir`, que muda siglas em uso e só se usa
+quando se sabe que nenhum ficheiro foi ainda nomeado com elas.
+
 **Uma distinção que importa: `origem_sigla`.** Cada linha de
 `siglas_organizacoes.csv` declara de onde veio a sigla:
 
@@ -609,7 +701,10 @@ python scripts/construir_vocabularios.py 1_fontes/externas/data-export_….xlsx
 - `derivada` (26) — extraída da denominação por um padrão fiável, entre
   parênteses ou a seguir a um travessão;
 - `recurso` (1 017) — **inventada pelo script**, em CamelCase das palavras
-  significativas. `Sindicato Nacional dos Motoristas` → `Motoristas`.
+  significativas. `Sindicato Nacional dos Motoristas` → `Motoristas`;
+- qualquer das anteriores com `+desambiguada` — a sigla colidia com a de outra
+  organização e subiu a escada do [ADR-0017](../adr/0017-regra-de-desambiguacao-de-siglas.md).
+  A coluna `sigla_base` guarda a que o registo dava.
 
 **A aplicação não carrega as de origem `recurso`.** Se as carregasse, calava o
 aviso de «confirmar» e transformava um palpite num facto: o ficheiro passaria a
@@ -701,16 +796,18 @@ está viva, usar a coluna `ultima_atividade`, que
 
 As três tarefas que a v2.1 dava como bloqueantes estão fechadas
 ([§5.3](#53-o-código-irct-é-estável-e-porquê), [§7-b](#b-sectores-e-matérias-no-mesmo-campo),
-[§5.5](#55-os-casos-que-o-script-não-resolve-sozinho)). O que fica é trabalho de
-preenchimento e de decisão, e nada disto impede começar o ciclo.
+[§5.5](#55-os-casos-que-o-script-não-resolve-sozinho)), e a desambiguação de
+siglas deixou de ser trabalho manual ([ADR-0017](../adr/0017-regra-de-desambiguacao-de-siglas.md)).
+O que fica é trabalho de preenchimento e de decisão, e **nada disto impede
+começar o ciclo**. Só a tarefa 2 depende de informação que não temos.
 
 | # | Tarefa | Porquê | Esforço | Bloqueia |
 |---|---|---|---|---|
 | 1 | **Completar o `temas.csv`** a partir do `plano_transicao_livro_codigos_europeu.xlsx` | Sem ele, `4_temas/` não se gera e a transição europeia não tem onde assentar | 1 dia | `4_temas/` |
-| 2 | **Decidir se os sectores passam a CAE/NACE** | A separação já está feita; falta decidir o vocabulário de destino. Afeta a ligação a NACE prevista no modelo europeu | ½ dia + decisão de equipa | análise sectorial |
+| 2 | **Obter a tabela de famílias do `COD: (IRCT)` da DGCP (ex-GEP)** — ou inferir os dígitos em falta de boletins que tragam um ACT e uma portaria de extensão | Só estão verificados os dígitos `2` e `4`. Sem os restantes, esses documentos ficam sem ligação ao registo da DGERT. A aplicação não adivinha: deixa a coluna vazia | ½ dia se a tabela existir; 1 dia por inferência | ligação ao registo para ACT, PE, AA e decisões arbitrais |
 | 3 | **Completar o `empregadores_ambito.csv`** — passagem sobre os acordos de empresa dos últimos 2–3 anos | Sem isto, empresas públicas entram como PRI por omissão e contaminam qualquer leitura por âmbito | 1–2 dias | leitura por âmbito |
-| 4 | **Resolver as 147 siglas ambíguas** e promover as `recurso` que forem boas | Cada uma que fique por resolver é um ficheiro que a aplicação recusa escrever | 1 dia | nomeação em lote |
-| 5 | **Confirmar o dígito de família do código IRCT** para ACT e portarias de extensão, com um boletim que os traga | Só estão observados os dígitos 2 e 4. A aplicação é conservadora entretanto | ½ dia | ligação ao registo da DGERT |
+| 4 | **Decidir se os sectores passam a CAE/NACE** | A separação já está feita; falta decidir o vocabulário de destino. Afeta a ligação a NACE prevista no modelo europeu | ½ dia + decisão de equipa | análise sectorial |
+| 5 | **Rever as 391 siglas desambiguadas** e promover as de origem `recurso` que forem boas | A regra garante que não há duplicados, não que a sigla escolhida é a que a equipa preferia. Rever uma vez fixa-a para sempre | 1 dia | nada — a regra já desbloqueou a nomeação em lote |
 | 6 | **Migrar o ciclo anterior** para a nova estrutura | Ver a tabela de correspondência abaixo | 2–3 dias | — |
 
 ### Correspondência com o ciclo anterior, para a migração
@@ -804,6 +901,8 @@ indicado, pelo que a tabela da equipa vem antes da tabela gerada.
 | Retificações resolvidas **sem** catálogo acumulado | 4/4 |
 | Âmbitos SPE detetados | 5 (1 por regra, 4 por vocabulário) |
 | Siglas por recurso final (nome feio) | 4 — `EmpresaMetropolitana`, `APSolutionsGMBH`, `Independe`, `Motoristas`. Acrescentar à tabela antes de usar em produção |
+| Siglas duplicadas no vocabulário, depois da regra | 0, de 391 conflitos |
+| Duas corridas do construtor dão o mesmo vocabulário | sim, byte a byte |
 | Sectores/matérias separados | 14/14, sem perda de itens |
 
 Reproduzível com `python -m pytest tests/test_rnc.py`.
