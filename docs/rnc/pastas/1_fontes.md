@@ -11,22 +11,33 @@ que está aqui → `0_gestao/vocabularios/`.
 
 ## Como se chamam os ficheiros
 Os PDF individuais seguem a convenção do
-[§5.1 do README](../README.md#51-a-regra) e estão em subpastas por âmbito:
+[§5.1 do README](../README.md#51-a-regra) e estão em subpastas por **família** e
+depois por **âmbito**:
 
 ```text
-1_fontes/irct/PRI/2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2.pdf
-1_fontes/irct/SPE/2026_SPE_387_AE-ALT-RECT_47109_BTE_31_CARRISTUR-ASPTC.pdf
-1_fontes/irct/APU/…                        ← recolhido e catalogado; NÃO processado
+1_fontes/irct/convencoes/PRI/2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2.pdf
+1_fontes/irct/convencoes/SPE/2026_SPE_387_AE-ALT-RECT_47109_BTE_31_CARRISTUR-ASPTC.pdf
+1_fontes/irct/convencoes/APU/…   ← recolhido e catalogado; NÃO processado (âmbito)
+1_fontes/irct/extensoes/PRI/…    ← portarias de extensão; NÃO processadas (família)
+1_fontes/irct/adesoes/PRI/…      ← acordos de adesão
+1_fontes/irct/avisos/PRI/…       ← projetos de portaria, denúncias, caducidades
 ```
+
+Só `convencoes/` entra no pipeline temático. Uma portaria de extensão refere-se
+a uma convenção mas não é uma: não tem o articulado que a codificação procura, e
+codificá-la como se tivesse dá números errados sem dar erro. Ver
+[§5.7 do README](../README.md#57-portarias-de-extensão-acordos-de-adesão-e-avisos).
 
 Índices: `2026_BTE_31_indice.xlsx`. Boletins completos: `2026_BTE_31.pdf`.
 Fontes externas mantêm o nome de origem, com a data de recolha à frente:
 `20260916_dgert_data-export.xlsx`.
 
 ## Quem escreve e quem lê
-Escreve a aplicação, na fase 1, e mais ninguém. Lê a aplicação (é daqui que o
-pipeline parte) e lê a equipa, para ir ver o original quando o texto extraído
-levanta dúvidas.
+Escreve a aplicação, na fase 1, e mais ninguém. Lê a aplicação — mas só de
+`irct/convencoes/{AMBITO}/`; apontar o `--pdfs` a outra pasta faz o pipeline
+recusar-se a correr. E lê a equipa, para ir ver o original quando o texto
+extraído levanta dúvidas, ou para consultar a portaria que estendeu uma
+convenção.
 
 ## Quando sai daqui
 **Nunca sai e nunca se edita.** Se um PDF estiver mal — ilegível, truncado, o

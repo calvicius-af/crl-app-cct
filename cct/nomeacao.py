@@ -45,8 +45,32 @@ MAX_SIGLAS_RNC = 3     # as restantes ficam em "+N"
 
 TOKEN_FAMILIA = {"convencao": "PR", "extensao": "PE",
                  "aviso": "AV", "adesao": "AA"}
+
+# Esquema de 2025: tudo o que não é convenção ia para uma só pasta `extensoes/`,
+# cujo único objetivo era ficar fora do `glob("*.pdf")` do pipeline.
 SUBPASTA_FAMILIA = {"convencao": "", "extensao": "extensoes",
                     "aviso": "extensoes", "adesao": "extensoes"}
+
+# Esquema RNC: cada família tem a sua pasta, e dentro dela o âmbito. Uma
+# portaria de extensão e um acordo de adesão referem-se a uma convenção
+# concreta, mas são actos de natureza diferente — a portaria é do Governo, a
+# adesão é de uma parte — e nenhum dos dois tem o articulado que a codificação
+# temática pressupõe. Juntá-los às convenções faria com que fossem codificados
+# como se fossem uma, e isso não dá erro: dá números errados.
+#
+#   1_fontes/irct/convencoes/PRI/    ← o pipeline lê daqui
+#   1_fontes/irct/extensoes/PRI/
+#   1_fontes/irct/adesoes/PRI/
+#   1_fontes/irct/avisos/PRI/
+#
+# Ver docs/rnc/README.md §5.7 e ADR-0018.
+PASTA_FAMILIA = {"convencao": "convencoes", "extensao": "extensoes",
+                 "adesao": "adesoes", "aviso": "avisos"}
+PASTA_FAMILIA_DESCONHECIDA = "por_classificar"
+
+# As famílias que o pipeline temático sabe processar. É a convenção e o que a
+# substitui; tudo o resto é contexto, não corpus.
+FAMILIAS_PROCESSAVEIS = frozenset({"convencao"})
 
 ESTADOS_COM_FICHEIRO = {"descarregado", "ja_existente", "inalterado"}
 
@@ -401,8 +425,13 @@ def carregar_siglas(caminho: Path) -> dict[str, str]:
     for linha in linhas:
         if max(i_nome, i_sigla) >= len(linha):
             continue
+        # A origem pode vir composta (`recurso+desambiguada`): compara-se a
+        # parte antes do `+`, que é de onde a sigla saiu. Comparar a cadeia
+        # inteira deixava passar exatamente as siglas que isto existe para
+        # travar — e sem dar erro nenhum.
         if (i_origem is not None and i_origem < len(linha)
-                and linha[i_origem].strip().lower() in ORIGENS_IGNORADAS):
+                and linha[i_origem].strip().lower().split("+")[0]
+                in ORIGENS_IGNORADAS):
             continue
         nome = _sem_acentos(linha[i_nome]).strip().lower()
         valor = _limpar_sigla(linha[i_sigla])[:MAX_SIGLA]
@@ -472,8 +501,10 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
                 avisos.append("outro documento do mesmo par de outorgantes neste ano: "
                               + ", ".join(vistos[(e.get("ano"), partes)][:-1]))
             if esquema == "rnc":
-                pasta = destino / f"bte_{e['ano']}" / nomeacao.get("ambito",
-                                                                  mod_ambito.OMISSAO)
+                pasta = (destino / f"bte_{e['ano']}"
+                         / PASTA_FAMILIA.get(e.get("familia"),
+                                             PASTA_FAMILIA_DESCONHECIDA)
+                         / nomeacao.get("ambito", mod_ambito.OMISSAO))
             else:
                 subpasta = SUBPASTA_FAMILIA.get(e["familia"], "")
                 pasta = destino / f"bte_{e['ano']}" / subpasta if subpasta \
@@ -583,3 +614,27 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def familia_do_nome(nome: str) -> str | None:
+    """A família documental que um nome de ficheiro declara, ou `None`.
+
+    Lê os dois esquemas: o token da família no esquema de 2025
+    (`26_PE_001_BTE_31_…` → `extensao`) e o tipo do BTE no esquema RNC
+    (`2026_PRI_401_PE_…` → `extensao`). Serve para que quem consome uma pasta
+    de PDF possa recusar o que não devia lá estar, em vez de o processar.
+    """
+    from .localizador import RE_DOC_ID, interpretar_nome_rnc
+    from .recolha import familia
+
+    meta = interpretar_nome_rnc(nome)
+    if meta:
+        return familia(meta["tipo"])
+    m = RE_DOC_ID.match(nome.strip())
+    if not m:
+        return None
+    token = nome.split("_")[1]
+    for fam, tok in TOKEN_FAMILIA.items():
+        if tok == token:
+            return fam
+    return None

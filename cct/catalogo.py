@@ -19,16 +19,20 @@ import re
 from pathlib import Path
 
 from . import ambito as mod_ambito
-from .nomeacao import (ESQUEMA_OMISSAO, carregar_siglas, nome_documento,
-                       separar_outorgantes, sequencial_bte, tipo_normalizado)
+from .nomeacao import (ESQUEMA_OMISSAO, FAMILIAS_PROCESSAVEIS, PASTA_FAMILIA,
+                       PASTA_FAMILIA_DESCONHECIDA, carregar_siglas,
+                       nome_documento, separar_outorgantes, sequencial_bte,
+                       tipo_normalizado)
 from .recolha import INDICES_OMISSAO, RAIZ, familia, ler_indice
 
 # Colunas produzidas pelo script. A ordem é a do documento de gestão documental.
 COLUNAS_AUTOMATICAS = [
     "nome_canonico", "ficheiro_destino", "ficheiro_origem", "ano", "seq_anual",
-    "tipo_documento", "familia", "ambito", "ambito_origem", "cod_irct",
-    "acto_negociacao", "bte_numero", "bte_data", "pagina_inicio", "pagina_fim",
-    "n_outorgantes", "outorgantes", "altera_estruturado", "altera_por_resolver",
+    "tipo_documento", "familia", "processavel", "ambito", "ambito_origem",
+    "cod_irct", "acto_negociacao", "bte_numero", "bte_data",
+    "pagina_inicio", "pagina_fim",
+    "n_outorgantes", "outorgantes", "relacao", "relacao_alvo",
+    "altera_estruturado", "altera_por_resolver",
     "vide_em_vigor", "materias_detectadas", "sectores_a_classificar",
     "url_fonte", "titulo", "estado", "avisos",
 ]
@@ -121,6 +125,30 @@ def separar_alteracoes(bruto: str) -> tuple[list[dict], list[str]]:
     return estruturado, resto
 
 
+# Que relação um documento tem com a convenção a que se refere. A cadeia de
+# alterações do índice tem o mesmo formato nos quatro casos — o que muda é o que
+# a relação significa, e isso não se lê da coluna: lê-se do tipo do documento.
+#
+#   altera   uma revisão da própria convenção (CCT-ALT, AE-ALT, …)
+#   estende  uma portaria alarga o âmbito de uma convenção a terceiros
+#   adere    uma parte adere a uma convenção de que não era outorgante
+#   refere   um aviso menciona a convenção, sem produzir efeito sobre ela
+#
+# Sem isto, uma leitura do catálogo conta uma portaria de extensão como se fosse
+# uma revisão da convenção — e a série de revisões passa a ter documentos que
+# nunca alteraram uma vírgula do articulado.
+RELACAO_POR_FAMILIA = {"convencao": "altera", "extensao": "estende",
+                       "adesao": "adere", "aviso": "refere"}
+
+
+def relacao(fam: str, estruturado: list[dict], por_resolver: list[str]) -> tuple[str, str]:
+    """`(tipo de relação, documento-alvo)` — vazios quando não há relação."""
+    if not estruturado and not por_resolver:
+        return "", ""
+    alvos = [f"{a['tipo']}.{a['data']}.{a['seq']}/{a['ano']}" for a in estruturado]
+    return RELACAO_POR_FAMILIA.get(fam or "", "refere"), "; ".join(alvos)
+
+
 def paginas(ficheiro_origem: str) -> tuple[int | None, int | None]:
     """`00260057.pdf` → (26, 57). `(None, None)` quando o nome não o diz."""
     m = RE_PAGINAS.match(Path(ficheiro_origem or "").stem)
@@ -185,15 +213,22 @@ def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,
             patronais[0] if patronais else item.get("titulo", ""),
             item.get("tipo", ""), vocabulario_ambito)
         p_ini, p_fim = paginas(item.get("ficheiro", ""))
-        processavel = mod_ambito.processavel(amb)
+        fam = item.get("familia") or familia(item.get("tipo", "")) or ""
+        pasta = PASTA_FAMILIA.get(fam, PASTA_FAMILIA_DESCONHECIDA)
+        # Processável é quem passa nas duas peneiras: a família certa (uma
+        # portaria não tem articulado para codificar) e o âmbito que a aplicação
+        # sabe ler (a Administração Pública ainda não).
+        processavel = (fam in FAMILIAS_PROCESSAVEIS and mod_ambito.processavel(amb))
+        rel, rel_alvo = relacao(fam, estruturado, por_resolver)
         saida.append({
             "nome_canonico": nome,
-            "ficheiro_destino": f"1_fontes/irct/{amb}/{nome}.pdf",
+            "ficheiro_destino": f"1_fontes/irct/{pasta}/{amb}/{nome}.pdf",
             "ficheiro_origem": item.get("ficheiro", ""),
             "ano": item.get("ano") or "",
             "seq_anual": sequencial_bte(item) or "",
             "tipo_documento": tipo_normalizado(item.get("tipo")),
-            "familia": familia(item.get("tipo", "")) or "",
+            "familia": fam,
+            "processavel": "sim" if processavel else "nao",
             "ambito": amb,
             "ambito_origem": amb_origem,
             "cod_irct": item.get("cod_irct", ""),
@@ -204,6 +239,8 @@ def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,
             "pagina_fim": p_fim if p_fim is not None else "",
             "n_outorgantes": len(patronais) + len(sindicais),
             "outorgantes": "; ".join(patronais + sindicais),
+            "relacao": rel,
+            "relacao_alvo": rel_alvo,
             "altera_estruturado": "; ".join(
                 f"{a['tipo']}.{a['data']}.{a['seq']}/{a['ano']}" for a in estruturado),
             "altera_por_resolver": "; ".join(por_resolver),
@@ -295,13 +332,22 @@ def main(argv=None):
                              vocabulario_ambito=voc, esquema=args.esquema), saida)
     escrever(catalogo, saida)
 
+    print(f"== Catálogo: {len(catalogo)} documentos → {saida}")
+    por_familia: dict[str, int] = {}
     por_ambito: dict[str, int] = {}
     for l in catalogo:
+        por_familia[l["familia"] or "por_classificar"] = \
+            por_familia.get(l["familia"] or "por_classificar", 0) + 1
         por_ambito[l["ambito"]] = por_ambito.get(l["ambito"], 0) + 1
-    print(f"== Catálogo: {len(catalogo)} documentos → {saida}")
+    print("  por família:")
+    for f, n in sorted(por_familia.items()):
+        print(f"    {f}: {n}" + ("" if f in FAMILIAS_PROCESSAVEIS
+                                 else "   (não entra no pipeline temático)"))
+    print("  por âmbito:")
     for a, n in sorted(por_ambito.items()):
         print(f"    {a}: {n}" + ("" if mod_ambito.processavel(a)
                                  else "   (não processável)"))
+    print(f"  processáveis: {sum(1 for l in catalogo if l['processavel'] == 'sim')}")
     com_aviso = [l for l in catalogo if l["avisos"]]
     por_classificar = [l for l in catalogo if l["sectores_a_classificar"]]
     print(f"    com avisos: {len(com_aviso)}")

@@ -19,7 +19,8 @@ from cct.localizador import interpretar_doc_id, interpretar_nome_rnc
 from cct.siglas import atribuir, candidatos, linhagem, palavras_distintivas
 from cct.nomeacao import (carregar_siglas, nome_documento, sequencial_bte,
                           siglas_outorgantes, tipo_normalizado)
-from cct.recolha import ler_indice
+from cct.nomeacao import familia_do_nome
+from cct.recolha import FAMILIAS_POR_OMISSAO, familia, ler_indice
 
 # Cabeçalho técnico: o que vem nos índices de 2026. O de 2025 usava rótulos
 # ("TIPO DE DOCUMENTO:", "COD:\n(IRCT)") e está coberto em tests/test_recolha.py.
@@ -307,7 +308,9 @@ def test_apu_fica_catalogado_mas_nao_processavel(itens):
     linha = catalogo.linhas([item])[0]
     assert linha["ambito"] == "APU"
     assert linha["estado"] == "nao_processavel"
-    assert linha["ficheiro_destino"].startswith("1_fontes/irct/APU/")
+    assert linha["familia"] == "convencao", "um ACEP é uma convenção, de âmbito APU"
+    assert linha["processavel"] == "nao"
+    assert linha["ficheiro_destino"].startswith("1_fontes/irct/convencoes/APU/")
 
 
 def test_regerar_o_catalogo_preserva_o_que_a_equipa_escreveu(tmp_path, itens):
@@ -475,3 +478,121 @@ def test_so_se_traduz_o_codigo_das_familias_verificadas():
     assert acto_negociacao("37000") == "", \
         "o dígito dos acordos coletivos está por determinar — não se adivinha"
     assert acto_negociacao("312") == "312"         # códigos curtos, intactos
+
+
+# --------------------------- famílias: extensões, adesões e avisos (ADR-0018)
+
+LINHAS_NAO_CONVENCAO = [
+    dict(id="401/2026", tipo="PE", cod="27251", pdf="00010004.pdf",
+         titulo="Portaria que estende o contrato coletivo entre a Associação do "
+                "Comércio e Serviços da Região do Algarve - ACRAL e o CESP - "
+                "Sindicato dos Trabalhadores do Comércio.",
+         outorgantes="", altera="CCT.20260822.377/2026",
+         sectores="COMÉRCIO A RETALHO", em_vigor=""),
+    dict(id="402/2026", tipo="AA", cod="26760", pdf="00050006.pdf",
+         titulo="Acordo de adesão entre a Santa Casa da Misericórdia de Beja e a "
+                "FNSTFPS ao contrato coletivo da CNIS.",
+         outorgantes="Santa Casa da Misericórdia de Beja; FNSTFPS",
+         altera="CCT.20260822.378/2026",
+         sectores="SOLIDARIEDADE SOCIAL", em_vigor=""),
+    dict(id="403/2026", tipo="AVISO", cod="26651", pdf="00070007.pdf",
+         titulo="Aviso de projeto de portaria de extensão do contrato coletivo "
+                "entre a AEVP e a FESAHT.",
+         outorgantes="", altera="CCT-ALT.20260822.379/2026",
+         sectores="VITICULTURA", em_vigor=""),
+]
+
+
+@pytest.fixture()
+def itens_mistos(tmp_path):
+    global LINHAS
+    originais = LINHAS
+    try:
+        LINHAS = originais + LINHAS_NAO_CONVENCAO
+        return ler_indice(escrever_indice_tecnico(tmp_path, "BTE33_2026.xlsx"))
+    finally:
+        LINHAS = originais
+
+
+def test_o_vocabulario_de_tipos_cobre_as_quatro_familias():
+    assert familia("CCT") == familia("AE") == familia("ACT") == "convencao"
+    assert familia("ACEP") == "convencao", "um ACEP é uma convenção, de âmbito APU"
+    assert familia("DA") == "convencao", "a decisão arbitral substitui a convenção"
+    assert familia("PE") == familia("PCT") == familia("PRT") == "extensao"
+    assert familia("AA") == familia("AA-ALT") == "adesao"
+    assert familia("AVISO") == familia("AV") == "aviso"
+    assert familia("ST") is None, "um tipo desconhecido não é adivinhado"
+
+
+def test_as_adesoes_sao_recolhidas_por_omissao():
+    """Estavam de fora, e uma adesão publicada não deixava rasto nenhum."""
+    assert "adesao" in FAMILIAS_POR_OMISSAO
+    assert set(FAMILIAS_POR_OMISSAO) == {"convencao", "extensao", "adesao", "aviso"}
+
+
+def test_cada_familia_vai_para_a_sua_pasta(itens_mistos):
+    destinos = {l["tipo_documento"]: l["ficheiro_destino"]
+                for l in catalogo.linhas(itens_mistos)}
+    assert destinos["CCT"].startswith("1_fontes/irct/convencoes/PRI/")
+    assert destinos["PE"].startswith("1_fontes/irct/extensoes/PRI/")
+    assert destinos["AA"].startswith("1_fontes/irct/adesoes/PRI/")
+    assert destinos["AVISO"].startswith("1_fontes/irct/avisos/PRI/")
+
+
+def test_so_as_convencoes_sao_processaveis(itens_mistos):
+    por_familia = {l["familia"]: l["processavel"]
+                   for l in catalogo.linhas(itens_mistos)}
+    assert por_familia["convencao"] == "sim"
+    assert por_familia["extensao"] == por_familia["adesao"] == "nao"
+    assert por_familia["aviso"] == "nao"
+
+
+def test_a_relacao_com_a_convencao_base_e_nomeada(itens_mistos):
+    linhas = {l["tipo_documento"]: l for l in catalogo.linhas(itens_mistos)}
+    assert linhas["PE"]["relacao"] == "estende"
+    assert linhas["PE"]["relacao_alvo"] == "CCT.20260822.377/2026"
+    assert linhas["AA"]["relacao"] == "adere"
+    assert linhas["AVISO"]["relacao"] == "refere"
+    assert linhas["CCT-ALT"]["relacao"] == "altera", \
+        "uma revisão altera; uma portaria não — contá-las juntas é contar mal"
+
+
+def test_a_portaria_herda_as_partes_do_titulo(itens_mistos):
+    """Uma portaria não tem outorgantes: quem a emite é o Governo."""
+    pe = next(i for i in itens_mistos if i["tipo"] == "PE")
+    assert pe["outorgantes"] == ""
+    nome, avisos = nome_documento(pe, 1, esquema="rnc")
+    assert "_PE_" in nome and "ACRAL" in nome
+    assert any("título" in a for a in avisos)
+
+
+def test_a_familia_le_se_do_nome_nos_dois_esquemas():
+    assert familia_do_nome("2026_PRI_401_PE_27251_BTE_33_ACRAL-CESP") == "extensao"
+    assert familia_do_nome("2026_PRI_377_CCT_27251_BTE_31_ACRAL") == "convencao"
+    assert familia_do_nome("26_PE_001_BTE_31_ACRAL_CESP") == "extensao"
+    assert familia_do_nome("26_PR_003_BTE_31_ACRAL_CESP") == "convencao"
+    assert familia_do_nome("um_ficheiro_qualquer") is None
+
+
+def test_o_pipeline_recusa_o_que_nao_e_convencao(tmp_path, monkeypatch):
+    """Uma portaria codificada como convenção não dá erro: dá números errados."""
+    from cct import pipeline_tema
+
+    pasta = tmp_path / "pdfs"
+    pasta.mkdir()
+    for nome in ("2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf",
+                 "2026_PRI_401_PE_27251_BTE_33_ACRAL-CESP.pdf"):
+        (pasta / nome).write_bytes(b"%PDF-1.4\n")
+    codebook = tmp_path / "cb.yaml"
+    codebook.write_text("tema: ensaio\ncodigos: []\n", encoding="utf-8")
+
+    monkeypatch.setattr("sys.argv",
+                        ["cct.pipeline_tema", "--pdfs", str(pasta),
+                         "--codebook", str(codebook),
+                         "--out", str(tmp_path / "out")])
+    with pytest.raises(SystemExit) as erro:
+        pipeline_tema.main()
+    mensagem = str(erro.value)
+    assert "não são convenções" in mensagem
+    assert "_PE_" in mensagem
+    assert "convencoes" in mensagem, "a mensagem tem de dizer para onde apontar"

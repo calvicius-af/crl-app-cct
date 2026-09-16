@@ -96,7 +96,8 @@ Cada corrida cria também `manifest.json`, com o comando, commit, versões, hash
 inputs/outputs, contagens e problemas encontrados.
 
 **Arrumar e catalogar um número do BTE** no esquema da gestão documental do RNC
-(âmbito no nome, código IRCT, separação PRI/SPE/APU e catálogo anotável):
+(âmbito no nome, código IRCT, separação por família e por âmbito, e catálogo
+anotável):
 
 ```bash
 python -m cct.nomeacao --esquema rnc --destino 1_fontes/irct \

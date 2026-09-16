@@ -1,7 +1,7 @@
 # RNC — Como organizamos e nomeamos os ficheiros
 
 Relatório da Negociação Coletiva · Centro de Relações Laborais
-**Versão 3.1 · 16 de setembro de 2026** · substitui `README.Estrutura_RNC_2027.docx` (v2.1),
+**Versão 3.2 · 16 de setembro de 2026** · substitui `README.Estrutura_RNC_2027.docx` (v2.1),
 `README_Estrutura_RNC_2026.md` (v1) e as secções 2–3 do `SOP_Gestao_Documental_RNC_2026.docx` (v1.0)
 
 > **O que muda na v3.0.** A v2.1 descrevia a convenção assumindo uma ferramenta
@@ -74,6 +74,7 @@ faz, e resolver três coisas que ficaram por decidir. Está tudo fechado.
 | 5 | Sectores misturados com matérias, «decisão de equipa» | **Separados por omissão.** O que a aplicação não reconhece vai para `sectores_a_classificar`, nunca é assumido | [§7-b](#b-sectores-e-matérias-no-mesmo-campo) |
 | 6 | `siglas_organizacoes.csv` com 2 401 organizações | **2 403, com a origem de cada sigla declarada.** As 1 017 que o script inventou não são carregadas enquanto ninguém as vir | [§8](#8-vocabulários-controlados) |
 | 7 | Siglas ambíguas resolvidas à mão, caso a caso | **Resolvidas por regra, automaticamente.** 391 conflitos, zero duplicados à saída, resultado independente de quem corre o script | [§5.5-b](#55-os-casos-que-o-script-não-resolve-sozinho), [ADR-0017](../adr/0017-regra-de-desambiguacao-de-siglas.md) |
+| 9 | Portarias de extensão e acordos de adesão sem tratamento próprio | **Cada família na sua pasta**, e só as convenções entram no pipeline. As adesões passam a ser recolhidas por omissão, o que não eram | [§5.7](#57-portarias-de-extensão-acordos-de-adesão-e-avisos), [ADR-0018](../adr/0018-familias-documentais-em-pastas-separadas.md) |
 | 8 | O número sequencial era atribuído pelo CRL | **É o da DGCP (ex-GEP).** Decisão da coordenação, que substitui a da SPEC-0001: compatibilizar ao máximo com os códigos já existentes | [§5.1-bis](#51-bis-de-onde-vem-o-número-sequencial) |
 
 O que se mantém da v2.1, e porque funcionava: as três regras do resumo; a
@@ -98,7 +99,11 @@ RNC_Dados_2026/
 ├── 1_fontes/                    tudo o que entra de fora. IMUTÁVEL.
 │   ├── indices_bte/             os XLSX de índice (2026_BTE_31_indice.xlsx)
 │   ├── bte_completo/            boletins inteiros em PDF
-│   ├── irct/                    ★ PDF individuais, já renomeados, em PRI/ SPE/ APU/
+│   ├── irct/                    ★ PDF individuais, já renomeados — ver §5.7
+│   │   ├── convencoes/          PRI/ SPE/ APU/   ← o pipeline lê daqui
+│   │   ├── extensoes/           PRI/ SPE/        portarias de extensão
+│   │   ├── adesoes/             PRI/ SPE/        acordos de adesão
+│   │   └── avisos/              PRI/ SPE/        projetos, denúncias, caducidades
 │   └── externas/                DGERT, DGAEP, CITE, INE, RAA/RAM, Eurofound
 ├── 2_processamento/             saídas automáticas da AppCCT
 │   ├── texto/                   .txt e doc.json extraídos do PDF
@@ -139,8 +144,8 @@ base nunca muda — mudam a extensão e a pasta.
 
 | # | Fase | Quem | Entra | Sai | Fica em | Nome |
 |---|---|---|---|---|---|---|
-| 1 | Recolha | Técnico de recolha | índice XLSX do BTE | 1 PDF por IRCT, renomeado, + linha no catálogo | `1_fontes/irct/{AMBITO}/` | `2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2.pdf` |
-| 2 | Extração | AppCCT (automático) | PDF | texto + estrutura | `2_processamento/texto/` | `…_ACRAL-CESP-STRUP+2.txt` e `.doc.json` |
+| 1 | Recolha | Técnico de recolha | índice XLSX do BTE | 1 PDF por IRCT, renomeado, + linha no catálogo | `1_fontes/irct/{FAMILIA}/{AMBITO}/` | `2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2.pdf` |
+| 2 | Extração | AppCCT (automático) | PDF **de `convencoes/`** | texto + estrutura | `2_processamento/texto/` | `…_ACRAL-CESP-STRUP+2.txt` e `.doc.json` |
 | 3 | Pré-codificação | AppCCT (automático) | texto | cláusulas candidatas por código | `2_processamento/precodificado/` | `…_ACRAL-CESP-STRUP+2.anotacoes.json` |
 | 4 | Empacotamento | AppCCT (automático) | pré-codificado | pacote QDPX + sugestões | `2_processamento/qdpx/` | `RNC_2026_lote_NN.qdpx` |
 | 5 | Validação | Técnico por tema | QDPX importado no MAXQDA | export individual | `3_analise/mqex/` | `2026_C9-SALARIOS_AF_20270315.mqex` |
@@ -161,7 +166,11 @@ base nunca muda — mudam a extensão e a pasta.
    reconstruir o master se ele se corromper.
 4. **A pasta `1_fontes/` é só de leitura.** Se um PDF estiver mal, não se
    corrige — regista-se no catálogo e trata-se a jusante.
-5. **Cada corrida da aplicação deixa um `manifest.json`** com o comando, o
+5. **Só a família `convencoes/` atravessa as fases 2 a 8.** As portarias de
+   extensão, os acordos de adesão e os avisos param na fase 1: são recolhidos,
+   nomeados e catalogados, e ficam disponíveis para consulta e para contagem —
+   mas não são extraídos nem codificados. O porquê está em [§5.7](#57-portarias-de-extensão-acordos-de-adesão-e-avisos).
+6. **Cada corrida da aplicação deixa um `manifest.json`** com o comando, o
    *commit*, as versões, os *hashes* das entradas e saídas, as contagens e os
    problemas. É o que responde, meses depois, a «como é que isto foi produzido?».
 
@@ -170,7 +179,7 @@ base nunca muda — mudam a extensão e a pasta.
 | Pasta do RNC | Pasta da AppCCT | Como se passa de uma à outra |
 |---|---|---|
 | `1_fontes/indices_bte/` | `data/raw/indices/` | cópia, ou a mesma pasta por atalho |
-| `1_fontes/irct/{AMBITO}/` | `data/raw/bte/bte_2026/{AMBITO}/` | escrito por `python -m cct.nomeacao --esquema rnc` |
+| `1_fontes/irct/{FAMILIA}/{AMBITO}/` | `data/raw/bte/bte_2026/{FAMILIA}/{AMBITO}/` | escrito por `python -m cct.nomeacao --esquema rnc` |
 | `1_fontes/bte_completo/` | `data/raw/bte_completo/` | usado só para os anos históricos, pelo `cct/localizador.py` |
 | `2_processamento/texto/` | `results/runs/2026/<corrida>/texto/` | saída da fase 1 do pipeline |
 | `2_processamento/precodificado/` | `results/runs/2026/<corrida>/` | saída das fases 2 a 4 |
@@ -282,14 +291,15 @@ documento do pipeline sem ninguém dar por isso. O catálogo regista, na coluna
 **Separação física também.** O `--esquema rnc` arruma em subpastas por âmbito:
 
 ```text
-1_fontes/irct/
+1_fontes/irct/convencoes/
 ├── PRI/    ← o pipeline lê daqui
 ├── SPE/    ← e daqui
 └── APU/    ← recolhe-se e cataloga-se; NÃO se processa (ainda)
 ```
 
 Assim «não conseguimos processar isto» deixa de ser uma nota num documento e
-passa a ser a estrutura das pastas.
+passa a ser a estrutura das pastas. O âmbito é o segundo eixo da arrumação; o
+primeiro é a família documental, em [§5.7](#57-portarias-de-extensão-acordos-de-adesão-e-avisos).
 
 ### 5.3 O código IRCT é estável — e porquê
 
@@ -501,6 +511,90 @@ a atual. As anteriores levam data e estão em `9_arquivo/`.
 
 ---
 
+### 5.7 Portarias de extensão, acordos de adesão e avisos
+
+O BTE publica quatro coisas diferentes sob o mesmo guarda-chuva dos IRCT. As três
+últimas referem-se sempre a uma convenção concreta, mas **não são convenções**.
+
+| Família | Tipos | O que é | Tem articulado? |
+|---|---|---|---|
+| `convencao` | CCT, ACT, ACEP, AE, DA | o articulado em si, e a decisão arbitral que o substitui | sim |
+| `extensao` | PE, PCT, PRT | acto do **Governo** que alarga o âmbito de uma convenção a quem não está filiado nas partes | não — dois ou três artigos sobre âmbito e produção de efeitos |
+| `adesao` | AA | uma **parte** adere a uma convenção de que não era outorgante | não |
+| `aviso` | AVISO, AV | projeto de portaria, denúncia, caducidade | não |
+
+Uma portaria de extensão não tem cláusula de retribuição, nem de tempo de
+trabalho, nem nada do que o livro de códigos procura. Se entrar no pipeline
+temático, **não dá erro: dá números errados** — cláusulas contadas a mais numa
+convenção que as não tem, e uma portaria a aparecer nas estatísticas como se
+fosse uma revisão.
+
+#### Cada família na sua pasta
+
+```text
+1_fontes/irct/
+├── convencoes/  PRI/ SPE/ APU/   ← o pipeline lê daqui, e só daqui
+├── extensoes/   PRI/ SPE/
+├── adesoes/     PRI/ SPE/
+└── avisos/      PRI/ SPE/
+```
+
+A família vem antes do âmbito porque é a distinção que decide **o que se faz**
+com o documento; o âmbito decide **se se consegue** fazer. São quatro níveis, o
+máximo que a regra de higiene 5 admite — e é onde ela se gasta.
+
+Um tipo que o vocabulário não conheça vai para `por_classificar/` e aparece no
+relatório. Não é silenciado, mas também não é adivinhado.
+
+#### Recolhem-se, catalogam-se, não se codificam
+
+As três famílias param na fase 1 do [ciclo de vida](#4-o-ciclo-de-vida-de-um-documento).
+São recolhidas, nomeadas e catalogadas — e ficam disponíveis para consulta e
+para contagem, que é o que o relatório precisa delas. A coluna `processavel` do
+catálogo cruza as duas peneiras:
+
+| | família `convencao` | outra família |
+|---|---|---|
+| **âmbito PRI ou SPE** | processável | recolhido, não processado |
+| **âmbito APU** | recolhido, não processado | recolhido, não processado |
+
+E o pipeline **recusa-se a correr** se encontrar na pasta de entrada um ficheiro
+cujo nome declare outra família, dizendo para onde apontar. Não avisa e
+continua: um aviso no meio de 277 linhas de saída é um aviso que ninguém lê, e o
+custo de errar aqui é uma análise inteira.
+
+#### A relação com a convenção-base
+
+Estes documentos só valem alguma coisa ligados à convenção a que se referem. O
+catálogo tem duas colunas para isso:
+
+| `relacao` | Quando | Significa |
+|---|---|---|
+| `altera` | CCT-ALT, AE-ALT, … | uma revisão do próprio articulado |
+| `estende` | PE, PCT, PRT | alarga o âmbito da convenção a terceiros |
+| `adere` | AA | uma parte passa a estar abrangida |
+| `refere` | AVISO | menciona, sem produzir efeito |
+
+`relacao_alvo` leva o documento-base no formato do índice
+(`CCT.20260822.377/2026`). A distinção não se lê da coluna do índice — o formato
+é o mesmo nos quatro casos — lê-se do **tipo** do documento. Sem ela, uma
+contagem de revisões de uma convenção inclui portarias que nunca lhe alteraram
+uma vírgula.
+
+> **Por verificar.** O BTE 31/2026, o único boletim de que temos o índice, não
+> traz nenhuma portaria de extensão nem nenhum acordo de adesão. A leitura da
+> relação está implementada e testada contra um índice de ensaio construído com
+> o mesmo cabeçalho, mas **não contra dados reais**. Duas coisas ficam por
+> confirmar num boletim que os traga: se a coluna de alterações é mesmo onde a
+> DGERT põe a convenção estendida, e se o `COD: (IRCT)` de uma portaria é o da
+> convenção que ela estende ou um código próprio. Ver [§10, tarefa 3](#10-o-que-falta-fazer).
+
+#### Uma família que estava a desaparecer
+
+Os **acordos de adesão não eram recolhidos por omissão**. Uma adesão publicada
+no BTE não deixava rasto nenhum — nem uma linha no catálogo a dizer que existia.
+Passam a ser recolhidos como as outras três.
+
 ## 6. Os temas — e porque não estão nas pastas
 
 Esta é a decisão mais importante deste documento e merece explicação.
@@ -582,14 +676,15 @@ python -m cct.catalogo \
     --siglas vocabularios/siglas_organizacoes.csv
 ```
 
-**Colunas produzidas automaticamente** (26):
+**Colunas produzidas automaticamente** (29):
 
 `nome_canonico` · `ficheiro_destino` · `ficheiro_origem` · `ano` · `seq_anual` ·
-`tipo_documento` · `familia` · `ambito` · `ambito_origem` · `cod_irct` ·
-`acto_negociacao` · `bte_numero` · `bte_data` · `pagina_inicio` · `pagina_fim` ·
-`n_outorgantes` · `outorgantes` · `altera_estruturado` · `altera_por_resolver` ·
-`vide_em_vigor` · `materias_detectadas` · `sectores_a_classificar` ·
-`url_fonte` · `titulo` · `estado` · `avisos`
+`tipo_documento` · `familia` · `processavel` · `ambito` · `ambito_origem` ·
+`cod_irct` · `acto_negociacao` · `bte_numero` · `bte_data` · `pagina_inicio` ·
+`pagina_fim` · `n_outorgantes` · `outorgantes` · `relacao` · `relacao_alvo` ·
+`altera_estruturado` · `altera_por_resolver` · `vide_em_vigor` ·
+`materias_detectadas` · `sectores_a_classificar` · `url_fonte` · `titulo` ·
+`estado` · `avisos`
 
 **Colunas preenchidas pela equipa ao longo do ciclo** (5):
 
@@ -805,10 +900,11 @@ começar o ciclo**. Só a tarefa 2 depende de informação que não temos.
 |---|---|---|---|---|
 | 1 | **Completar o `temas.csv`** a partir do `plano_transicao_livro_codigos_europeu.xlsx` | Sem ele, `4_temas/` não se gera e a transição europeia não tem onde assentar | 1 dia | `4_temas/` |
 | 2 | **Obter a tabela de famílias do `COD: (IRCT)` da DGCP (ex-GEP)** — ou inferir os dígitos em falta de boletins que tragam um ACT e uma portaria de extensão | Só estão verificados os dígitos `2` e `4`. Sem os restantes, esses documentos ficam sem ligação ao registo da DGERT. A aplicação não adivinha: deixa a coluna vazia | ½ dia se a tabela existir; 1 dia por inferência | ligação ao registo para ACT, PE, AA e decisões arbitrais |
-| 3 | **Completar o `empregadores_ambito.csv`** — passagem sobre os acordos de empresa dos últimos 2–3 anos | Sem isto, empresas públicas entram como PRI por omissão e contaminam qualquer leitura por âmbito | 1–2 dias | leitura por âmbito |
-| 4 | **Decidir se os sectores passam a CAE/NACE** | A separação já está feita; falta decidir o vocabulário de destino. Afeta a ligação a NACE prevista no modelo europeu | ½ dia + decisão de equipa | análise sectorial |
-| 5 | **Rever as 391 siglas desambiguadas** e promover as de origem `recurso` que forem boas | A regra garante que não há duplicados, não que a sigla escolhida é a que a equipa preferia. Rever uma vez fixa-a para sempre | 1 dia | nada — a regra já desbloqueou a nomeação em lote |
-| 6 | **Migrar o ciclo anterior** para a nova estrutura | Ver a tabela de correspondência abaixo | 2–3 dias | — |
+| 3 | **Verificar as portarias de extensão e os acordos de adesão com dados reais** — um boletim que os traga. Confirmar onde a DGERT põe a convenção estendida, e se o `COD: (IRCT)` de uma portaria é o da convenção ou próprio | A leitura da relação está implementada e testada contra um índice de ensaio, não contra dados reais. Se o `COD:` for próprio, a ligação portaria↔convenção passa a depender só da coluna de relação | ½ dia | contagem de cobertura por extensão |
+| 4 | **Completar o `empregadores_ambito.csv`** — passagem sobre os acordos de empresa dos últimos 2–3 anos | Sem isto, empresas públicas entram como PRI por omissão e contaminam qualquer leitura por âmbito | 1–2 dias | leitura por âmbito |
+| 5 | **Decidir se os sectores passam a CAE/NACE** | A separação já está feita; falta decidir o vocabulário de destino. Afeta a ligação a NACE prevista no modelo europeu | ½ dia + decisão de equipa | análise sectorial |
+| 6 | **Rever as 391 siglas desambiguadas** e promover as de origem `recurso` que forem boas | A regra garante que não há duplicados, não que a sigla escolhida é a que a equipa preferia. Rever uma vez fixa-a para sempre | 1 dia | nada — a regra já desbloqueou a nomeação em lote |
+| 7 | **Migrar o ciclo anterior** para a nova estrutura | Ver a tabela de correspondência abaixo | 2–3 dias | — |
 
 ### Correspondência com o ciclo anterior, para a migração
 
@@ -816,7 +912,8 @@ começar o ciclo**. Só a tarefa 2 depende de informação que não temos.
 |---|---|
 | `01_roteiro/` | `0_gestao/roteiro/` + `0_gestao/livro_codigos/` |
 | `02_recolha/bte/` | `1_fontes/bte_completo/` |
-| `02_recolha/convencoes/por_sigla/` | `1_fontes/irct/{AMBITO}/` (renomeado pela aplicação) |
+| `02_recolha/convencoes/por_sigla/` | `1_fontes/irct/convencoes/{AMBITO}/` (renomeado pela aplicação) |
+| `data/raw/bte/bte_AAAA/extensoes/` (esquema de 2025) | separa-se em `extensoes/`, `adesoes/` e `avisos/`, pelo token do nome |
 | `02_recolha/fontes_primarias/` | `1_fontes/externas/` |
 | `03_analise/maxqda/` | `3_analise/master/` + `3_analise/mqex/` |
 | `03_analise/temas_transversais/NN_tema/` | `4_temas/{CODIGO}/` — gerado, não migrado |
@@ -839,7 +936,7 @@ Tudo dentro da aplicação, tudo com testes que correm no CI em Linux e macOS.
 | Comando | O que faz |
 |---|---|
 | `python -m cct.recolha` | Lê os índices e descarrega os PDF. **Só liga à rede com `--confirmar-rede`**, só para anfitriões de uma lista fechada ([ADR-0015](../adr/0015-recolha-em-rede-desligada-por-omissao.md)) |
-| `python -m cct.nomeacao --esquema rnc` | Atribui os nomes canónicos e arruma em `PRI/`, `SPE/`, `APU/`. Sem `--aplicar` só simula |
+| `python -m cct.nomeacao --esquema rnc` | Atribui os nomes canónicos e arruma por família e âmbito. Sem `--aplicar` só simula |
 | `python -m cct.catalogo` | Escreve o `catalogo_irct_AAAA.csv` |
 | `python -m cct.aquisicao` | Encadeia recolha + nomeação, com relatório único |
 | `python scripts/construir_vocabularios.py` | Reconstrói os vocabulários do export da DGERT |
@@ -875,7 +972,7 @@ python -m cct.catalogo --indices 1_fontes/indices_bte \
 
 # 6. pipeline do tema, só sobre o que é processável
 python -m cct.pipeline_tema \
-    --pdfs 1_fontes/irct/PRI \
+    --pdfs 1_fontes/irct/convencoes/PRI \
     --codebook codebooks/4_08_protecao_dados.yaml \
     --out 2_processamento
 ```
@@ -904,6 +1001,9 @@ indicado, pelo que a tabela da equipa vem antes da tabela gerada.
 | Siglas duplicadas no vocabulário, depois da regra | 0, de 391 conflitos |
 | Duas corridas do construtor dão o mesmo vocabulário | sim, byte a byte |
 | Sectores/matérias separados | 14/14, sem perda de itens |
+| Famílias no BTE 31/2026 | 14 convenções; 0 portarias, 0 adesões, 0 avisos |
+| Portarias, adesões e avisos | verificados contra índice de ensaio, **não contra dados reais** — tarefa 3 do §10 |
+| O pipeline recusa um ficheiro que não é convenção | sim, com mensagem a dizer para onde apontar |
 
 Reproduzível com `python -m pytest tests/test_rnc.py`.
 

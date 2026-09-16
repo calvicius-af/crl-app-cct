@@ -44,14 +44,34 @@ TENTATIVAS = 3
 
 # Vocabulário de tipos da DGERT → família. A comparação é feita pelo prefixo do
 # tipo normalizado, para apanhar as variantes (-ALT, -RECT, -ALT-RECT).
+#
+# As famílias não são uma arrumação decorativa: decidem em que pasta o
+# documento fica e, por consequência, o que o pipeline lê. Uma portaria de
+# extensão e um acordo de adesão referem-se a uma convenção concreta, mas não
+# são convenções — não têm o articulado que a codificação temática pressupõe, e
+# codificá-los como se fossem contamina qualquer contagem por cláusula.
+# Ver docs/rnc/README.md §5.7.
+#
+#   convencao   o articulado em si: CCT, ACT, AE, ACEP, e as decisões arbitrais,
+#               que substituem a convenção e têm cláusulas como ela
+#   extensao    PE, PCT, PRT — actos do Governo que alargam o âmbito de outro
+#   adesao      AA — uma parte adere a uma convenção existente
+#   aviso       avisos de projeto de portaria, denúncias, caducidades
+#
+# A ordem importa: o primeiro prefixo que encaixar ganha, pelo que os prefixos
+# mais longos vêm antes dos que os contêm (ACTV antes de ACT, AVISO antes de AV).
 PREFIXOS_FAMILIA = [
-    ("CCT", "convencao"), ("ACTV", "convencao"), ("ACT", "convencao"),
-    ("AE", "convencao"),
+    ("CCT", "convencao"), ("ACTV", "convencao"), ("ACEP", "convencao"),
+    ("ACT", "convencao"), ("AE", "convencao"), ("DA", "convencao"),
     ("PE", "extensao"), ("PCT", "extensao"), ("PRT", "extensao"),
     ("AVISO", "aviso"), ("AV", "aviso"),
     ("AA", "adesao"),
 ]
-FAMILIAS_POR_OMISSAO = ("convencao", "extensao", "aviso")
+
+# Os acordos de adesão passam a ser recolhidos por omissão. Estavam de fora, e
+# isso significava que uma adesão publicada no BTE não deixava rasto nenhum —
+# nem sequer uma linha no catálogo a dizer que existia.
+FAMILIAS_POR_OMISSAO = ("convencao", "extensao", "adesao", "aviso")
 
 REGISTO_OMISSAO = RAIZ / "data" / "registo" / "registo_bte.jsonl"
 DESTINO_OMISSAO = RAIZ / "data" / "interim" / "recolha"

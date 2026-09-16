@@ -5,6 +5,7 @@
 - **Autoria:** CRL (António Fula)
 - **Decisões relacionadas:** [ADR-0016](../docs/adr/0016-esquema-de-nomes-do-rnc.md),
   [ADR-0017](../docs/adr/0017-regra-de-desambiguacao-de-siglas.md),
+  [ADR-0018](../docs/adr/0018-familias-documentais-em-pastas-separadas.md),
   [ADR-0015](../docs/adr/0015-recolha-em-rede-desligada-por-omissao.md),
   [ADR-0004](../docs/adr/0004-fases-desacopladas-por-ficheiros.md),
   [ADR-0009](../docs/adr/0009-layout-do-repositorio.md)
@@ -18,6 +19,11 @@ convenção. Os dois lados descrevem o mesmo trabalho e não encaixam.
 
 Quatro pontos de atrito, por ordem de gravidade:
 
+0. **Portarias de extensão e acordos de adesão sem tratamento próprio.** Todas
+   as famílias não-convenção iam para uma só pasta `extensoes/`, cujo propósito
+   era ficar fora do `glob` do pipeline — e no esquema RNC nem isso, o que fazia
+   com que uma portaria fosse codificada como se fosse uma convenção. Os acordos
+   de adesão não eram sequer recolhidos por omissão.
 1. **A aplicação não lê o índice de 2026.** A DGERT distribui o índice do BTE em
    dois dialetos de cabeçalho, e nenhum campo relevante coincide entre eles
    (`TIPO DE DOCUMENTO:` / `TipoSubTipoDoc`, `COD:\n(IRCT)` / `CodigoGEPDGERT`).
@@ -135,6 +141,16 @@ mantida com aviso, não apagada.
 - [x] Quando o nome não cabe, encurta-se a base e não o que distingue.
 - [x] O construtor falha, e não avisa, se sobrar um duplicado.
 - [x] Um `COD: (IRCT)` de família não verificada não é traduzido para acto.
+- [x] Cada família documental vai para a sua pasta, cruzada com o âmbito.
+- [x] `ACEP` e `DA` são classificados como convenção; um tipo desconhecido não é
+      adivinhado.
+- [x] Os acordos de adesão são recolhidos por omissão.
+- [x] Só a família `convencao` é marcada processável, e só em âmbito PRI ou SPE.
+- [x] A relação com a convenção-base é nomeada (`altera`, `estende`, `adere`,
+      `refere`) a partir do tipo, não da coluna do índice.
+- [x] Uma portaria sem outorgantes é nomeada a partir do título.
+- [x] `pipeline_tema` recusa-se a correr se a pasta de entrada tiver um ficheiro
+      de outra família, e a mensagem diz para onde apontar.
 
 ## Plano de verificação
 
@@ -159,6 +175,8 @@ mantida com aviso, não apagada.
 |---|---|
 | Um terceiro dialeto de índice voltar a devolver zero linhas em silêncio | Um cabeçalho desconhecido deixa a coluna vazia e o problema aparece no relatório; a leitura é por nome normalizado, não por posição |
 | Uma sigla derivada pelo script entrar num nome como se fosse confirmada | A origem de cada sigla é declarada no vocabulário; as de origem `recurso` não são carregadas, e a nomeação recusa-se a escrever o ficheiro |
+| Uma portaria de extensão ser codificada como convenção | Família em pasta própria, coluna `processavel` no catálogo, e recusa do pipeline coberta por teste (ADR-0018) |
+| A leitura da relação portaria↔convenção estar errada | Está testada contra um índice de ensaio, não contra dados reais: fica assinalado no §5.7 do README do RNC e é a tarefa 3 do §10 |
 | Um falso APU retirar um documento do pipeline sem ninguém dar por isso | A regra nunca decide APU em silêncio: sai sempre com aviso e `ambito_origem=regra` no catálogo |
 | Regerar o catálogo apagar trabalho humano | As cinco colunas da equipa são recuperadas pelo `nome_canonico`, e as linhas órfãs são mantidas com aviso; teste dedicado |
 | O dígito de família do código IRCT não ser o observado para ACT e portarias | Só se traduzem os dígitos verificados (`2` e `4`); os outros deixam `acto_negociacao` vazio em vez de produzirem uma junção errada. Tarefa 2 do §10 do README do RNC |

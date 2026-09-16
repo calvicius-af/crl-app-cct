@@ -6,7 +6,7 @@ Por onde começar, consoante o que precisas:
 |---|---|
 | ver o sistema a funcionar, com ficheiros reais | [../examples/](../examples/README.md) |
 | perceber como funciona | [arquitetura/arquitetura.md](arquitetura/arquitetura.md) |
-| perceber **porque** é assim | [adr/](adr/README.md) — 17 decisões registadas |
+| perceber **porque** é assim | [adr/](adr/README.md) — 18 decisões registadas |
 | operá-lo | [operacao/guia-operacao.md](operacao/guia-operacao.md) |
 | arrumar e nomear os ficheiros do RNC | [rnc/README.md](rnc/README.md) — a convenção, o catálogo e os vocabulários |
 | criar ou afinar um codebook | [operacao/prompts-codebooks.md](operacao/prompts-codebooks.md) |
