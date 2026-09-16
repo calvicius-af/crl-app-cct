@@ -6,8 +6,9 @@ Por onde começar, consoante o que precisas:
 |---|---|
 | ver o sistema a funcionar, com ficheiros reais | [../examples/](../examples/README.md) |
 | perceber como funciona | [arquitetura/arquitetura.md](arquitetura/arquitetura.md) |
-| perceber **porque** é assim | [adr/](adr/README.md) — 14 decisões registadas |
+| perceber **porque** é assim | [adr/](adr/README.md) — 19 decisões registadas |
 | operá-lo | [operacao/guia-operacao.md](operacao/guia-operacao.md) |
+| arrumar e nomear os ficheiros do RNC | [rnc/README.md](rnc/README.md) — a convenção, o catálogo e os vocabulários |
 | criar ou afinar um codebook | [operacao/prompts-codebooks.md](operacao/prompts-codebooks.md) |
 | saber se é fiável | [validacao/](validacao/README.md) — gates, memos das peritas, métricas |
 | instalar numa máquina nova | [dados/](dados/README.md) + [institucional/requisitos-tecnicos.md](institucional/requisitos-tecnicos.md) |
@@ -24,6 +25,9 @@ Por onde começar, consoante o que precisas:
 - **adr/** — uma página por decisão estruturante, escrita no momento em que se decide.
   Não se apaga nem se reescreve: se a decisão mudar, escreve-se outra que a substitui.
 - **operacao/** — o que fazer, por que ordem, e o que fazer quando corre mal.
+- **rnc/** — a gestão documental do Relatório da Negociação Coletiva: onde vive cada
+  ficheiro, como se chama, e como a aplicação se encaixa nessa arrumação. Inclui um
+  README por pasta principal, em `rnc/pastas/`.
 - **validacao/** — os gates de qualidade, os comentários das peritas exportados do
   MaxQDA, e as métricas contra codificação humana.
 - **dados/** — proveniência de cada fonte, convenções de nomes, e como repor `data/`.

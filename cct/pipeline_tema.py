@@ -16,6 +16,7 @@ import yaml
 
 from .extractor import extrair_pdf
 from .lexical import codificar
+from .nomeacao import FAMILIAS_PROCESSAVEIS, familia_do_nome
 from .qdpx import exportar_qdpx
 from .export_xlsx import exportar_xlsx
 from .triagem import codigos_auto, triar
@@ -106,6 +107,23 @@ def main():
     pdfs = sorted(Path(args.pdfs).glob("*.pdf"))
     if not pdfs:
         raise SystemExit(f"Sem PDFs em {args.pdfs}")
+
+    # Uma portaria de extensão ou um acordo de adesão não têm o articulado que a
+    # codificação temática pressupõe. Se um deles entrar aqui, não dá erro: dá
+    # números errados, que só se descobrem muito mais tarde — ou nunca. Por
+    # isso recusa-se à entrada, em vez de se avisar e continuar.
+    intrusos = [(f, fam) for f in pdfs
+                if (fam := familia_do_nome(f.stem))
+                and fam not in FAMILIAS_PROCESSAVEIS]
+    if intrusos:
+        linhas = "\n".join(f"    {f.name}  ({fam})" for f, fam in intrusos[:10])
+        raise SystemExit(
+            f"{len(intrusos)} ficheiro(s) em {args.pdfs} não são convenções:\n"
+            f"{linhas}\n"
+            "  Estes documentos referem-se a uma convenção mas não são uma, e\n"
+            "  codificá-los como se fossem contamina as contagens por cláusula.\n"
+            "  Apontar --pdfs para a pasta das convenções "
+            "(1_fontes/irct/convencoes/PRI).")
 
     entradas = [*pdfs, Path(args.codebook)]
     for opcional in (args.variaveis, args.master, args.metricas):
