@@ -136,6 +136,35 @@ def test_deteta_chave_aws(tmp_path):
     assert any("chave de acesso AWS" in problema for problema in problemas)
 
 
+def test_deteta_token_do_github_classico(tmp_path):
+    caminho = "config.py"
+    (tmp_path / caminho).write_text(
+        'TOKEN = "ghp_' + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8" + '"\n',
+        encoding="utf-8")
+    problemas = verificar_seguranca.verificar_segredos([caminho], tmp_path)
+    assert any("token do GitHub" in problema for problema in problemas)
+
+
+def test_deteta_token_do_github_granularidade_fina(tmp_path):
+    # Formato github_pat_: prefixo, 22 caracteres, underscore, 59 caracteres.
+    # Não era apanhado pelo padrão clássico gh[pousr]_ — ver revisão do PR #52.
+    caminho = "config.py"
+    corpo = "11ABCDEFG0abcdefghijklm" + "_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v2W3x4Y5z6A7b8C9"
+    (tmp_path / caminho).write_text(
+        'TOKEN = "github_pat_' + corpo + '"\n', encoding="utf-8")
+    problemas = verificar_seguranca.verificar_segredos([caminho], tmp_path)
+    assert any("token do GitHub" in problema for problema in problemas)
+
+
+def test_nao_confunde_texto_com_token_do_github(tmp_path):
+    caminho = "docs/nota.md"
+    (tmp_path / caminho).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / caminho).write_text(
+        "O github_pat_ é o prefixo dos tokens de granularidade fina.\n",
+        encoding="utf-8")
+    assert verificar_seguranca.verificar_segredos([caminho], tmp_path) == []
+
+
 def test_deteta_password_atribuida_real(tmp_path):
     caminho = "config.py"
     (tmp_path / caminho).write_text(

@@ -57,7 +57,12 @@ _CHAVES_GENERICAS = (
 PADROES_SEGREDOS = (
     ("chave privada PEM", re.compile(
         r"-----BEGIN (RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY-----")),
-    ("token do GitHub", re.compile(r"gh[pousr]_[A-Za-z0-9]{36,}")),
+    # Dois formatos em uso: o clássico (ghp_, gho_, ghu_, ghs_, ghr_) e o
+    # token pessoal de granularidade fina (github_pat_), que é mais longo e
+    # admite underscores no corpo. O prefixo "gh[pousr]_" exige underscore na
+    # terceira posição, pelo que não colide com "github_pat_".
+    ("token do GitHub", re.compile(
+        r"gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{50,}")),
     ("chave de acesso AWS", re.compile(r"AKIA[0-9A-Z]{16}")),
     ("token do Slack", re.compile(r"xox[abprs]-[A-Za-z0-9-]{10,}")),
     ("chave da OpenAI/Anthropic", re.compile(r"sk-(ant-)?[A-Za-z0-9_-]{20,}")),
