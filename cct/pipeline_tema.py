@@ -199,12 +199,21 @@ def main():
             # auditoria cruzada de tabelas: o que um extrator vê e o outro
             # não — a perda silenciosa que motivou o guardião (2026-09-17).
             # O canário de anexos sem tabela já vem na sanidade.
-            from .auditoria import (contar_blocos_tabela,
-                                   contar_tabelas_pdfplumber, divergencias)
-            n_texto = contar_blocos_tabela(texto)
-            n_pp = contar_tabelas_pdfplumber(pdf)
-            for aviso in divergencias(n_pp, n_texto):
-                problemas.append(f"{pdf.stem}: [auditoria] {aviso}")
+            # A auditoria é OPCIONAL e nunca pode custar o documento: com
+            # --extrator docling, o docling pode ter extraído bem um PDF
+            # que o auditor pdfplumber não consegue abrir — uma falha aqui
+            # é um aviso, não a exclusão do resultado válido do QDPX.
+            try:
+                from .auditoria import (contar_blocos_tabela,
+                                       contar_tabelas_pdfplumber, divergencias)
+                n_texto = contar_blocos_tabela(texto)
+                n_pp = contar_tabelas_pdfplumber(pdf)
+                for aviso in divergencias(n_pp, n_texto):
+                    problemas.append(f"{pdf.stem}: [auditoria] {aviso}")
+            except Exception as e:
+                problemas.append(
+                    f"{pdf.stem}: [auditoria] não foi possível verificar "
+                    f"as tabelas ({e}) — documento mantido")
             anot = codificar(doc, texto, codebook)
             if args.semantica:
                 from .semantico import codificar_semantico, backend_lmstudio

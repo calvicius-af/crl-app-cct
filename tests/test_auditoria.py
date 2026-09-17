@@ -135,3 +135,62 @@ def test_sanidade_inclui_o_canario_de_tabelas():
         "Sem tabela aqui.")
     avisos = verificar(doc, texto)
     assert any("Mapa de remunerações" in a and "tabela" in a for a in avisos)
+
+
+# ------------------- integração: a auditoria nunca custa o documento (PR #67)
+
+def test_auditoria_a_rebentar_nao_exclui_o_documento(tmp_path, monkeypatch):
+    """Uma exceção na auditoria pdfplumber é um aviso, não perda de documento.
+
+    O caso real: com --extrator docling, o docling extrai bem um PDF que
+    o auditor pdfplumber não consegue abrir. Se a exceção caísse no
+    `except` geral do loop, o documento válido era excluído do QDPX por
+    causa de uma verificação opcional — a degradação da auditoria não
+    pode custar o resultado (bloqueante apontado na revisão do PR #67).
+    """
+    from cct import pipeline_tema
+    from cct.auditoria import contar_tabelas_pdfplumber
+
+    pasta = tmp_path / "pdfs"
+    pasta.mkdir()
+    # nome de convenção (passa ao gate de famílias); conteúdo irrelevante
+    # porque a extração é substituída por um duplo
+    pdf = pasta / "26_PR_001_BTE_31_TESTE_X_Y.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n")
+    codebook = tmp_path / "cb.yaml"
+    codebook.write_text("tema: ensaio\ncodigos: []\n", encoding="utf-8")
+    out = tmp_path / "out"
+
+    DOC, TEXTO = estruturar(
+        "Cláusula 1.ª - Âmbito\n1- Aplica-se à empresa.\n"
+        "Depositado em 23 de janeiro de 2025, a fl. 87.\n", "teste")
+
+    def _extrair_falso(pdf_path, **kw):
+        return {"**DOC**": None}  # nunca chega a ser usado
+
+    def _extrair_duplo(pdf_path, paginas=None, doc_id=None, subtipo="desconhecido"):
+        import copy
+        return copy.deepcopy(DOC), TEXTO
+
+    def _auditoria_rebenta(pdf_path):
+        raise OSError("PDF corrompido para o auditor")
+
+    monkeypatch.setattr(pipeline_tema, "extrair_pdf", _extrair_duplo)
+    monkeypatch.setattr("cct.auditoria.contar_tabelas_pdfplumber",
+                        _auditoria_rebenta)
+    monkeypatch.setattr("sys.argv",
+                        ["cct.pipeline_tema", "--pdfs", str(pasta),
+                         "--codebook", str(codebook), "--out", str(out)])
+
+    pipeline_tema.main()
+
+    # o documento TEM de estar no QDPX apesar da auditoria rebentada
+    import zipfile
+    zf = zipfile.ZipFile(out / "projeto.qdpx")
+    fontes = [n for n in zf.namelist()
+              if n.startswith("Sources/") and n.endswith(".txt")]
+    assert len(fontes) == 1, "o documento foi excluído do QDPX pela auditoria"
+    # e o relatório regista a falha como aviso, não como erro do documento
+    rel = (out / "relatorio.txt").read_text(encoding="utf-8")
+    assert "[auditoria] não foi possível verificar" in rel
+    assert "Convenções processadas: 1/1" in rel
