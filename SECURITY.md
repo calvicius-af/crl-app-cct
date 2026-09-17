@@ -19,6 +19,73 @@ normal usa apenas os ficheiros locais.
 O produto não requer credenciais, chaves ou segredos. Ficheiros `.env` não devem ser
 guardados no repositório nem dentro das cópias locais em `vendor/`.
 
+## Barreiras automáticas no repositório
+
+Três camadas, todas verificáveis:
+
+1. **`.gitignore`** — ignora `data/`, `results/`, `vendor/`, `archive/`, os ficheiros de
+   projeto QDA e `.env` com todas as variantes (`.env.*`), com uma única excepção
+   explícita para `.env.example`.
+2. **`scripts/verificar_seguranca.py`** — corre localmente antes de um commit e no CI (job
+   *segurança*). Sobre os ficheiros já versionados, verifica que não entraram ficheiros de
+   dados fora de `examples/` e `tests/`, que não há `.env` versionado, que tudo o que está
+   em `examples/` consta de uma *allowlist* explícita, e varre o conteúdo à procura de
+   segredos (chaves PEM, tokens do GitHub e do Slack, chaves AWS, chaves de API,
+   atribuições do género `password = "…"`). O relatório indica ficheiro e linha, nunca o
+   valor encontrado. Só usa a biblioteca padrão.
+3. **Definições do GitHub** — *secret scanning* com *push protection* e alertas do
+   Dependabot devem ficar activos no repositório. São gratuitos em repositórios públicos e
+   privados, e apanham o que uma verificação local não apanha (histórico já enviado,
+   padrões de fornecedores conhecidos). Esta parte não se configura por ficheiro: faz-se em
+   *Settings → Code security*.
+
+A *allowlist* de `examples/` é deliberadamente estreita: passam o `README.md`, as métricas
+de calibração e os artefactos de saída anonimizados em `examples/*/saida/`. Os PDFs de
+origem em `examples/*/entrada/` não são redistribuídos
+([ADR-0013](docs/adr/0013-anonimizacao-dos-exemplos-publicados.md)). Acrescentar um tipo
+novo de ficheiro exige acrescentar o padrão ao script, no mesmo commit — é esse o momento
+de revisão.
+
+## Cadeia de fornecimento e permissões do CI
+
+O workflow declara `permissions: contents: read` ao nível do ficheiro: nenhum job escreve
+no repositório, publica pacotes ou comenta em issues. Uma permissão adicional, se vier a
+ser precisa, declara-se no job que a usa, não globalmente.
+
+As GitHub Actions estão fixadas por SHA, com a versão em comentário ao lado. Uma tag como
+`v4` pode ser reapontada para outro commit entre duas corridas; um SHA não. O Dependabot
+propõe o SHA seguinte por *pull request*, que passa pelos mesmos jobs.
+
+As versões instaladas estão fixadas em `requirements/runtime.txt`, `requirements/dev.txt` e
+`requirements/docling.txt`, usados como *constraints*. O `requirements.txt` continua a
+declarar mínimos, para que a instalação local se mantenha leve. O procedimento de
+actualização está em [CONTRIBUTING.md](CONTRIBUTING.md), secção *Actualizar versões*.
+
+**Hashes de artefactos.** Foi avaliado usar `--require-hashes` no CI e concluiu-se que, para
+já, não compensa: obrigaria a fixar a árvore transitiva completa por plataforma, e a matriz
+cobre Linux e macOS em 3.11 e 3.12, o que multiplicaria os ficheiros a manter sem
+acrescentar garantia face ao que as *constraints* já dão (versões exactas, servidas pelo
+PyPI com TLS e com *integrity* verificada pelo pip). A recomendação mantém-se para uma
+**instalação institucional fechada**: gerar aí um ficheiro com hashes por plataforma,
+incluindo a árvore do Docling, e instalar com `--require-hashes --no-deps`.
+
+## Auditoria de dependências
+
+O CI corre `pip-audit --strict` sobre os ficheiros de *constraints* (job *auditoria*), o
+que inclui as dependências transitivas resolvidas. Audita o que o projeto declara, não o
+que vem pré-instalado na imagem do runner.
+
+Política de resposta a um alerta:
+
+1. se houver versão corrigida e ela mantiver a matriz 3.11/3.12, sobe-se a versão no
+   ficheiro de *constraints* e o *pull request* segue o caminho normal;
+2. se não houver correção, avalia-se a exposição real — a aplicação corre localmente, sem
+   portas abertas e sem rede no processamento, pelo que muitas vulnerabilidades de rede não
+   são alcançáveis aqui. A conclusão fica escrita num issue;
+3. só depois disso se acrescenta uma excepção `--ignore-vuln GHSA-…` ao job, sempre com o
+   número do issue em comentário ao lado, para que a excepção tenha dono e data;
+4. uma excepção sem issue associado é para remover.
+
 ## Dados tratados
 
 - **Convenções coletivas** publicadas no Boletim do Trabalho e Emprego — documentos
@@ -46,5 +113,6 @@ interface gráfica usa `tkinter`, da biblioteca padrão do Python. O Docling é 
 tem uma cadeia de dependências distinta, que deve ser inventariada e fixada antes de uma
 instalação institucional.
 
-Se o repositório for alojado no GitHub, recomenda-se ativar os alertas do Dependabot e o
-*secret scanning*, que são gratuitos em repositórios públicos e privados.
+O Dependabot está configurado em [`.github/dependabot.yml`](.github/dependabot.yml) para as
+dependências Python e para as GitHub Actions. Os alertas do Dependabot e o *secret
+scanning* activam-se nas definições do repositório, como descrito acima.

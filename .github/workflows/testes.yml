@@ -5,6 +5,17 @@ on:
     branches: [main]
   pull_request:
 
+# Cadeia de fornecimento (issue #30): o CI só precisa de ler o repositório.
+# Nenhum job escreve conteúdo, publica pacotes ou comenta em issues; se algum
+# vier a precisar, declara a permissão adicional no próprio job, não aqui.
+permissions:
+  contents: read
+
+# As actions estão fixadas por SHA, não por tag móvel: uma tag pode ser
+# reapontada para outro commit entre duas corridas, um SHA não. O comentário
+# ao lado diz a que versão corresponde, e é o Dependabot (.github/dependabot.yml)
+# que propõe o SHA seguinte por pull request.
+
 jobs:
   pytest:
     name: pytest (${{ matrix.os }}, Python ${{ matrix.python }})
@@ -16,17 +27,20 @@ jobs:
         python: ["3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python }}
           cache: pip
 
       - name: Instalar dependências
+        # requirements.txt declara mínimos (instalação leve, sem Docling); as
+        # constraints fixam as versões exactas que esta corrida testa.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          python -m pip install -r requirements.txt \
+            -c requirements/runtime.txt -c requirements/dev.txt
 
       - name: Correr os testes
         # Os testes que precisam dos dados (fora do repositório) declaram-se
@@ -37,29 +51,58 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         run: python scripts/anonimizar_exemplos.py --check
 
-      - name: Verificar que não entraram dados no repositório
-        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
-        run: |
-          fugas=$(git ls-files | grep -iE '\.(pdf|qdpx|mqda|xlsx|qdc)$' \
-                  | grep -vE '^(examples|tests)/' || true)
-          if [ -n "$fugas" ]; then
-            echo "Ficheiros de dados versionados fora de examples/ e tests/:"
-            echo "$fugas"
-            exit 1
-          fi
-          echo "OK — nenhum ficheiro de dados fora do sítio."
+  seguranca:
+    # Segredos, dados internos e allowlist de examples/ (issue #5). A mesma
+    # verificação corre localmente antes de um commit:
+    #     python scripts/verificar_seguranca.py --verboso
+    name: segurança (segredos, dados, allowlist)
+    runs-on: ubuntu-latest
 
-      - name: Verificar que não entraram ficheiros de credenciais
-        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Verificar segredos, dados e allowlist
+        # Só biblioteca padrão: não instala nada, não depende da rede.
+        run: python scripts/verificar_seguranca.py --verboso
+
+  auditoria:
+    # Auditoria das dependências instaladas contra a base de dados de
+    # vulnerabilidades do PyPI/OSV. Política em SECURITY.md.
+    name: auditoria de dependências (pip-audit)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar o pip-audit
         run: |
-          credenciais=$(git ls-files | grep -E '(^|/)\.env($|\.)' \
-                        | grep -vE '(^|/)\.env\.example$' || true)
-          if [ -n "$credenciais" ]; then
-            echo "Ficheiros de credenciais versionados:"
-            echo "$credenciais"
-            exit 1
-          fi
-          echo "OK — nenhum .env versionado."
+          python -m pip install --upgrade pip
+          python -m pip install -c requirements/dev.txt pip-audit
+
+      - name: Auditar as dependências declaradas
+        # Audita os ficheiros de constraints, não o ambiente do runner: o
+        # pip-audit resolve as dependências transitivas (pdfminer.six, pillow,
+        # cryptography, ...) e ignora o que vem pré-instalado na imagem do
+        # GitHub, que não faz parte do que este projeto distribui.
+        # --strict faz falhar também quando um pacote não pode ser auditado,
+        # para que um silêncio não passe por "sem vulnerabilidades".
+        # Excepções revistas acrescentam-se aqui como --ignore-vuln GHSA-...,
+        # sempre com o issue correspondente indicado em comentário.
+        # Política de resposta: SECURITY.md, secção "Auditoria de dependências".
+        run: |
+          pip-audit --strict --desc \
+            -r requirements/runtime.txt \
+            -r requirements/dev.txt \
+            -r requirements/docling.txt
 
   tipos-docling:
     # O extrator docling é opcional e a suite normal corre sem ele (os
@@ -70,9 +113,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
           cache: pip
@@ -80,8 +123,11 @@ jobs:
       - name: Instalar dependências + tipos do docling
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-          python -m pip install docling-core
+          python -m pip install -r requirements.txt \
+            -c requirements/runtime.txt -c requirements/dev.txt
+          python -m pip install -r requirements/docling.txt \
+            -c requirements/runtime.txt -c requirements/dev.txt \
+            -c requirements/docling.txt
 
       - name: Correr os testes
         run: python -m pytest -q -rs
