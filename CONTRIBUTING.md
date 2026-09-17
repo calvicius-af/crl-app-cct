@@ -54,9 +54,27 @@ assim?"* e a resposta não estiver no código, é um ADR.
 ```bash
 .venv/bin/python -m pytest -q
 
-# nada de dados a escapar: só deve aparecer o que está em examples/ e tests/
-git ls-files | grep -iE '\.(pdf|qdpx|mqda|xlsx|qdc)$'
+# nada de dados, credenciais ou segredos a escapar
+python scripts/verificar_seguranca.py --verboso
 ```
+
+`scripts/verificar_seguranca.py` é a mesma barreira que corre no CI (job
+*segurança*) e só usa a biblioteca padrão, pelo que corre em qualquer máquina sem
+instalar nada. Faz quatro verificações sobre os ficheiros versionados:
+
+1. ficheiros de dados (`.pdf`, `.qdpx`, `.mqda`, `.xlsx`, `.qdc`) fora de
+   `examples/` e `tests/`;
+2. ficheiros `.env` e variantes (`.env.production`, …), com excepção de
+   `.env.example`;
+3. *allowlist* de `examples/`: só passam o `README.md`, as métricas de calibração
+   e os artefactos de saída anonimizados em `examples/*/saida/`. Nada de
+   `examples/*/entrada/` é redistribuído ([ADR-0013](docs/adr/0013-anonimizacao-dos-exemplos-publicados.md));
+4. varrimento de segredos no conteúdo (chaves PEM, tokens do GitHub e do Slack,
+   chaves AWS, chaves de API, atribuições do género `password = "…"`). O relatório
+   indica ficheiro e linha, nunca o valor encontrado.
+
+Se um ficheiro novo em `examples/` for deliberado, acrescenta o padrão à
+`ALLOWLIST_EXAMPLES` do script, no mesmo commit — é essa a revisão.
 
 Nunca versionar: PDFs do BTE fora de `examples/`, exports do MaxQDA, ficheiros `.mqda`,
 resultados de corridas. O `.gitignore` cobre isto, mas convém confirmar — sobretudo antes
@@ -66,6 +84,52 @@ Uma nova corrida deve conservar o `manifest.json` que o pipeline gera. Antes de 
 limpar ficheiros locais, correr `python scripts/inventariar_workspace.py` e seguir
 [a política do workspace](docs/dados/organizacao-workspace.md). Nunca guardar `.env` ou
 credenciais dentro de `vendor/`, mesmo sendo uma pasta ignorada pelo Git.
+
+## Actualizar versões
+
+As dependências vivem em dois registos, de propósito — mínimos para quem
+instala, versões exactas para quem verifica:
+
+| Ficheiro | O que declara | Para quê |
+|---|---|---|
+| `requirements.txt` | mínimos (`>=`) | instalação local leve, tolerante, sem Docling |
+| `requirements/runtime.txt` | versões exactas | o que o CI testa e o que uma release instala |
+| `requirements/dev.txt` | versões exactas | `pytest` e `pip-audit` |
+| `requirements/docling.txt` | versão exacta | `docling-core`, só os tipos, para o job opcional |
+
+Os ficheiros em `requirements/` usam-se como *constraints*, não como lista de
+instalação:
+
+```bash
+python -m pip install -r requirements.txt \
+    -c requirements/runtime.txt -c requirements/dev.txt
+```
+
+Para subir uma versão:
+
+1. altera o `==` no ficheiro de *constraints* correspondente (e o `>=` em
+   `requirements.txt` apenas se o mínimo deixar de ser suportado);
+2. corre a suite nas **duas** versões do Python da matriz, 3.11 e 3.12 — uma
+   versão nova que já não suporte 3.11 parte o CI em metade dos jobs;
+3. confirma que a instalação leve continua a funcionar sem Docling: a suite tem
+   de passar sem `docling-core` instalado (os testes respectivos declaram-se
+   `skipped`);
+4. corre `pip-audit --strict -r requirements/runtime.txt -r requirements/dev.txt`.
+
+O Dependabot ([`.github/dependabot.yml`](.github/dependabot.yml)) abre estes
+*pull requests* automaticamente, às segundas-feiras, para as dependências Python
+e para as GitHub Actions. Nenhum entra sem passar os jobs.
+
+As GitHub Actions estão fixadas por SHA no workflow, com a versão em comentário
+ao lado (`actions/checkout@11d5960… # v4.4.0`). Uma tag como `v4` pode ser
+reapontada para outro commit entre duas corridas; um SHA não. Ao actualizar à
+mão, actualiza também o comentário.
+
+Só `docling-core` é que está fixado sem a sua árvore transitiva: é uma
+dependência opcional, fora da instalação base, e fixar toda a árvore traria
+dezenas de pacotes que o produto não distribui. Para uma instalação
+institucional fechada, essa árvore deve ser inventariada e fixada à parte, com
+`--require-hashes` — ver [SECURITY.md](SECURITY.md).
 
 ## Mensagens de commit
 
