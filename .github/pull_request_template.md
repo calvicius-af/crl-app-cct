@@ -10,6 +10,6 @@
 
 - [ ] `python -m pytest -q` — todos os testes passam
 - [ ] Acrescentei teste(s) para o comportamento novo ou para o problema corrigido
-- [ ] `git ls-files | grep -iE '\.(pdf|qdpx|mqda|xlsx|qdc)$'` — nada fora de `examples/` e `tests/`
+- [ ] `python scripts/verificar_seguranca.py` — sem dados, credenciais, segredos ou ficheiros fora da *allowlist*
 - [ ] As três regras críticas continuam válidas (UTF-8 sem BOM/LF · zero perda de texto · pipeline agnóstico de temas)
 - [ ] Se houve decisão estruturante, escrevi o ADR correspondente
