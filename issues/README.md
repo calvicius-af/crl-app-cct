@@ -35,3 +35,9 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0006](0006-colunas-cortam-cabecalhos-centrados.md) | O corte em duas colunas parte cabeçalhos centrados (pdfplumber) | Aberta |
 | [0007](0007-unicode-cp1252-app-grafica.md) | UnicodeEncodeError na app gráfica em estações Windows com cp1252 | Resolvida |
 | [0008](0008-clausula-previa-nao-reconhecida.md) | O extrator não reconhece "Cláusula prévia" como cabeçalho | Resolvida |
+| [0009](0009-instalacao-offline-falha-em-caminho-unc.md) | A instalação offline falha quando o projeto está num caminho de rede | Aberta |
+| [0010](0010-python-do-projeto-em-windows.md) | Em Windows, não é claro qual o Python do projeto, e o doctor não ajuda | Aberta |
+| [0011](0011-siglas-inexistente-da-traceback.md) | `--siglas` com ficheiro inexistente dá traceback em vez de mensagem | Aberta |
+| [0012](0012-ci-nao-cobre-windows-nem-python-313.md) | O CI não corre em Windows nem em Python 3.13 | Aberta |
+| [0013](0013-proveniencia-sem-git-na-estacao.md) | A proveniência perde o commit quando não há git na estação | Aberta |
+| [0014](0014-carristur-sem-clausulas-nem-nota-de-deposito.md) | Quatro documentos CARRISTUR produzem zero cláusulas | Aberta |
