@@ -24,6 +24,14 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 DESTINO = RAIZ / "vendor" / "wheels"
 
+# Constraints com as versões exactas que o CI testa. O requirements.txt declara
+# mínimos (">="), o que é bom para uma instalação local tolerante e mau para um
+# pacote institucional: sem isto, um pacote preparado hoje traria a versão mais
+# recente de cada biblioteca, que pode não ser a que passou nos testes. Ver
+# ADR-0020, lacuna 1.
+CONSTRAINTS_RUNTIME = RAIZ / "requirements" / "runtime.txt"
+CONSTRAINTS_DEV = RAIZ / "requirements" / "dev.txt"
+
 sys.path.insert(0, str(RAIZ))
 from cct.proveniencia import agora_utc, escrever_manifesto as escrever_json, sha256
 
@@ -48,6 +56,27 @@ _NOME_PACOTE = re.compile(r"^[A-Za-z0-9._-]+")
 def parar(mensagem: str, solucao: str) -> None:
     """Termina com o mesmo formato de erro que o instalador usa."""
     raise SystemExit(f"\nPAROU AQUI: {mensagem}\n  → {solucao}")
+
+
+def ficheiros_de_constraints(incluir_testes: bool) -> list[Path]:
+    """Constraints a aplicar: sempre runtime, mais dev quando entra o pytest."""
+    ficheiros = [CONSTRAINTS_RUNTIME]
+    if incluir_testes:
+        ficheiros.append(CONSTRAINTS_DEV)
+    for ficheiro in ficheiros:
+        if not ficheiro.is_file():
+            parar(f"não encontrei {ficheiro}",
+                  "correr o script a partir de uma cópia completa do projeto; "
+                  "as constraints fazem parte do repositório")
+    return ficheiros
+
+
+def argumentos_de_constraints(ficheiros: list[Path]) -> list[str]:
+    """Traduz a lista de constraints para argumentos -c do pip."""
+    argumentos = []
+    for ficheiro in ficheiros:
+        argumentos += ["-c", str(ficheiro)]
+    return argumentos
 
 
 def pacotes_de_requirements(incluir_testes: bool) -> list[str]:
@@ -88,7 +117,8 @@ def _analisar_alvo(texto: str) -> tuple[str, str]:
     return plataforma, versao
 
 
-def descarregar(alvos: list[tuple[str, str]], pacotes: list[str]) -> None:
+def descarregar(alvos: list[tuple[str, str]], pacotes: list[str],
+                constraints: list[Path] | None = None) -> None:
     # A pasta é recriada de raiz: acrescentar wheels a uma pasta já povoada
     # deixaria lá versões antigas, e o instalador (que pede os pacotes pelo
     # nome, sem versão) poderia resolver para a errada, sem aviso nenhum.
@@ -113,6 +143,7 @@ def descarregar(alvos: list[tuple[str, str]], pacotes: list[str]) -> None:
             "--abi", f"cp{versao}",
             "--implementation", "cp",
             "--dest", str(DESTINO),
+            *argumentos_de_constraints(constraints or []),
             *pacotes,
         ]
         resultado = subprocess.run(comando, text=True,
@@ -130,7 +161,8 @@ def descarregar(alvos: list[tuple[str, str]], pacotes: list[str]) -> None:
                 print("  " + linha.strip())
 
 
-def escrever_manifesto(alvos: list[tuple[str, str]]) -> Path:
+def escrever_manifesto(alvos: list[tuple[str, str]],
+                       constraints: list[Path] | None = None) -> Path:
     """Regista o que ficou na pasta, com hashes, para conferência posterior.
 
     O `manifesto.json` é lido por scripts/instalar_offline.py antes de
@@ -142,11 +174,19 @@ def escrever_manifesto(alvos: list[tuple[str, str]]) -> Path:
     gerado = agora_utc()
     registo = [{"ficheiro": w.name, "sha256": sha256(w),
                 "bytes": w.stat().st_size} for w in wheels]
+    # O hash de cada ficheiro de constraints entra no manifesto para que uma
+    # auditoria possa dizer, sem adivinhar, contra que versões este pacote foi
+    # preparado.
+    registo_constraints = [
+        {"ficheiro": str(c.relative_to(RAIZ)), "sha256": sha256(c)}
+        for c in (constraints or [])
+    ]
 
     linhas = [
         "MANIFESTO DO PACOTE OFFLINE — AppCCT",
         f"Gerado em {gerado}",
         f"Alvos: {', '.join(f'{p}/py{v}' for p, v in alvos)}",
+        f"Constraints: {', '.join(c['ficheiro'] for c in registo_constraints) or 'nenhumas'}",
         f"Ficheiros: {len(wheels)}  "
         f"({sum(w['bytes'] for w in registo) / 1e6:.1f} MB)",
         "",
@@ -160,10 +200,13 @@ def escrever_manifesto(alvos: list[tuple[str, str]]) -> Path:
     temporario.write_text("\n".join(linhas) + "\n", encoding="utf-8")
     temporario.replace(manifesto)
 
+    # schema_version 2 acrescenta "constraints". O instalador só lê "wheels",
+    # pelo que um manifesto antigo continua a ser aceite.
     escrever_json(DESTINO / "manifesto.json", {
-        "schema_version": 1,
+        "schema_version": 2,
         "gerado": gerado,
         "alvos": [f"{p}/py{v}" for p, v in alvos],
+        "constraints": registo_constraints,
         "wheels": registo,
     })
     return manifesto
@@ -199,10 +242,13 @@ def main() -> int:
         print()
 
     pacotes = pacotes_de_requirements(args.incluir_testes)
+    constraints = ficheiros_de_constraints(args.incluir_testes)
     print(f"Dependências lidas de requirements.txt: {', '.join(pacotes)}")
+    print("Versões fixadas por: "
+          f"{', '.join(str(c.relative_to(RAIZ)) for c in constraints)}")
     print()
-    descarregar(alvos, pacotes)
-    manifesto = escrever_manifesto(alvos)
+    descarregar(alvos, pacotes, constraints)
+    manifesto = escrever_manifesto(alvos, constraints)
 
     total = sum(w.stat().st_size for w in DESTINO.glob("*.whl")) / 1e6
     print()

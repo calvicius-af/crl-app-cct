@@ -15,7 +15,9 @@
 
 Os ficheiros não foram reescritos. O inventário foi regenerado depois da
 operação, permitindo confirmar o número, tamanho e SHA-256 dos artefactos
-restantes em [RESUMO.md](../../results/_inventory/RESUMO.md).
+restantes em `results/_inventory/RESUMO.md`, que é gerado localmente por
+`scripts/inventariar_workspace.py` e não é versionado (`results/` está no
+`.gitignore`).
 
 Foi também preparado `scripts/manifestar_legado.py`, que cria um manifesto
 local para cada conjunto migrado. Estes manifestos registam hashes e origem de

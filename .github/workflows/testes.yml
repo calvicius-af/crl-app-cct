@@ -69,6 +69,12 @@ jobs:
         # Só biblioteca padrão: não instala nada, não depende da rede.
         run: python scripts/verificar_seguranca.py --verboso
 
+      - name: Verificar referências documentais locais
+        # Links Markdown locais e caminhos de documentação em código Python
+        # (issue #6); sensível a maiúsculas/minúsculas, para apanhar em CI
+        # (Linux) o que passa despercebido em macOS/Windows.
+        run: python scripts/verificar_referencias.py --verboso
+
   auditoria:
     # Auditoria das dependências instaladas contra a base de dados de
     # vulnerabilidades do PyPI/OSV. Política em SECURITY.md.

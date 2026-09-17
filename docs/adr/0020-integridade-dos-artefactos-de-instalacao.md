@@ -59,26 +59,89 @@ Em concreto:
 3. O algoritmo é SHA-256 em todo o projeto, através de `cct/proveniencia.py`,
    tal como já acontece nos manifestos de corrida do ADR-0014. Não se introduz
    um segundo mecanismo.
+4. A via escolhida para a autenticidade é o **controlo de acesso à partilha de
+   rede**, não a assinatura nem um procedimento manual. É um requisito
+   operacional a montar fora deste repositório, e enquanto não estiver montado e
+   confirmado a garantia é apenas a que os hashes sozinhos dão.
 
-Ficam reconhecidas três lacunas, que são trabalho identificado e não decisão
-adiada:
+5. **`--require-hashes` também não entra no pacote offline.** Seria possível:
+   o preparador tem todas as *wheels* e podia gerar um ficheiro de requisitos
+   com um `--hash` por distribuição. Mas esse ficheiro viajaria na mesma pasta,
+   com a mesma raiz de confiança do manifesto, pelo que trocaria quem faz a
+   verificação sem tornar a verificação mais forte. O único buraco concreto que
+   cobriria — uma *wheel* presente na pasta mas ausente do manifesto, que o pip
+   podia resolver como dependência sem nunca ter sido conferida — passou a ser
+   fechado directamente: o instalador recusa qualquer `.whl` fora do manifesto.
+   Reavalia-se quando a lacuna de autenticidade estiver fechada, porque é aí
+   que `--require-hashes` passaria a acrescentar alguma coisa.
 
-1. O preparador do pacote offline lê `requirements.txt`, que declara mínimos.
-   Um pacote preparado hoje pode, por isso, trazer versões diferentes das que o
-   CI testou. As *constraints* introduzidas pelo issue #30 ainda não estão
-   ligadas a este caminho.
-2. A ausência de `manifesto.json` faz o instalador avisar e continuar, em vez de
-   parar. A tolerância existe para pacotes preparados por versões anteriores do
-   preparador, mas transforma a garantia em opcional.
-3. O manifesto não prova que os bytes correspondem ao que o PyPI publicou. É
-   precisamente isso que `--require-hashes` acrescentaria, e é a razão para o
-   reavaliar dentro do pacote offline, onde o custo por plataforma já foi pago.
-4. O manifesto não é autenticado. Está na mesma pasta que as *wheels* e o
-   instalador confia no hash que ele próprio traz, pelo que quem adultere uma
-   *wheel* pode adulterar o manifesto no mesmo gesto. Afirmar aprovação
-   institucional dos bytes exige autenticar o manifesto ou distribuí-lo por um
-   canal independente do conjunto que verifica: assinatura, ou um SHA-256 do
-   próprio manifesto comunicado à parte e conferido à chegada.
+Das quatro lacunas reconhecidas na primeira redacção deste ADR, três ficaram
+fechadas em código. A quarta tem via decidida, mas **não está fechada**: depende
+de uma configuração externa a este repositório, que ainda não foi confirmada. O
+seguimento está no issue #56.
+
+| Lacuna | Estado |
+|---|---|
+| O preparador lê `requirements.txt`, com mínimos, e não as *constraints* | **Fechada.** `preparar_pacote_offline.py` e `instalar_offline.py` aplicam `-c requirements/runtime.txt`, mais `dev.txt` quando o pacote inclui o pytest. O manifesto regista que *constraints* foram usadas, e o SHA-256 de cada uma |
+| A ausência de `manifesto.json` faz o instalador avisar e continuar | **Fechada.** Passou a parar. A saída explícita `--aceitar-sem-manifesto` existe para pacotes preparados por versões anteriores, e obriga quem a usa a declarar o que está a dispensar |
+| Uma *wheel* fora do manifesto podia ser instalada sem ser conferida | **Fechada.** O instalador compara a pasta com o manifesto nos dois sentidos, e recusa ficheiros a mais tal como recusa ficheiros a menos |
+| O manifesto não é autenticado | **Aberta, com via decidida.** A resposta é controlo de acesso à partilha, não código. Fecha quando as permissões estiverem configuradas e a confirmação registada no issue #56, com responsável e data. Ver a secção seguinte |
+
+### A autenticidade resolve-se na partilha, não no instalador
+
+O manifesto viaja dentro de `vendor/wheels/` e o instalador confia no hash que
+ele próprio traz: quem consiga escrever naquela pasta altera a *wheel* e o
+manifesto no mesmo gesto. As respostas criptográficas a isto — assinar o
+manifesto, ou comunicar o seu SHA-256 por um canal independente — foram
+ponderadas e **rejeitadas por não serem operáveis neste contexto**: exigiriam
+gestão de chaves ou um procedimento manual repetido a cada pacote, por pessoas
+cuja formação informática é de utilizador, e com acesso directo ao Git vedado
+pelas protecções do proxy nas máquinas de serviço. Uma medida de segurança que
+depende de alguém se lembrar de a cumprir não é uma medida de segurança.
+
+**A via escolhida para fechar esta lacuna é o controlo de acesso:** a pasta da
+partilha de rede onde o pacote é publicado deve ter escrita restrita a quem
+prepara o pacote e leitura para as estações, configurada pelo Instituto de
+Informática. Com isso, o canal entre a preparação e a instalação deixa de ser
+modificável por terceiros, e o manifesto deixa de precisar de autenticar-se a si
+próprio. A transferência dessa responsabilidade, quando a pessoa que a detém
+deixar o organismo, cabe igualmente ao Instituto de Informática, para que o
+controlo não fique preso a um indivíduo.
+
+**Nada disto está montado à data deste ADR, e o ADR não o substitui.** Esta
+secção regista uma decisão sobre o caminho a seguir, não um controlo em vigor:
+as permissões são externas ao repositório e não são demonstráveis por código,
+testes ou CI. Até a configuração existir e ser confirmada, a autenticidade não
+está assegurada, e afirmá-la seria repetir o erro que este ADR foi escrito para
+corrigir.
+
+Pré-requisito operacional, a confirmar antes de se poder declarar a lacuna
+fechada:
+
+| O que | Quem | Evidência |
+|---|---|---|
+| Escrita restrita a quem prepara o pacote, leitura para as estações, na pasta da partilha onde o pacote é publicado | Instituto de Informática, a pedido do CRL | Confirmação escrita no issue #56, com data e identificação de quem configurou |
+| Transferência da responsabilidade de escrita quando a pessoa que a detém sair | Instituto de Informática | O mesmo registo, actualizado na altura |
+
+O que isto cobre e o que não cobre, dito sem arredondar:
+
+| Cobre | Não cobre |
+|---|---|
+| Alteração do pacote na partilha por quem não tem escrita nela | Alteração na máquina que prepara o pacote, antes da publicação |
+| Corrupção, truncagem e cópia incompleta, que a verificação de hashes já apanhava | Erro ou acto deliberado de quem detém a escrita na pasta |
+| Uma *wheel* acrescentada à pasta, que o instalador recusa por não constar do manifesto | Falha ou má configuração das permissões, que ninguém verifica automaticamente |
+
+A garantia a declarar depende de em que ponto se está, e não deve ser antecipada:
+
+1. **Hoje, sem as permissões confirmadas:** integridade verificada por hashes.
+   Apanha corrupção, truncagem, cópia incompleta e ficheiros a mais na pasta.
+   Não resiste a adulteração deliberada.
+2. **Depois de confirmadas:** integridade verificada por hashes, sobre um canal
+   de distribuição com controlo de acesso. Continua a não ser prova
+   criptográfica de autenticidade, e não deve ser apresentada como tal. É o
+   controlo que a maioria das instituições usa para este problema, e é
+   proporcionado ao risco: o cenário que sobra exige alguém com escrita
+   autorizada na partilha a agir deliberadamente.
 
 ## Alternativas consideradas
 
@@ -111,7 +174,9 @@ offline, que é o caminho institucional de qualquer modo.
 ## Revisitar quando
 
 Houver distribuição do produto a terceiros fora do CRL, ou quando uma exigência
-de auditoria pedir prova de autenticidade e não apenas de integridade. Nessa
+de auditoria pedir prova criptográfica de autenticidade e não aceitar o controlo
+de acesso como resposta. Também quando as permissões da partilha deixarem de
+poder ser garantidas, por mudança de infraestrutura ou de política: é essa
+configuração que sustenta a decisão acima, e sem ela a lacuna reabre. Nessa
 altura há duas peças a decidir em conjunto, e nenhuma delas no CI:
-`--require-hashes` dentro do pacote offline, para a lacuna 3, e a autenticação
-do manifesto, para a lacuna 4.
+`--require-hashes` dentro do pacote offline, e a autenticação do manifesto.

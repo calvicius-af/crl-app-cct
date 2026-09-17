@@ -134,13 +134,32 @@ passa a ser zero. Os pontos que uma auditoria interna tenderá a perguntar:
    `manifesto.json` guarda o mesmo em formato lido pela máquina. O instalador
    confere todos os hashes automaticamente antes de instalar: uma wheel corrompida
    ou truncada entre a preparação e a instalação faz o procedimento parar, com o
-   nome do ficheiro. Isto é integridade, não autenticidade: o manifesto segue
-   dentro da mesma pasta que verifica e não é assinado, pelo que não resiste a
-   quem altere as duas coisas de propósito — ver
+   nome do ficheiro. A conferência é nos dois sentidos — um ficheiro `.whl` que
+   esteja na pasta sem constar do manifesto também faz parar, porque o pip
+   resolveria as dependências a partir dele sem nunca o ter conferido. Um pacote
+   sem `manifesto.json` não instala: para um pacote antigo, de origem de
+   confiança, existe a saída explícita `--aceitar-sem-manifesto`.
+
+   Isto é integridade: o manifesto segue dentro da mesma pasta que verifica e não
+   é assinado, pelo que sozinho não resiste a quem altere as duas coisas de
+   propósito. A autenticidade é assegurada fora do instalador, pelo ponto
+   seguinte.
+3. **Controlo de acesso à partilha, a montar.** A pasta onde o pacote é publicado
+   deve ter escrita restrita a quem o prepara e leitura para as estações,
+   configurada pelo Instituto de Informática, a quem cabe também transferir essa
+   responsabilidade quando a pessoa que a detém deixar o organismo. É isto que
+   impede que alguém substitua uma biblioteca entre a preparação e a instalação.
+   **Enquanto estas permissões não estiverem configuradas e confirmadas, a
+   garantia é apenas** a que os hashes sozinhos dão — ver
    [ADR-0020](../adr/0020-integridade-dos-artefactos-de-instalacao.md).
-3. **Momento da descarga.** Uma vez, numa máquina identificada, e não em cada
+4. **Versões.** O pacote é preparado e instalado com as *constraints* em
+   `requirements/`, as mesmas que o CI usa, pelo que a estação recebe as versões
+   que passaram nos testes e não a mais recente de cada biblioteca. O manifesto
+   regista que *constraints* foram aplicadas e o SHA-256 de cada uma, para que
+   isso seja verificável depois.
+5. **Momento da descarga.** Uma vez, numa máquina identificada, e não em cada
    estação.
-4. **Ausência de tráfego posterior.** A aplicação não faz pedidos de rede em
+6. **Ausência de tráfego posterior.** A aplicação não faz pedidos de rede em
    operação (ver [requisitos-tecnicos.md](requisitos-tecnicos.md) §4). As duas
    exceções opcionais, Docling e camada semântica local, estão desligadas por
    omissão.

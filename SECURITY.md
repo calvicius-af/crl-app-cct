@@ -69,10 +69,21 @@ faltar ou não corresponder. O procedimento está em
 [`docs/institucional/instalacao-offline.md`](docs/institucional/instalacao-offline.md).
 
 O que esta verificação garante, dito com precisão: **integridade**, isto é, que os ficheiros
-chegaram intactos desde a preparação, apanhando corrupção, truncagem e cópia incompleta.
-Não garante **autenticidade**: o manifesto viaja dentro da mesma pasta que verifica e não é
-assinado, pelo que quem consiga alterar uma *wheel* consegue reescrever o manifesto no mesmo
-gesto. A verificação não resiste, por isso, a adulteração deliberada.
+chegaram intactos desde a preparação, apanhando corrupção, truncagem e cópia incompleta. Não
+garante, por si só, **autenticidade**: o manifesto viaja dentro da mesma pasta que verifica e
+não é assinado, pelo que quem consiga escrever nessa pasta altera a *wheel* e o manifesto no
+mesmo gesto.
+
+A via decidida para a autenticidade fica fora do instalador, no **controlo de acesso**: a
+pasta da partilha de rede onde o pacote é publicado deve ter escrita restrita a quem prepara
+o pacote e leitura para as estações, configurada pelo Instituto de Informática, a quem cabe
+também transferir essa responsabilidade quando a pessoa que a detém deixar o organismo. A
+decisão, o que cobre, o que não cobre e o pré-requisito a confirmar estão no
+[ADR-0020](docs/adr/0020-integridade-dos-artefactos-de-instalacao.md).
+
+**Esse controlo ainda não está confirmado**, e é externo ao repositório: não há código,
+teste ou job de CI que o demonstre. Até haver confirmação escrita, com responsável e data, a
+garantia a declarar perante uma auditoria é apenas integridade verificada por hashes.
 
 No CI não se usa `--require-hashes`, por decisão registada no
 [ADR-0020](docs/adr/0020-integridade-dos-artefactos-de-instalacao.md): obrigaria a fixar a
@@ -80,13 +91,16 @@ No CI não se usa `--require-hashes`, por decisão registada no
 acrescenta (bytes idênticos) não é a que falta ao CI (versões conhecidas), que as
 *constraints* já dão.
 
-O mesmo ADR regista três lacunas conhecidas, para que não sejam tomadas por resolvidas: o
-preparador do pacote offline lê `requirements.txt`, que declara mínimos, e não as
-*constraints*, pelo que um pacote preparado hoje pode trazer versões diferentes das
-testadas; a ausência de `manifesto.json` faz o instalador avisar em vez de parar; o
-manifesto não prova que os bytes correspondem ao que o PyPI publicou; e o manifesto não é
-autenticado, o que é a lacuna a fechar antes de se poder afirmar, perante uma auditoria,
-que os bytes instalados são os aprovados.
+Das lacunas que esse ADR identificou, ficaram fechadas as que dependiam só de código: o
+preparador e o instalador aplicam agora as *constraints*, pelo que a estação recebe as
+versões que o CI testou; um pacote sem `manifesto.json` deixou de instalar, salvo saída
+explícita; e uma *wheel* que esteja na pasta sem constar do manifesto faz parar, porque o
+pip a resolveria como dependência sem nunca a ter conferido.
+
+A que não depende de código, a autenticação do manifesto, continua aberta, com via decidida:
+controlo de acesso à partilha, como descrito acima, a confirmar antes de poder ser dada por
+fechada. As alternativas criptográficas foram ponderadas e rejeitadas por não serem
+operáveis com regularidade neste contexto, o que está fundamentado no ADR-0020.
 
 ## Auditoria de dependências
 

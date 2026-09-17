@@ -10,6 +10,10 @@ scripts/instalar_offline.command (macOS).
 Uso por linha de comandos:
     python scripts/instalar_offline.py
     python scripts/instalar_offline.py --refazer   # deita abaixo o .venv e repete
+
+Sem `vendor/wheels/manifesto.json` a instalação pára: um pacote sem manifesto
+não é verificável. Para um pacote antigo, de origem de confiança, a saída
+explícita é `--aceitar-sem-manifesto`.
 """
 from __future__ import annotations
 
@@ -27,7 +31,10 @@ VENV = RAIZ / ".venv"
 
 sys.path.insert(0, str(RAIZ))
 from cct.proveniencia import sha256
-from scripts.preparar_pacote_offline import pacotes_de_requirements
+from scripts.preparar_pacote_offline import (
+    argumentos_de_constraints, ficheiros_de_constraints,
+    pacotes_de_requirements,
+)
 
 # Só o mapeamento módulo -> pacote, que não está em lado nenhum senão aqui: os
 # nomes a instalar vêm de requirements.txt (ver pacotes_de_requirements), para
@@ -73,20 +80,33 @@ def verificar_pre_requisitos() -> None:
     print(f"  ✓ {n} bibliotecas em vendor/wheels/ ({mb:.0f} MB)")
 
 
-def verificar_integridade() -> None:
+def verificar_integridade(aceitar_sem_manifesto: bool = False) -> None:
     """Confere os SHA-256 das wheels contra o manifesto, antes de instalar.
 
     A cópia entre a máquina que preparou o pacote e a estação passa por uma
-    partilha de rede ou por uma pen: um ficheiro truncado ou alterado pelo
-    caminho é exactamente o que o manifesto existe para apanhar. Sem esta
-    verificação, o manifesto só serviria se alguém decidisse compará-lo à mão.
+    partilha de rede ou por uma pen: um ficheiro truncado pelo caminho é
+    exactamente o que o manifesto existe para apanhar. Sem esta verificação, o
+    manifesto só serviria se alguém decidisse compará-lo à mão.
+
+    O que isto garante é integridade, não autenticidade: o manifesto viaja
+    dentro da mesma pasta que verifica e não é assinado, pelo que não resiste a
+    quem altere as duas coisas de propósito. Ver ADR-0020.
     """
     print("== Integridade das bibliotecas")
     manifesto = WHEELS / "manifesto.json"
     if not manifesto.is_file():
-        print("  · sem manifesto.json — integridade não verificada "
-              "(pacote preparado por uma versão anterior do preparador)")
-        return
+        # Falha por omissão: um pacote sem manifesto não é verificável, e
+        # deixar passar em silêncio transformava a garantia em opcional. A
+        # saída explícita existe para pacotes preparados por versões antigas
+        # do preparador, e obriga quem a usa a saber o que está a dispensar.
+        if aceitar_sem_manifesto:
+            print("  · sem manifesto.json — integridade NÃO verificada, por "
+                  "indicação expressa (--aceitar-sem-manifesto)")
+            return
+        parar("não encontrei vendor/wheels/manifesto.json",
+              "voltar a preparar o pacote com scripts/preparar_pacote_offline.py, "
+              "ou, se o pacote for antigo e a origem for de confiança, repetir "
+              "com --aceitar-sem-manifesto")
     try:
         dados = json.loads(manifesto.read_text(encoding="utf-8"))
         registos = dados["wheels"]
@@ -103,6 +123,21 @@ def verificar_integridade() -> None:
             parar(f"a biblioteca {registo['ficheiro']} não corresponde ao manifesto",
                   "o ficheiro alterou-se ou corrompeu-se na cópia — repetir a "
                   "cópia de vendor/wheels/ a partir da origem")
+
+    # Ficheiros a mais são tão graves como ficheiros a menos: o pip resolve as
+    # dependências a partir de tudo o que estiver em --find-links, pelo que uma
+    # wheel que não conste do manifesto pode acabar instalada sem nunca ter
+    # sido conferida. Verificar só o que o manifesto lista deixava esse caminho
+    # aberto.
+    esperados = {registo["ficheiro"] for registo in registos}
+    intrusos = sorted(w.name for w in WHEELS.glob("*.whl")
+                      if w.name not in esperados)
+    if intrusos:
+        parar(f"há {len(intrusos)} ficheiro(s) em vendor/wheels/ fora do "
+              f"manifesto: {', '.join(intrusos)}",
+              "a pasta não é a que foi preparada — repetir a cópia de "
+              "vendor/wheels/ a partir da origem, sem acrescentar ficheiros")
+
     print(f"  ✓ {len(registos)} ficheiro(s) conferidos contra o manifesto")
 
 
@@ -135,6 +170,10 @@ def instalar() -> None:
     # faria o pip falhar sem necessidade.
     incluir_testes = bool(list(WHEELS.glob("pytest-*.whl")))
     pacotes = pacotes_de_requirements(incluir_testes)
+    # As mesmas constraints que fixaram a descarga fixam a instalação: sem
+    # elas, o pip escolheria de entre o que estivesse na pasta, e o pacote
+    # deixaria de instalar necessariamente as versões que o CI testou.
+    constraints = ficheiros_de_constraints(incluir_testes)
     if incluir_testes:
         print("  · o pacote inclui o pytest (suite de testes disponível)")
     comando = [
@@ -143,6 +182,7 @@ def instalar() -> None:
         "--find-links", str(WHEELS),        # só o que está nesta pasta
         "--disable-pip-version-check",
         "--no-cache-dir",
+        *argumentos_de_constraints(constraints),
         *pacotes,
     ]
     r = subprocess.run(comando, text=True, stdout=subprocess.PIPE,
@@ -185,13 +225,17 @@ def main() -> int:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--refazer", action="store_true",
                    help="apagar o .venv existente e instalar de novo")
+    p.add_argument("--aceitar-sem-manifesto", action="store_true",
+                   help="instalar mesmo sem manifesto.json, dispensando a "
+                        "conferência de integridade (só para pacotes antigos, "
+                        "de origem de confiança)")
     args = p.parse_args()
 
     print("Instalação offline da AppCCT")
     print(f"Pasta do projeto: {RAIZ}")
     print()
     verificar_pre_requisitos()
-    verificar_integridade()
+    verificar_integridade(args.aceitar_sem_manifesto)
     criar_venv(args.refazer)
     instalar()
     return confirmar()
