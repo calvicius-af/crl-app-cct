@@ -61,6 +61,29 @@ dito (`✗ não existe data/raw/bte/bte_<ano>/ com PDFs`). Só depois a aquisiç
 os 14 documentos, e aí o pipeline correu. Não há aqui defeito nenhum, e registá-lo como
 problema custaria tempo a quem viesse a investigar.
 
+As nove linhas "a confirmar" da nomeação também **não são problema**. Quatro dizem que há
+vários outorgantes do mesmo lado e que o nome usa o primeiro: é comportamento deliberado,
+documentado em `docs/dados/README.md` pelo PR #39, que escreve que "o aviso fica no
+relatório para confirmação, mas não há escolha a fazer entre outorgantes". As outras cinco
+são siglas derivadas por heurística, assinaladas precisamente para serem confirmadas por
+uma pessoa. O sistema está a fazer o que deve: a pedir confirmação, não a falhar.
+
+## Relação com o PR #39
+
+Parte do que este gate encontrou já tinha sido trabalhada na ronda anterior, no PR #39
+(*branch* `claude/sharp-ptolemy-e6ursw`, integrada em 2026-09-15 e entretanto apagada).
+Vale a pena registar o que lhe pertence, para que o histórico se leia:
+
+| O que o PR #39 fez | Como aparece neste gate |
+|---|---|
+| Correção UTF-8 nos subprocessos da app, mais os lançadores `.bat` | **Funcionou.** É a confirmação em máquina real descrita acima |
+| `docs/operacao/siglas.exemplo.csv` e a explicação de que o `siglas.csv` é local | **Metade do ISSUE-0011 já estava feita.** O que resta é o *traceback* cru e dizer onde pôr o ficheiro |
+| Documentou que, com vários outorgantes do mesmo lado, entra o primeiro no nome | Explica quatro das nove linhas "a confirmar" do teste, que **não são problema** |
+
+O PR #39 tocou `scripts/instalar_offline.bat` para fixar as variáveis de UTF-8. É o mesmo
+ficheiro envolvido no ISSUE-0009, mas o problema do caminho de rede não era conhecido
+nessa altura e nada no PR #39 o podia ter apanhado.
+
 ## A lição de método
 
 Seis dos sete problemas são de **primeira utilização**: não partem o código, partem a

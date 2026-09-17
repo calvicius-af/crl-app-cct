@@ -29,10 +29,19 @@ em inglês, que expõe caminhos internos. Todo o resto do projeto trata erros de
 com mensagem em português e uma seta a dizer o que fazer — este caminho escapou ao padrão.
 
 **O que não é defeito, mas confundiu.** O `siglas.csv` não existe no repositório de
-propósito: é conhecimento da equipa, criado localmente, como está documentado em
-`docs/dados/README.md:177-188`. O modelo existe e está versionado, em
-`docs/operacao/siglas.exemplo.csv`. A segunda tentativa falhou porque esse modelo está em
-`docs/operacao/` e não na raiz do projeto, que era de onde o comando corria.
+propósito: é conhecimento da equipa, criado localmente. Isto foi **decidido e documentado
+no PR #39** (2026-09-15), que acrescentou o modelo `docs/operacao/siglas.exemplo.csv` e
+escreveu em `docs/dados/README.md:177-188` que não existe um `siglas.csv` "oficial" para
+copiar. A segunda tentativa do teste falhou porque esse modelo está em `docs/operacao/` e
+o comando corria a partir da raiz do projeto.
+
+Ou seja, metade deste problema já foi resolvida noutra ronda, e bem. O que resta é mais
+estreito do que parece à primeira vista, e são duas coisas pequenas:
+
+1. o erro sai como *traceback* em vez de mensagem;
+2. a documentação diz que o ficheiro tem de ser criado, mas não diz **onde** o pôr, e o
+   exemplo em `docs/dados/README.md:188` usa `--siglas siglas.csv`, um caminho relativo
+   que só funciona se o ficheiro estiver na raiz — o que em lado nenhum está escrito.
 
 ## O que devia acontecer
 
@@ -57,6 +66,6 @@ Validar a existência em `main`, antes de chamar `carregar_siglas`, e usar o mes
 de erro dos outros módulos. A validação pertence a `main` e não a `carregar_siglas`, para
 que a função continue a poder ser usada em testes com caminhos construídos.
 
-Vale a pena, na mesma correção, rever o exemplo em `docs/dados/README.md:188`
-(`--siglas siglas.csv`): funciona se a pessoa copiar o modelo para a raiz, que é o que a
-mensagem de erro deve passar a dizer.
+Na mesma correção, dizer no `docs/dados/README.md` onde colocar o ficheiro, já que o
+exemplo da L188 assume a raiz do projeto sem o declarar. É a peça que faltou ao trabalho
+do PR #39, não um erro dele.
