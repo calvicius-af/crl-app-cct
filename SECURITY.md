@@ -61,13 +61,25 @@ As versões instaladas estão fixadas em `requirements/runtime.txt`, `requiremen
 declarar mínimos, para que a instalação local se mantenha leve. O procedimento de
 actualização está em [CONTRIBUTING.md](CONTRIBUTING.md), secção *Actualizar versões*.
 
-**Hashes de artefactos.** Foi avaliado usar `--require-hashes` no CI e concluiu-se que, para
-já, não compensa: obrigaria a fixar a árvore transitiva completa por plataforma, e a matriz
-cobre Linux e macOS em 3.11 e 3.12, o que multiplicaria os ficheiros a manter sem
-acrescentar garantia face ao que as *constraints* já dão (versões exactas, servidas pelo
-PyPI com TLS e com *integrity* verificada pelo pip). A recomendação mantém-se para uma
-**instalação institucional fechada**: gerar aí um ficheiro com hashes por plataforma,
-incluindo a árvore do Docling, e instalar com `--require-hashes --no-deps`.
+**Hashes de artefactos.** A prova de integridade por hashes já existe neste projeto, no
+pacote offline: `scripts/preparar_pacote_offline.py` calcula o SHA-256 de cada *wheel* e
+escreve `vendor/wheels/MANIFESTO.txt` e `vendor/wheels/manifesto.json`;
+`scripts/instalar_offline.py` recalcula todos os hashes e recusa instalar se um ficheiro
+faltar ou não corresponder. O procedimento está em
+[`docs/institucional/instalacao-offline.md`](docs/institucional/instalacao-offline.md).
+
+No CI não se usa `--require-hashes`, por decisão registada no
+[ADR-0020](docs/adr/0020-integridade-dos-artefactos-de-instalacao.md): obrigaria a fixar a
+árvore transitiva por plataforma para as quatro combinações da matriz, e a garantia que
+acrescenta (bytes idênticos) não é a que falta ao CI (versões conhecidas), que as
+*constraints* já dão.
+
+O mesmo ADR regista três lacunas conhecidas, para que não sejam tomadas por resolvidas: o
+preparador do pacote offline lê `requirements.txt`, que declara mínimos, e não as
+*constraints*, pelo que um pacote preparado hoje pode trazer versões diferentes das
+testadas; a ausência de `manifesto.json` faz o instalador avisar em vez de parar; e o
+manifesto prova que os bytes não mudaram desde a preparação, não que correspondem ao que o
+PyPI publicou.
 
 ## Auditoria de dependências
 
