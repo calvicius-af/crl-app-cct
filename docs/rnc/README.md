@@ -54,7 +54,7 @@ RNC_Dados_2026/
 │   │   ├── convencoes/          PRI/ SPE/ APU/   o pipeline lê daqui
 │   │   ├── portarias_extensao/
 │   │   └── acordos_adesao/
-│   └── externas/                DGERT, DGAEP, INE, CITE, Eurofound
+│   └── externas/                DGERT, DGAEP, INE, CITE, Eurofound, RAA, RAM
 ├── 2_processamento/             saídas automáticas da aplicação
 │   ├── texto/                   ver a nota em 3.1
 │   ├── precodificado/           ver a nota em 3.1
@@ -119,7 +119,7 @@ A árvore do RNC é o arquivo partilhado e de longa duração do projeto. A árv
 | `0_gestao/catalogo/` | escrito diretamente | `python -m cct.catalogo --saida …` |
 | `0_gestao/vocabularios/` | `vocabularios/` do repositório | versionado com o código (ver 7) |
 
-**Nota sobre `2_processamento/texto/` e `precodificado/`.** O `cct.pipeline_tema` vai do PDF ao QDPX numa só passagem e mantém o texto extraído e as anotações em memória. Não escreve ficheiros intermédios. As duas pastas existem na árvore para receberem esses ficheiros quando a aplicação passar a escrevê-los, e para receberem extrações feitas à mão durante um diagnóstico. Hoje ficam vazias, e isso está correto. As saídas persistentes de cada execução são `projeto.qdpx`, `sugestoes_peritas.xlsx`, `relatorio.txt` e `manifest.json`.
+**Nota sobre `2_processamento/texto/` e `precodificado/`.** O `cct.pipeline_tema` vai do PDF ao QDPX numa só passagem e mantém o texto extraído e as anotações em memória. Não escreve ficheiros intermédios. As duas pastas existem na árvore para receberem esses ficheiros quando a aplicação passar a escrevê-los, e para receberem extrações feitas à mão durante um diagnóstico. Hoje ficam vazias, e isso está correto. As saídas persistentes de cada execução são `projeto.qdpx`, `sugestoes_peritas.xlsx`, `relatorio.txt` e `manifest.json`. Ao promover uma execução para o arquivo, o QDPX recebe o nome do lote e o manifesto acompanha-o.
 
 Cada execução da aplicação é datada e descartável. O que fica no arquivo do RNC é a execução que gerou o QDPX importado no master, e o respetivo `manifest.json`, que regista o comando, o commit, as versões, os hashes das entradas e saídas, as contagens e os problemas encontrados.
 
@@ -157,6 +157,7 @@ Os dois esquemas de nome coexistem. Um corpus pode ter nomes de 2025 (`26_PR_003
 |---|---|---|
 | Índice BTE recebido | `AAAA_BTE_NN_indice.xlsx` | `2026_BTE_31_indice.xlsx` |
 | BTE completo | `AAAA_BTE_NN.pdf` | `2026_BTE_31.pdf` |
+| Lote QDPX | `RNC_AAAA_lote_NN.qdpx` | `RNC_2026_lote_03.qdpx` |
 | Export individual MAXQDA | `AAAA_{TEMA}_{INICIAIS}_AAAAMMDD.mqex` | `2026_C9-SALARIOS_AF_20270315.mqex` |
 | Projeto master | `RNC_Dados_AAAA_master.mqda` | `RNC_Dados_2026_master.mqda` |
 | Export por tema | `AAAA_{TEMA}_{CONTEUDO}_AAAAMMDD.xlsx` | `2026_C9-SALARIOS_segcod_20270401.xlsx` |
