@@ -611,9 +611,20 @@ def main(argv=None):
     if not registo.entradas:
         raise SystemExit(f"Registo vazio ({args.registo}) — correr primeiro "
                          "python -m cct.recolha")
+    # Validar aqui, e não dentro de `carregar_siglas`, para que a função
+    # continue a poder ser usada em testes com caminhos construídos. O
+    # `siglas.csv` é conhecimento da equipa e não vem no repositório (PR #39):
+    # a mensagem tem de dizer isso, porque um traceback não o diria.
     tabela: dict[str, str] = {}
     for caminho in args.siglas:
-        for nome, s in carregar_siglas(Path(caminho)).items():
+        caminho = Path(caminho)
+        if not caminho.is_file():
+            raise SystemExit(
+                f"PAROU AQUI: não encontrei o ficheiro de siglas '{caminho}'\n"
+                "  → o siglas.csv é conhecimento da equipa e não vem no\n"
+                "    repositório: copiar docs/operacao/siglas.exemplo.csv\n"
+                "    para a raiz do projeto, editar, e repetir")
+        for nome, s in carregar_siglas(caminho).items():
             tabela.setdefault(nome, s)      # o primeiro ficheiro ganha
     voc_ambito = (mod_ambito.carregar_vocabulario(Path(args.ambitos))
                   if args.ambitos else mod_ambito.carregar_vocabulario())
