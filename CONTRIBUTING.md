@@ -56,6 +56,9 @@ assim?"* e a resposta não estiver no código, é um ADR.
 
 # nada de dados, credenciais ou segredos a escapar
 python scripts/verificar_seguranca.py --verboso
+
+# nada de links ou caminhos documentais quebrados (nem sensíveis a maiúsculas/minúsculas)
+python scripts/verificar_referencias.py --verboso
 ```
 
 `scripts/verificar_seguranca.py` é a mesma barreira que corre no CI (job
@@ -75,6 +78,12 @@ instalar nada. Faz quatro verificações sobre os ficheiros versionados:
 
 Se um ficheiro novo em `examples/` for deliberado, acrescenta o padrão à
 `ALLOWLIST_EXAMPLES` do script, no mesmo commit — é essa a revisão.
+
+`scripts/verificar_referencias.py` corre a par, também localmente e no CI
+(job *segurança*): apanha links Markdown locais e caminhos de documentação em
+código Python que apontem para um destino inexistente, incluindo o caso
+traiçoeiro de um destino que só existe com outra caixa (passa em
+macOS/Windows, falha em Linux).
 
 Nunca versionar: PDFs do BTE fora de `examples/`, exports do MaxQDA, ficheiros `.mqda`,
 resultados de corridas. O `.gitignore` cobre isto, mas convém confirmar — sobretudo antes
@@ -133,9 +142,10 @@ A instalação institucional não passa por aqui: passa pelo pacote offline, que
 verifica o SHA-256 de cada *wheel* antes de instalar — ver
 [`docs/institucional/instalacao-offline.md`](docs/institucional/instalacao-offline.md)
 e o [ADR-0020](docs/adr/0020-integridade-dos-artefactos-de-instalacao.md).
-Atenção a uma incoerência conhecida e ainda por fechar: o preparador do pacote
-offline lê `requirements.txt`, que declara mínimos, e não as *constraints*, pelo
-que um pacote preparado hoje pode trazer versões diferentes das que o CI testou.
+O pacote offline é preparado e instalado com estas mesmas *constraints*, pelo que
+uma estação institucional recebe as versões que o CI testou. Se acrescentares um
+ficheiro de *constraints* novo, liga-o também a `ficheiros_de_constraints` em
+`scripts/preparar_pacote_offline.py`, senão as duas vias divergem em silêncio.
 
 ## Mensagens de commit
 

@@ -45,7 +45,7 @@ def test_alvo_invalido_levanta_value_error(texto):
 
 # ---------- comando pip download ----------
 
-def _capturar_comando(monkeypatch, tmp_path, alvos):
+def _capturar_comando(monkeypatch, tmp_path, alvos, constraints=None):
     """Corre descarregar() sem rede, devolvendo os comandos que teria corrido."""
     comandos = []
 
@@ -60,7 +60,7 @@ def _capturar_comando(monkeypatch, tmp_path, alvos):
     monkeypatch.setattr(preparar_pacote_offline, "DESTINO", tmp_path / "wheels")
     monkeypatch.setattr(preparar_pacote_offline, "RAIZ", tmp_path)
     monkeypatch.setattr(preparar_pacote_offline.subprocess, "run", falso_run)
-    preparar_pacote_offline.descarregar(alvos, ["pdfplumber>=0.11"])
+    preparar_pacote_offline.descarregar(alvos, ["pdfplumber>=0.11"], constraints)
     return comandos
 
 
@@ -78,6 +78,45 @@ def test_um_comando_por_alvo(monkeypatch, tmp_path):
         monkeypatch, tmp_path, [("win_amd64", "311"), ("win_amd64", "312")])
     assert len(comandos) == 2
     assert [c[c.index("--abi") + 1] for c in comandos] == ["cp311", "cp312"]
+
+
+def test_pip_download_aplica_as_constraints(monkeypatch, tmp_path):
+    """Sem constraints o pacote traria a versão mais recente, não a testada."""
+    fixacao = tmp_path / "runtime.txt"
+    fixacao.write_text("pdfplumber==0.11.10\n", encoding="utf-8")
+    comando = _capturar_comando(monkeypatch, tmp_path, [("win_amd64", "311")],
+                                constraints=[fixacao])[0]
+    assert "-c" in comando
+    assert comando[comando.index("-c") + 1] == str(fixacao)
+    # As constraints têm de vir antes dos pacotes, como qualquer opção do pip.
+    assert comando.index("-c") < comando.index("pdfplumber>=0.11")
+
+
+def test_constraints_em_falta_param_com_erro_claro(monkeypatch, tmp_path):
+    monkeypatch.setattr(preparar_pacote_offline, "CONSTRAINTS_RUNTIME",
+                        tmp_path / "nao-existe.txt")
+    with pytest.raises(SystemExit):
+        preparar_pacote_offline.ficheiros_de_constraints(False)
+
+
+def test_manifesto_regista_as_constraints_usadas(monkeypatch, tmp_path):
+    """Uma auditoria tem de poder dizer contra que versões o pacote foi feito."""
+    destino = tmp_path / "wheels"
+    destino.mkdir(parents=True)
+    (destino / "exemplo-1.0-py3-none-any.whl").write_bytes(b"conteudo")
+    fixacao = tmp_path / "requirements" / "runtime.txt"
+    fixacao.parent.mkdir(parents=True)
+    fixacao.write_text("pdfplumber==0.11.10\n", encoding="utf-8")
+    monkeypatch.setattr(preparar_pacote_offline, "DESTINO", destino)
+    monkeypatch.setattr(preparar_pacote_offline, "RAIZ", tmp_path)
+
+    preparar_pacote_offline.escrever_manifesto([("win_amd64", "311")], [fixacao])
+    dados = json.loads((destino / "manifesto.json").read_text(encoding="utf-8"))
+
+    assert dados["schema_version"] == 2
+    assert [c["ficheiro"] for c in dados["constraints"]] == [
+        "requirements/runtime.txt"]
+    assert len(dados["constraints"][0]["sha256"]) == 64
 
 
 def test_pasta_e_recriada_a_cada_corrida(monkeypatch, tmp_path):
@@ -131,12 +170,33 @@ def test_integridade_deteta_wheel_em_falta(monkeypatch, tmp_path):
         instalar_offline.verificar_integridade()
 
 
-def test_sem_manifesto_avisa_mas_nao_para(monkeypatch, tmp_path, capsys):
-    """Pacotes preparados por versões anteriores não têm manifesto.json."""
+def test_integridade_deteta_wheel_a_mais(monkeypatch, tmp_path):
+    """Uma wheel fora do manifesto podia ser instalada sem ser conferida.
+
+    O pip resolve as dependências a partir de tudo o que está em --find-links,
+    não só do que o manifesto lista.
+    """
+    wheels, _ = _preparar_wheels(monkeypatch, tmp_path)
+    (wheels / "intrusa-9.9-py3-none-any.whl").write_bytes(b"nao-conferida")
+    with pytest.raises(SystemExit):
+        instalar_offline.verificar_integridade()
+
+
+def test_sem_manifesto_para(monkeypatch, tmp_path):
+    """Um pacote sem manifesto não é verificável, logo não se instala."""
     wheels, _ = _preparar_wheels(monkeypatch, tmp_path)
     (wheels / "manifesto.json").unlink()
-    instalar_offline.verificar_integridade()
-    assert "não verificada" in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        instalar_offline.verificar_integridade()
+
+
+def test_sem_manifesto_com_saida_explicita_avisa_mas_nao_para(
+        monkeypatch, tmp_path, capsys):
+    """A saída existe para pacotes antigos, e obriga a dizê-lo por escrito."""
+    wheels, _ = _preparar_wheels(monkeypatch, tmp_path)
+    (wheels / "manifesto.json").unlink()
+    instalar_offline.verificar_integridade(aceitar_sem_manifesto=True)
+    assert "NÃO verificada" in capsys.readouterr().out
 
 
 def test_manifesto_ilegivel_para(monkeypatch, tmp_path):

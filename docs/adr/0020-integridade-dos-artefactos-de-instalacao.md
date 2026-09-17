@@ -60,25 +60,30 @@ Em concreto:
    tal como já acontece nos manifestos de corrida do ADR-0014. Não se introduz
    um segundo mecanismo.
 
-Ficam reconhecidas três lacunas, que são trabalho identificado e não decisão
-adiada:
+4. **`--require-hashes` também não entra no pacote offline.** Seria possível:
+   o preparador tem todas as *wheels* e podia gerar um ficheiro de requisitos
+   com um `--hash` por distribuição. Mas esse ficheiro viajaria na mesma pasta,
+   com a mesma raiz de confiança do manifesto, pelo que trocaria quem faz a
+   verificação sem tornar a verificação mais forte. O único buraco concreto que
+   cobriria — uma *wheel* presente na pasta mas ausente do manifesto, que o pip
+   podia resolver como dependência sem nunca ter sido conferida — passou a ser
+   fechado directamente: o instalador recusa qualquer `.whl` fora do manifesto.
+   Reavalia-se quando a lacuna de autenticidade estiver fechada, porque é aí
+   que `--require-hashes` passaria a acrescentar alguma coisa.
 
-1. O preparador do pacote offline lê `requirements.txt`, que declara mínimos.
-   Um pacote preparado hoje pode, por isso, trazer versões diferentes das que o
-   CI testou. As *constraints* introduzidas pelo issue #30 ainda não estão
-   ligadas a este caminho.
-2. A ausência de `manifesto.json` faz o instalador avisar e continuar, em vez de
-   parar. A tolerância existe para pacotes preparados por versões anteriores do
-   preparador, mas transforma a garantia em opcional.
-3. O manifesto não prova que os bytes correspondem ao que o PyPI publicou. É
-   precisamente isso que `--require-hashes` acrescentaria, e é a razão para o
-   reavaliar dentro do pacote offline, onde o custo por plataforma já foi pago.
-4. O manifesto não é autenticado. Está na mesma pasta que as *wheels* e o
-   instalador confia no hash que ele próprio traz, pelo que quem adultere uma
-   *wheel* pode adulterar o manifesto no mesmo gesto. Afirmar aprovação
-   institucional dos bytes exige autenticar o manifesto ou distribuí-lo por um
-   canal independente do conjunto que verifica: assinatura, ou um SHA-256 do
-   próprio manifesto comunicado à parte e conferido à chegada.
+Das quatro lacunas reconhecidas na primeira redacção deste ADR, três ficaram
+fechadas e uma continua aberta, com o trabalho a ser seguido no issue #56:
+
+| Lacuna | Estado |
+|---|---|
+| O preparador lê `requirements.txt`, com mínimos, e não as *constraints* | **Fechada.** `preparar_pacote_offline.py` e `instalar_offline.py` aplicam `-c requirements/runtime.txt`, mais `dev.txt` quando o pacote inclui o pytest. O manifesto regista que *constraints* foram usadas, e o SHA-256 de cada uma |
+| A ausência de `manifesto.json` faz o instalador avisar e continuar | **Fechada.** Passou a parar. A saída explícita `--aceitar-sem-manifesto` existe para pacotes preparados por versões anteriores, e obriga quem a usa a declarar o que está a dispensar |
+| Uma *wheel* fora do manifesto podia ser instalada sem ser conferida | **Fechada.** O instalador compara a pasta com o manifesto nos dois sentidos, e recusa ficheiros a mais tal como recusa ficheiros a menos |
+| O manifesto não é autenticado | **Aberta.** Está na mesma pasta que as *wheels* e o instalador confia no hash que ele próprio traz, pelo que quem adultere uma *wheel* pode adulterar o manifesto no mesmo gesto. Fechá-la exige assinatura, com a gestão de chaves que implica, ou o SHA-256 do próprio manifesto comunicado por um canal independente e conferido à chegada. É uma decisão institucional, não técnica |
+
+Enquanto a última linha desta tabela estiver aberta, a garantia que o pacote
+offline dá é **integridade**, não autenticidade, e é assim que deve ser descrita
+em qualquer documento ou resposta a auditoria.
 
 ## Alternativas consideradas
 

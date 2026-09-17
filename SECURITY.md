@@ -80,13 +80,15 @@ No CI não se usa `--require-hashes`, por decisão registada no
 acrescenta (bytes idênticos) não é a que falta ao CI (versões conhecidas), que as
 *constraints* já dão.
 
-O mesmo ADR regista três lacunas conhecidas, para que não sejam tomadas por resolvidas: o
-preparador do pacote offline lê `requirements.txt`, que declara mínimos, e não as
-*constraints*, pelo que um pacote preparado hoje pode trazer versões diferentes das
-testadas; a ausência de `manifesto.json` faz o instalador avisar em vez de parar; o
-manifesto não prova que os bytes correspondem ao que o PyPI publicou; e o manifesto não é
-autenticado, o que é a lacuna a fechar antes de se poder afirmar, perante uma auditoria,
-que os bytes instalados são os aprovados.
+Das lacunas que esse ADR identificou, ficaram fechadas as que dependiam só de código: o
+preparador e o instalador aplicam agora as *constraints*, pelo que a estação recebe as
+versões que o CI testou; um pacote sem `manifesto.json` deixou de instalar, salvo saída
+explícita; e uma *wheel* que esteja na pasta sem constar do manifesto faz parar, porque o
+pip a resolveria como dependência sem nunca a ter conferido.
+
+Continua aberta a que não depende de código: **o manifesto não é autenticado**. É a lacuna
+a fechar antes de se poder afirmar, perante uma auditoria, que os bytes instalados são os
+aprovados. Até lá, a garantia a declarar é integridade. O seguimento está no issue #56.
 
 ## Auditoria de dependências
 
