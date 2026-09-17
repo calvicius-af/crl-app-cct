@@ -118,16 +118,13 @@ apareceu como texto plano (`Níveis | Escalão 1 | Escalão 2`) — o MaxQDA
 ignora o `richTextPath` na importação REFI-QDA e usa só o
 `plainTextPath`. As codificações ancoraram (marcas na margem), o que
 confirma que o TXT continua a ser a única representação que conta.
-Consequência: a legibilidade tem de ser conquistada DENTRO do texto
-plano — pontos 1-3 desta issue (regex `#+`, colapso de células de
-colspan, linha em branco na exportação) passam a ser o teto do que é
-possível com TextSource.
 
-Se o teste falhar (falhou), alternativa máxima: `PDFSource` com o PDF original
-(o MaxQDA mostra o layout perfeito), mas as seleções passam a
-retângulos por página (`PDFSelection`) — o docling fornece as bbox de
-cada item, porém obrigaria a repensar o harness e as anotações, hoje
-todos por offsets de caracteres. Só a considerar se o DOCX não resultar.
-
-Relacionada com a limitação já conhecida das tabelas partidas na mudança
-de página (merge por continuação sem cabeçalho, AguasNorte G-M).
+**RECONFIRMAÇÃO (2026-09-17, utilizador):** a prova foi repetida numa
+importação recente e o resultado é o mesmo — o documento continuou a
+aparecer com o formato MD/texto plano do `plainTextPath`, nunca com a
+grelha DOCX. A via richtext está encerrada por via experimental em duas
+rodadas independentes. A representação de tabelas aceite no MaxQDA é o
+formato pipe (`célula | célula`) isolado por linhas em branco — o caminho
+da Fase 3 do plano de extração de tabelas de 2026-09-17 afina apenas esse
+formato (deteção robusta de blocos em `qdpx.py`), sem voltar a tocar na
+hipótese richtext.

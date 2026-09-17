@@ -12,8 +12,17 @@ matéria depois da nota de depósito legal.
 import re
 
 # nota de depósito do art. 494.º CT: fecha SEMPRE uma convenção publicada
-# ("Depositado em 23 de janeiro…", "Depositado a 17 de julho…")
+# ("Depositado em 23 de janeiro…", "Depositado a 17 de julho…"). Pode vir
+# colada à assinatura na mesma linha ("…Rosa Depositado a 7 de agosto…"),
+# porque o extrator une a assinatura e a nota que o PDF traz seguidas.
 RE_DEPOSITO = re.compile(r"^Depositad[oa]\s+(?:em|a)\s+\d", re.IGNORECASE)
+RE_DEPOSITO_MID = re.compile(
+    r"^.*\bDepositad[oa]\s+(?:em|a)\s+\d", re.IGNORECASE)
+# retificações: publicam a correção de outra convenção e referem-se ao
+# depósito desta — não têm nota de depósito própria (AE-ALT-RECT no
+# registo; confirmação do utilizador na importação MaxQDA de 2026-09-17)
+RE_RETIFICACAO = re.compile(
+    r"\bRECT\b|[-–]RECT$|retifica", re.IGNORECASE)
 # "( Revogado. )" fecha a frase tanto como "Revogado." — o fecho pode
 # vir separado por espaços
 RE_FRASE_FECHADA = re.compile(r"[.!?][\s)\]»”\"']*$")
@@ -41,12 +50,21 @@ def clausulas_sem_corpo(doc: dict, texto: str) -> list[str]:
     return falhas
 
 
-def deposito_no_fim(texto: str) -> str | None:
-    """Verifica que a nota de depósito legal fecha o documento."""
+def deposito_no_fim(texto: str, e_retificacao: bool = False) -> str | None:
+    """Verifica que a nota de depósito legal fecha o documento.
+
+    Retificações (confirmação de 2026-09-17): não têm nota de depósito
+    própria — referem-se ao depósito da convenção que retificam. O
+    subtipo AE-ALT-RECT (ou equivalente) desliga o controlo.
+    """
     linhas = [l.strip() for l in texto.split("\n") if l.strip()]
     if not linhas:
         return "documento vazio"
-    posicao = next((i for i, l in enumerate(linhas) if RE_DEPOSITO.match(l)), None)
+    if e_retificacao:
+        return None
+    # a nota pode vir colada à assinatura ("Rosa Depositado a 7…")
+    posicao = next((i for i, l in enumerate(linhas)
+                     if RE_DEPOSITO.match(l) or RE_DEPOSITO_MID.match(l)), None)
     if posicao is None:
         return "sem nota de depósito (art. 494.º CT) — documento truncado?"
     restantes = len(linhas) - posicao - 1
@@ -58,8 +76,15 @@ def deposito_no_fim(texto: str) -> str | None:
 
 def verificar(doc: dict, texto: str) -> list[str]:
     """Todos os controlos; devolve a lista de avisos (vazia = tudo bem)."""
+    from .auditoria import tabelas_esperadas
+
     avisos = []
-    aviso = deposito_no_fim(texto)
+    # retificação: pelo subtipo do schema ou pelo tipo IRCT do registo
+    # (AE-ALT-RECT etc.), que o pipeline põe no doc como 'tipo_registo'
+    e_retificacao = bool(
+        RE_RETIFICACAO.search(doc.get("subtipo", ""))
+        or RE_RETIFICACAO.search(doc.get("tipo_registo", "")))
+    aviso = deposito_no_fim(texto, e_retificacao=e_retificacao)
     if aviso:
         avisos.append(aviso)
     vazias = clausulas_sem_corpo(doc, texto)
@@ -67,4 +92,8 @@ def verificar(doc: dict, texto: str) -> list[str]:
         avisos.append(f"{len(vazias)} cláusula(s)/artigo(s) sem corpo válido: "
                       + "; ".join(vazias[:5])
                       + (" …" if len(vazias) > 5 else ""))
+    sem_tabela = tabelas_esperadas(doc, texto)
+    if sem_tabela:
+        avisos.extend(sem_tabela[:5]
+                      + (["…"] if len(sem_tabela) > 5 else []))
     return avisos

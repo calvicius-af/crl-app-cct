@@ -12,6 +12,7 @@ SUBTIPOS = [
     "revisao_parcial",
     "revisao_parcial_com_consolidado",
     "texto_consolidado",
+    "retificacao",        # AE-ALT-RECT / CCT-ALT-RECT no registo BTE
     "desconhecido",
 ]
 
