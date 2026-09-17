@@ -127,9 +127,15 @@ mão, actualiza também o comentário.
 
 Só `docling-core` é que está fixado sem a sua árvore transitiva: é uma
 dependência opcional, fora da instalação base, e fixar toda a árvore traria
-dezenas de pacotes que o produto não distribui. Para uma instalação
-institucional fechada, essa árvore deve ser inventariada e fixada à parte, com
-`--require-hashes` — ver [SECURITY.md](SECURITY.md).
+dezenas de pacotes que o produto não distribui.
+
+A instalação institucional não passa por aqui: passa pelo pacote offline, que já
+verifica o SHA-256 de cada *wheel* antes de instalar — ver
+[`docs/institucional/instalacao-offline.md`](docs/institucional/instalacao-offline.md)
+e o [ADR-0020](docs/adr/0020-integridade-dos-artefactos-de-instalacao.md).
+Atenção a uma incoerência conhecida e ainda por fechar: o preparador do pacote
+offline lê `requirements.txt`, que declara mínimos, e não as *constraints*, pelo
+que um pacote preparado hoje pode trazer versões diferentes das que o CI testou.
 
 ## Mensagens de commit
 
