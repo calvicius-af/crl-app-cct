@@ -8,8 +8,8 @@ do MaxQDA) lê o nome do ficheiro.
 import pytest
 
 from cct.localizador import interpretar_doc_id
-from cct.nomeacao import (MAX_NOME, MAX_SIGLA, carregar_siglas, e_sindical, nome_documento,
-                          nomear, separar_outorgantes, sigla)
+from cct.nomeacao import (MAX_NOME, MAX_SIGLA, carregar_siglas, e_sindical, main,
+                          nome_documento, nomear, separar_outorgantes, sigla)
 from cct.recolha import Registo, recolher
 
 from .test_recolha import URL, AbridorFalso, escrever_indice
@@ -78,6 +78,32 @@ def test_tabela_de_siglas_sobrepoe_se_a_derivacao(tmp_path):
     tabela = carregar_siglas(csv)
     s, aviso = sigla("Empresa Metropolitana de Estacionamento da Maia, EM", tabela)
     assert (s, aviso) == ("EMEMaia", None)
+
+
+def test_siglas_inexistentes_param_com_mensagem(registo_com_recolha, tmp_path):
+    """ISSUE-0011: ficheiro inexistente dá mensagem, não traceback.
+
+    O `siglas.csv` não vem no repositório de propósito — a mensagem tem de
+    dizer isso e apontar para o modelo, porque um `FileNotFoundError` não o
+    diria a quem opera a estação.
+    """
+    registo, _ = registo_com_recolha
+    with pytest.raises(SystemExit) as e:
+        main(["--registo", str(registo.caminho),
+             "--destino", str(tmp_path / "bte"),
+             "--siglas", str(tmp_path / "nao-existe.csv"), "--aplicar"])
+    saida = str(e.value)
+    assert "PAROU AQUI" in saida
+    assert "nao-existe.csv" in saida
+    assert "siglas.exemplo.csv" in saida
+    assert "não vem no" in saida
+
+
+def test_siglas_vazias_continuam_a_funcionar(registo_com_recolha, tmp_path):
+    """Sem `--siglas` o caminho tradicional (derivação com avisos) segue."""
+    registo, _ = registo_com_recolha
+    assert main(["--registo", str(registo.caminho),
+                 "--destino", str(tmp_path / "bte")]) == 0
 
 
 # ------------------------------------------------------------- lados da mesa

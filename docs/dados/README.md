@@ -182,7 +182,9 @@ entidade por linha, cabeçalho opcional):
 
 [`siglas.exemplo.csv`](../operacao/siglas.exemplo.csv)
 
-Para fixar os casos que a equipa quer decididos de uma vez por todas:
+Para fixar os casos que a equipa quer decididos de uma vez por todas — o ficheiro
+vive na **raiz do projeto** (é esse o caminho que o exemplo abaixo assume; noutro
+sítio, indicar o caminho relativo a partir da raiz):
 
 ```bash
 python -m cct.nomeacao --siglas siglas.csv --aplicar     # ficheiro 'nome;sigla' por linha
