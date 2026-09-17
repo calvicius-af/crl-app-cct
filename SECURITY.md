@@ -69,10 +69,21 @@ faltar ou não corresponder. O procedimento está em
 [`docs/institucional/instalacao-offline.md`](docs/institucional/instalacao-offline.md).
 
 O que esta verificação garante, dito com precisão: **integridade**, isto é, que os ficheiros
-chegaram intactos desde a preparação, apanhando corrupção, truncagem e cópia incompleta.
-Não garante **autenticidade**: o manifesto viaja dentro da mesma pasta que verifica e não é
-assinado, pelo que quem consiga alterar uma *wheel* consegue reescrever o manifesto no mesmo
-gesto. A verificação não resiste, por isso, a adulteração deliberada.
+chegaram intactos desde a preparação, apanhando corrupção, truncagem e cópia incompleta. Não
+garante, por si só, **autenticidade**: o manifesto viaja dentro da mesma pasta que verifica e
+não é assinado, pelo que quem consiga escrever nessa pasta altera a *wheel* e o manifesto no
+mesmo gesto.
+
+A autenticidade é assegurada fora do instalador, por **controlo de acesso**: a pasta da
+partilha de rede onde o pacote é publicado tem escrita restrita a quem prepara o pacote e
+leitura para as estações, configurada pelo Instituto de Informática, que assegura a
+transferência dessa responsabilidade quando a pessoa que a detém deixar o organismo. A
+decisão, o que cobre e o que não cobre estão no
+[ADR-0020](docs/adr/0020-integridade-dos-artefactos-de-instalacao.md).
+
+A garantia a declarar, perante uma auditoria, é integridade verificada por hashes sobre um
+canal de distribuição com controlo de acesso. Não é prova criptográfica de autenticidade, e
+depende de essas permissões estarem efectivamente configuradas.
 
 No CI não se usa `--require-hashes`, por decisão registada no
 [ADR-0020](docs/adr/0020-integridade-dos-artefactos-de-instalacao.md): obrigaria a fixar a
@@ -86,9 +97,10 @@ versões que o CI testou; um pacote sem `manifesto.json` deixou de instalar, sal
 explícita; e uma *wheel* que esteja na pasta sem constar do manifesto faz parar, porque o
 pip a resolveria como dependência sem nunca a ter conferido.
 
-Continua aberta a que não depende de código: **o manifesto não é autenticado**. É a lacuna
-a fechar antes de se poder afirmar, perante uma auditoria, que os bytes instalados são os
-aprovados. Até lá, a garantia a declarar é integridade. O seguimento está no issue #56.
+A que não dependia de código, a autenticação do manifesto, foi fechada por decisão
+institucional: controlo de acesso à partilha, como descrito acima. As alternativas
+criptográficas foram ponderadas e rejeitadas por não serem operáveis com regularidade neste
+contexto, o que está fundamentado no ADR-0020.
 
 ## Auditoria de dependências
 
