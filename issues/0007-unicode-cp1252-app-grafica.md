@@ -53,8 +53,15 @@ alcance da correção da app.
 O último teste é o controlo negativo — sem a correção, o mesmo cenário falha
 com `UnicodeEncodeError`, o que garante que a reprodução continua fiel.
 
-## Por confirmar
+## Confirmação em máquina real (2026-09-17)
 
-Falta a validação em máquina real do CRL (critério de aceitação do #37): correr
-"Verificar instalação" e "Recolher do BTE…" numa estação com região portuguesa
-e confirmar que terminam sem traceback.
+O [gate de instalação numa estação do CRL](../docs/validacao/instalacao-estacao-crl-2026-09-17.md)
+exercitou o caso. Windows 11, Python 3.13.5, região portuguesa. O registo da app mostra
+`cct.aquisicao` ("Recolher do BTE…") e `cct.pipeline_tema` ("Correr pipeline") a correrem
+pela interface gráfica, portanto com o stdout ligado a um pipe, e a imprimirem `→` e `⚠`.
+Nenhum destes caracteres existe em cp1252. As duas acções terminaram com código 0, sem
+`UnicodeEncodeError`.
+
+Falta um pedaço do critério de aceitação do #37: a acção **"Verificar instalação"** não foi
+exercitada pela app — nesse teste, o `cct.doctor` correu no terminal, onde o problema não
+se manifesta. Basta clicar nesse botão dentro da aplicação para fechar o #37 sem margem.

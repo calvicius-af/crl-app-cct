@@ -22,6 +22,7 @@ Há duas formas de medir, e são complementares:
 | F3 | Triagem AUTO/REVER e árvore de códigos aninhada | [memos-peritas-4_08-v1.html](memos-peritas-4_08-v1.html) |
 | F4 | Consolidado, assinaturas, GUIDs do codebook master | [memos-peritas-4_08-v3.html](memos-peritas-4_08-v3.html) |
 | PR #23 | Docling opcional, ordem de leitura, spans, sanidade e offsets QDPX | [revisão técnica](../../issues/0004-revisao-pr-23.md) |
+| Instalação | Primeira instalação numa estação real do CRL: Windows 11, Python 3.13, projeto em unidade de rede | [instalacao-estacao-crl-2026-09-17.md](instalacao-estacao-crl-2026-09-17.md) |
 
 A validação visual do QDPX Docling final no MaxQDA continua pendente na
 [ISSUE-0003](../../issues/0003-qdpx-perde-ganhos-do-docling.md). Testes automáticos e
