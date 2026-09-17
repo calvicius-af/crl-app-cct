@@ -11,7 +11,7 @@ que está aqui → `0_gestao/vocabularios/`.
 
 ## Como se chamam os ficheiros
 Os PDF individuais seguem a convenção do
-[§5.1 do README](../README.md#51-a-regra) e estão em subpastas por **família** e
+[ponto 4.1 do README](../README.md#41-a-regra) e estão em subpastas por **família** e
 depois por **âmbito**:
 
 ```text
@@ -30,7 +30,7 @@ ficheiro aqui** — ficam como metadado da portaria correspondente, na coluna
 Só `convencoes/` entra no pipeline temático. Uma portaria de extensão refere-se
 a uma convenção mas não é uma: não tem o articulado que a codificação procura, e
 codificá-la como se tivesse dá números errados sem dar erro. Ver
-[§5.7 do README](../README.md#57-portarias-de-extensão-acordos-de-adesão-e-avisos).
+[ponto 4.6 do README](../README.md#46-famílias-documentais).
 
 Índices: `2026_BTE_31_indice.xlsx`. Boletins completos: `2026_BTE_31.pdf`.
 Fontes externas mantêm o nome de origem, com a data de recolha à frente:

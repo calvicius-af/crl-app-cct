@@ -92,4 +92,4 @@ Se um valor não está no vocabulário, **não se inventa** — acrescenta-se ao
 vocabulário, com data e responsável. É o que impede que «Teletrabalho»,
 «teletrabalho» e «Tele-trabalho» convivam como se fossem coisas diferentes.
 
-Contexto completo: [docs/rnc/README.md §8](../docs/rnc/README.md#8-vocabulários-controlados).
+Contexto completo: [docs/rnc/README.md, ponto 7](../docs/rnc/README.md#7-vocabulários-controlados).

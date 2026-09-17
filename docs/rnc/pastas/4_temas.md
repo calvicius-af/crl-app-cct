@@ -8,7 +8,7 @@ capítulo: os segmentos codificados, a matriz de códigos e um LEIAME com o
 **É a única pasta da árvore em que o tema aparece no nome**, e é deliberado:
 este é o ponto de entrega a pessoas externas, que recebem a sua pasta e não
 devem ter de navegar o resto. O porquê da regra geral está no
-[§6 do README](../README.md#6-os-temas--e-porque-não-estão-nas-pastas).
+[ponto 5 do README](../README.md#5-temas).
 
 ## O que não vive aqui
 O projeto MAXQDA de onde isto sai → `3_analise/master/`. Os capítulos que as

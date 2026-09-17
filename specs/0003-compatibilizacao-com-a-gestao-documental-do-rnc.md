@@ -175,11 +175,11 @@ mantida com aviso, não apagada.
   Correm offline, sem rede e sem dados locais.
 - **Verificação manual** — correr `python -m cct.catalogo` sobre o
   `BTE31_2026.xlsx` real e conferir os 14 nomes contra o índice publicado.
-  Resultados no §11 do [README do RNC](../docs/rnc/README.md#11-as-ferramentas).
+  Resultados no ponto 11.2 do [README do RNC](../docs/rnc/README.md#112-estado-verificado-bte-312026-14-documentos).
 - **Verificação das três tarefas bloqueantes** — a estabilidade do código IRCT
   foi verificada por cruzamento do índice com a folha «Negociação coletiva» do
   export da DGERT; o método e o resultado estão no
-  [§5.3](../docs/rnc/README.md#53-o-código-irct-é-estável-e-porquê).
+  [ponto 4.4](../docs/rnc/README.md#44-código-irct).
 
 ## Riscos
 
@@ -189,9 +189,9 @@ mantida com aviso, não apagada.
 | Uma sigla derivada pelo script entrar num nome como se fosse confirmada | A origem de cada sigla é declarada no vocabulário; as de origem `recurso` não são carregadas, e a nomeação recusa-se a escrever o ficheiro |
 | A lista do INE retirar do pipeline empresas públicas processáveis | As entradas com forma jurídica empresarial propõem SPE e nunca APU; os casos-armadilha estão fixados por nome em teste (ADR-0019) |
 | Uma portaria de extensão ser codificada como convenção | Família em pasta própria, coluna `processavel` no catálogo, e recusa do pipeline coberta por teste (ADR-0018) |
-| A leitura da relação portaria↔convenção estar errada | Está testada contra um índice de ensaio, não contra dados reais: fica assinalado no §5.7 do README do RNC e é a tarefa 3 do §10 |
+| A leitura da relação portaria↔convenção estar errada | Está testada contra um índice de ensaio, não contra dados reais: fica assinalado no ponto 4.6 do README do RNC e é a tarefa 3 do ponto 9 |
 | Um falso APU retirar um documento do pipeline sem ninguém dar por isso | A regra nunca decide APU em silêncio: sai sempre com aviso e `ambito_origem=regra` no catálogo |
 | Regerar o catálogo apagar trabalho humano | As cinco colunas da equipa são recuperadas pelo `nome_canonico`, e as linhas órfãs são mantidas com aviso; teste dedicado |
-| O dígito de família do código IRCT não ser o observado para ACT e portarias | Só se traduzem os dígitos verificados (`2` e `4`); os outros deixam `acto_negociacao` vazio em vez de produzirem uma junção errada. Tarefa 2 do §10 do README do RNC |
+| O dígito de família do código IRCT não ser o observado para ACT e portarias | Só se traduzem os dígitos verificados (`2` e `4`); os outros deixam `acto_negociacao` vazio em vez de produzirem uma junção errada. Tarefa 2 do ponto 9 do README do RNC |
 | Duas pessoas atribuírem siglas diferentes à mesma organização | A desambiguação é por regra, determinística e independente da ordem; as siglas atribuídas são fixadas no vocabulário versionado (ADR-0017) |
 | Os dois esquemas de nome divergirem ao ponto de partirem o MaxQDA | Teste que verifica que todo o nome gerado é aceite pelo localizador e cabe em 63 caracteres |
