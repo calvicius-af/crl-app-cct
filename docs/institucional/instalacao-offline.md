@@ -132,9 +132,12 @@ passa a ser zero. Os pontos que uma auditoria interna tenderá a perguntar:
    [requisitos-tecnicos.md](requisitos-tecnicos.md) §3.
 2. **Integridade.** O `MANIFESTO.txt` regista o SHA-256 de cada ficheiro, e o
    `manifesto.json` guarda o mesmo em formato lido pela máquina. O instalador
-   confere todos os hashes automaticamente antes de instalar: uma wheel alterada
+   confere todos os hashes automaticamente antes de instalar: uma wheel corrompida
    ou truncada entre a preparação e a instalação faz o procedimento parar, com o
-   nome do ficheiro.
+   nome do ficheiro. Isto é integridade, não autenticidade: o manifesto segue
+   dentro da mesma pasta que verifica e não é assinado, pelo que não resiste a
+   quem altere as duas coisas de propósito — ver
+   [ADR-0020](../adr/0020-integridade-dos-artefactos-de-instalacao.md).
 3. **Momento da descarga.** Uma vez, numa máquina identificada, e não em cada
    estação.
 4. **Ausência de tráfego posterior.** A aplicação não faz pedidos de rede em

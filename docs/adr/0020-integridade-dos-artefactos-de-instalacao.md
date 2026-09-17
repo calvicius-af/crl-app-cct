@@ -20,7 +20,10 @@ ser deste ADR.
 calcula o SHA-256 de cada *wheel* e escreve `vendor/wheels/MANIFESTO.txt`,
 legível por pessoas, e `vendor/wheels/manifesto.json`, legível pela máquina. O
 `scripts/instalar_offline.py` recalcula todos os SHA-256 e recusa instalar se um
-ficheiro faltar ou não corresponder. O procedimento está descrito em
+ficheiro faltar ou não corresponder. **O que isto apanha é corrupção acidental e
+cópia incompleta**, não adulteração deliberada: o manifesto viaja dentro de
+`vendor/wheels/`, na mesma pasta que verifica, pelo que quem consiga alterar uma
+*wheel* consegue igualmente reescrever o manifesto. O procedimento está descrito em
 [`docs/institucional/instalacao-offline.md`](../institucional/instalacao-offline.md)
 e testado em `tests/test_pacote_offline.py`. Nada disto precisava de ser criado.
 
@@ -36,7 +39,7 @@ pergunta é *estamos a testar versões conhecidas?* Na estação institucional, 
 | Camada | Garante | Não garante |
 |---|---|---|
 | `requirements/*.txt` (constraints) | que o CI e uma release usam as versões exactas que foram testadas | que os bytes descarregados são os mesmos de uma corrida para a outra |
-| Manifesto SHA-256 do pacote offline | que os bytes instalados na estação são os que foram preparados e aprovados | que os bytes preparados correspondem ao que o PyPI publicou no momento da preparação |
+| Manifesto SHA-256 do pacote offline | que os bytes instalados na estação chegaram intactos desde a preparação, apanhando corrupção, truncagem e cópia incompleta | autenticidade: o manifesto viaja com as *wheels* e não é autenticado, pelo que não resiste a adulteração deliberada, nem prova o que o PyPI publicou |
 | `--require-hashes` do pip | ambas as anteriores, em qualquer instalação | nada além disso, e ao custo de fixar a árvore transitiva por plataforma |
 
 ## Decisão
@@ -49,8 +52,10 @@ Em concreto:
 1. O CI instala com `-c requirements/runtime.txt -c requirements/dev.txt`. Não
    usa `--require-hashes` nem ficheiros de hashes por plataforma.
 2. A instalação institucional continua a passar pelo par
-   `preparar_pacote_offline.py` e `instalar_offline.py`, cuja verificação de
-   SHA-256 é a prova de integridade que vale para uma estação.
+   `preparar_pacote_offline.py` e `instalar_offline.py`. A verificação de
+   SHA-256 é uma prova de **integridade**, contra corrupção e cópia incompleta.
+   Não é uma prova de **autenticidade**, e não deve ser apresentada como tal em
+   nenhum documento nem perante uma auditoria.
 3. O algoritmo é SHA-256 em todo o projeto, através de `cct/proveniencia.py`,
    tal como já acontece nos manifestos de corrida do ADR-0014. Não se introduz
    um segundo mecanismo.
@@ -65,10 +70,15 @@ adiada:
 2. A ausência de `manifesto.json` faz o instalador avisar e continuar, em vez de
    parar. A tolerância existe para pacotes preparados por versões anteriores do
    preparador, mas transforma a garantia em opcional.
-3. O manifesto prova que os bytes não mudaram entre a preparação e a instalação.
-   Não prova que correspondem ao que o PyPI publicou. É precisamente isso que
-   `--require-hashes` acrescentaria, e é a razão para o reavaliar dentro do
-   pacote offline, onde o custo por plataforma já foi pago.
+3. O manifesto não prova que os bytes correspondem ao que o PyPI publicou. É
+   precisamente isso que `--require-hashes` acrescentaria, e é a razão para o
+   reavaliar dentro do pacote offline, onde o custo por plataforma já foi pago.
+4. O manifesto não é autenticado. Está na mesma pasta que as *wheels* e o
+   instalador confia no hash que ele próprio traz, pelo que quem adultere uma
+   *wheel* pode adulterar o manifesto no mesmo gesto. Afirmar aprovação
+   institucional dos bytes exige autenticar o manifesto ou distribuí-lo por um
+   canal independente do conjunto que verifica: assinatura, ou um SHA-256 do
+   próprio manifesto comunicado à parte e conferido à chegada.
 
 ## Alternativas consideradas
 
@@ -76,7 +86,7 @@ adiada:
 |---|---|
 | `--require-hashes` no CI, com ficheiros por plataforma | quatro combinações de sistema e versão, ficheiros gerados que ninguém revê, e a garantia que acrescenta (bytes idênticos) não é a que falta ao CI (versões conhecidas) |
 | Um segundo mecanismo de hashes só para dependências | já existe `cct/proveniencia.py`, usado pelos manifestos de corrida e pelo pacote offline; duplicar o mecanismo duplicaria os sítios onde se pode divergir |
-| Assinatura criptográfica dos pacotes | resolve uma ameaça que este projeto não tem: não há distribuição pública de binários nem terceiros a instalar a partir de uma origem nossa |
+| Assinatura criptográfica dos pacotes | é a resposta certa para a lacuna 4 e fica em aberto no issue de seguimento; não entra nesta decisão porque exige gestão de chaves e um procedimento de confiança que o CRL ainda não tem, e decidi-la à pressa aqui seria decidi-la mal |
 | Não fazer nada e deixar o issue #30 em aberto | a avaliação pedida ficou feita; deixar o issue aberto esconderia o que está decidido atrás do que falta implementar |
 
 ## Consequências
@@ -84,9 +94,11 @@ adiada:
 **Torna fácil:** explicar a uma auditoria onde está a prova de integridade e o
 que ela cobre, sem depender de quem escreveu o CI.
 
-**Torna difícil:** afirmar que uma instalação institucional usa exactamente as
-versões testadas pelo CI, enquanto a lacuna 1 não estiver fechada. Essa
-afirmação não deve ser feita até lá.
+**Torna difícil:** duas afirmações que ficam interditas até as lacunas fecharem.
+Que uma instalação institucional usa exactamente as versões testadas pelo CI,
+enquanto a lacuna 1 estiver aberta. E que os bytes instalados são
+comprovadamente os aprovados, enquanto a lacuna 4 estiver aberta: o que se pode
+dizer é que chegaram intactos.
 
 **Passa a ser obrigatório manter:** a coerência entre as *constraints* em
 `requirements/` e o que o preparador do pacote offline consome. Se uma delas
@@ -99,6 +111,7 @@ offline, que é o caminho institucional de qualquer modo.
 ## Revisitar quando
 
 Houver distribuição do produto a terceiros fora do CRL, ou quando uma exigência
-de auditoria pedir prova de que os artefactos instalados correspondem ao que o
-índice público publicou. Nessa altura, o sítio para aplicar `--require-hashes` é
-o pacote offline, não o CI.
+de auditoria pedir prova de autenticidade e não apenas de integridade. Nessa
+altura há duas peças a decidir em conjunto, e nenhuma delas no CI:
+`--require-hashes` dentro do pacote offline, para a lacuna 3, e a autenticação
+do manifesto, para a lacuna 4.

@@ -68,6 +68,12 @@ escreve `vendor/wheels/MANIFESTO.txt` e `vendor/wheels/manifesto.json`;
 faltar ou não corresponder. O procedimento está em
 [`docs/institucional/instalacao-offline.md`](docs/institucional/instalacao-offline.md).
 
+O que esta verificação garante, dito com precisão: **integridade**, isto é, que os ficheiros
+chegaram intactos desde a preparação, apanhando corrupção, truncagem e cópia incompleta.
+Não garante **autenticidade**: o manifesto viaja dentro da mesma pasta que verifica e não é
+assinado, pelo que quem consiga alterar uma *wheel* consegue reescrever o manifesto no mesmo
+gesto. A verificação não resiste, por isso, a adulteração deliberada.
+
 No CI não se usa `--require-hashes`, por decisão registada no
 [ADR-0020](docs/adr/0020-integridade-dos-artefactos-de-instalacao.md): obrigaria a fixar a
 árvore transitiva por plataforma para as quatro combinações da matriz, e a garantia que
@@ -77,9 +83,10 @@ acrescenta (bytes idênticos) não é a que falta ao CI (versões conhecidas), q
 O mesmo ADR regista três lacunas conhecidas, para que não sejam tomadas por resolvidas: o
 preparador do pacote offline lê `requirements.txt`, que declara mínimos, e não as
 *constraints*, pelo que um pacote preparado hoje pode trazer versões diferentes das
-testadas; a ausência de `manifesto.json` faz o instalador avisar em vez de parar; e o
-manifesto prova que os bytes não mudaram desde a preparação, não que correspondem ao que o
-PyPI publicou.
+testadas; a ausência de `manifesto.json` faz o instalador avisar em vez de parar; o
+manifesto não prova que os bytes correspondem ao que o PyPI publicou; e o manifesto não é
+autenticado, o que é a lacuna a fechar antes de se poder afirmar, perante uma auditoria,
+que os bytes instalados são os aprovados.
 
 ## Auditoria de dependências
 
