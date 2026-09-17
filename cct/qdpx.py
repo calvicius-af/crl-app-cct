@@ -51,17 +51,33 @@ def pontos_de_espacamento(texto: str, doc: dict) -> list[int]:
     Antes de cada cláusula/artigo/capítulo/secção/anexo e à volta de cada
     bloco de tabela (o texto canónico não tem linhas vazias — são elas
     que o estruturar descarta para garantir a propriedade zero-perda).
+
+    Uma linha isolada com " | " não é tabela: pode ser prosa com uma
+    barra vertical (listas de "X | Y" no corpo da cláusula). Exige-se um
+    bloco de ≥2 linhas consecutivas com separador, que é o padrão real
+    dos extratores (`célula | célula` por linha de grelha).
     """
     pontos = set()
     for no in doc.get("nos", []):
         if no.get("tipo") in _TIPOS_ESPACADOS and no.get("char_start", 0) > 0:
             pontos.add(no["char_start"])
+    # duas passagens: primeiro marcar as linhas de tabela (bloco ≥2),
+    # depois espaçar nas transições prosa↔tabela
+    linhas = texto.split("\n")
+    e_tabela = [False] * len(linhas)
+    for i, linha in enumerate(linhas):
+        e_tabela[i] = " | " in linha
+    # uma linha com " | " só é tabela se tiver vizinha igual (bloco ≥2)
+    for i, linha in enumerate(linhas):
+        if e_tabela[i] and not ((i > 0 and e_tabela[i - 1])
+                                or (i + 1 < len(linhas) and e_tabela[i + 1])):
+            e_tabela[i] = False
     pos, antes_era_tabela = 0, False
-    for linha in texto.split("\n"):
-        e_tabela = " | " in linha
-        if e_tabela != antes_era_tabela and pos > 0:
+    for i, linha in enumerate(linhas):
+        atual_e_tabela = e_tabela[i]
+        if atual_e_tabela != antes_era_tabela and pos > 0:
             pontos.add(pos)
-        antes_era_tabela = e_tabela
+        antes_era_tabela = atual_e_tabela
         pos += len(linha) + 1
     return sorted(pontos)
 

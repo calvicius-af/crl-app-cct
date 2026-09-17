@@ -79,6 +79,45 @@ def test_isola_o_bloco_de_tabela():
     assert "\n\nAssinaturas seguem-se" in saida
 
 
+# ---------- falsos positivos: prosa com " | " não é tabela ----------
+
+TEXTO_PROSA = ("Cláusula 21.ª - Retribuição\n"
+               "1- A retribuição consta do anexo I.\n"
+               "2- Os níveis | escalões constam de mapa anexo.\n"
+               "Cláusula 22.ª - Descanso diário\n"
+               "1- O trabalhador tem direito a onze horas.\n")
+
+
+def test_linha_isolada_com_pipe_nao_e_tabela():
+    """Uma linha de prosa com " | " não gera espaçamento de tabela.
+
+    Só um bloco de ≥2 linhas consecutivas com separador é tabela — o
+    padrão que os extratores produzem (uma linha por linha de grelha).
+    A linha "níveis | escalões" do TEXTO_PROSA está isolada entre prosa.
+    """
+    doc, texto = estruturar(TEXTO_PROSA, "teste")
+    pontos = pontos_de_espacamento(texto, doc)
+    # os pontos existem (há cláusulas), mas nenhum pode dever-se à
+    # linha com " | ": verificar que a linha não ganha isolamento
+    saida = espacar(texto, pontos)
+    # a linha com " | " não vem precedida de linha em branco
+    idx = saida.index("níveis | escalões")
+    assert not saida[:idx].endswith("\n\n")
+
+
+def test_bloco_de_duas_linhas_e_tabela():
+    """Duas linhas consecutivas com " | " formam bloco e são isoladas."""
+    texto_tab = ("Uma linha antes.\n"
+                 "Níveis | Escalão 1 | Escalão 2\n"
+                 "1 | 1 234,56 | 1 345,67\n"
+                 "Uma linha depois.\n")
+    doc = {"nos": []}
+    pontos = pontos_de_espacamento(texto_tab, doc)
+    saida = espacar(texto_tab, pontos)
+    assert "\n\nNíveis | Escalão 1" in saida
+    assert "\n\nUma linha depois" in saida
+
+
 def test_texto_canonico_intacto():
     # o espaçamento é só de apresentação: sem linhas vazias, é o mesmo texto
     doc, texto = _canonico()

@@ -37,6 +37,36 @@ def test_deteta_ausencia_do_deposito():
     assert aviso and "sem nota de depósito" in aviso
 
 
+# ---------- depósito colado à assinatura (ACRAL, BTE 31/2026) ----------
+
+def test_deposito_colado_a_assinatura_na_mesma_linha():
+    # o extrator une a assinatura e a nota seguidas numa só linha
+    texto = ("Texto da convenção.\n"
+             "Vânia Elisabete Serfaty Rosa Depositado a 7 de agosto de 2026, "
+             "a fl. 150 do livro n.º 13.\n")
+    assert deposito_no_fim(texto) is None
+
+
+# ---------- retificações (CARRISTUR, BTE 31/2026) ----------
+
+def test_retificacao_nao_exige_nota_de_deposito():
+    """AE-ALT-RECT: retifica outra convenção, o depósito é o dela."""
+    texto = ("Retifica o acordo de empresa publicado no BTE 30/2026.\n"
+             "1- O número anterior passa a ler-se como segue.\n")
+    assert deposito_no_fim(texto, e_retificacao=True) is None
+    # sem a bandeira, o aviso existe — é o comportamento clássico
+    assert deposito_no_fim(texto) is not None
+
+
+def test_verificar_respeita_subtipo_rect():
+    doc = {"subtipo": "retificacao", "nos": []}
+    texto = ("1- O número anterior passa a ler-se como segue.\n")
+    assert deposito_no_fim(texto, e_retificacao=True) is None
+    avisos = verificar(doc, texto)
+    # a retificação não gera aviso de depósito (pode gerar outros)
+    assert not any("depósito" in a for a in avisos)
+
+
 # ---------- cláusulas sem corpo ----------
 
 def test_clausula_vazia_e_detetada():

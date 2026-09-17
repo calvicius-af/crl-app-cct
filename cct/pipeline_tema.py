@@ -153,6 +153,36 @@ def main():
         from .extractor_docling import extrair_pdf_docling
         extrair = extrair_pdf_docling
 
+    # o subtipo pode vir das variáveis MaxQDA ou, em sua falta, do registo
+    # BTE — é o que diz se um documento é uma retificação (AE-ALT-RECT),
+    # e isso desliga o controlo da nota de depósito. O tipo do registo
+    # (código IRCT) traduz-se no subtipo do schema; o que não encaixa
+    # fica "desconhecido" e o tipo original viaja no doc para a sanidade.
+    SUBTIPOS_RETIFICACAO = ("CCT-RECT", "AE-RECT", "CCT-ALT-RECT", "AE-ALT-RECT")
+    tipo_do_registo: dict[str, str] = {}
+    REGISTO_OMISSAO = Path(__file__).resolve().parent.parent / "data" / "registo" / "registo_bte.jsonl"
+    if REGISTO_OMISSAO.exists():
+        import json as _json
+        for _linha in REGISTO_OMISSAO.read_text(encoding="utf-8").splitlines():
+            if not _linha.strip():
+                continue
+            try:
+                _e = _json.loads(_linha)
+                _doc = (_e.get("nomeacao") or {}).get("doc_id")
+                if _doc and _e.get("tipo"):
+                    tipo_do_registo.setdefault(_doc, _e["tipo"])
+            except ValueError:
+                continue
+
+    def _subtipo_do(doc_id: str, das_variaveis: str | None) -> tuple[str, str]:
+        """Subtipo do schema; o tipo IRCT viaja no doc como 'tipo_registo'."""
+        tipo = tipo_do_registo.get(doc_id, "")
+        if das_variaveis:
+            return das_variaveis, tipo
+        if tipo in SUBTIPOS_RETIFICACAO:
+            return "retificacao", tipo
+        return "desconhecido", tipo
+
     itens, problemas = [], []
     for i, pdf in enumerate(pdfs, 1):
         try:
@@ -160,11 +190,21 @@ def main():
             if variaveis:
                 from .variaveis import procurar
                 v = procurar(variaveis, pdf.stem)
-            doc, texto = extrair(pdf, doc_id=pdf.stem,
-                                 subtipo=(v or {}).get("subtipo", "desconhecido"))
+            subtipo, tipo_registo = _subtipo_do(pdf.stem, (v or {}).get("subtipo"))
+            doc, texto = extrair(pdf, doc_id=pdf.stem, subtipo=subtipo)
+            doc["tipo_registo"] = tipo_registo  # fora do schema: meta para sanidade
             validar_doc(doc)
             for aviso in verificar_sanidade(doc, texto):
                 problemas.append(f"{pdf.stem}: {aviso}")
+            # auditoria cruzada de tabelas: o que um extrator vê e o outro
+            # não — a perda silenciosa que motivou o guardião (2026-09-17).
+            # O canário de anexos sem tabela já vem na sanidade.
+            from .auditoria import (contar_blocos_tabela,
+                                   contar_tabelas_pdfplumber, divergencias)
+            n_texto = contar_blocos_tabela(texto)
+            n_pp = contar_tabelas_pdfplumber(pdf)
+            for aviso in divergencias(n_pp, n_texto):
+                problemas.append(f"{pdf.stem}: [auditoria] {aviso}")
             anot = codificar(doc, texto, codebook)
             if args.semantica:
                 from .semantico import codificar_semantico, backend_lmstudio
