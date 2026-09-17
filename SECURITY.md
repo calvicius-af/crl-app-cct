@@ -74,16 +74,16 @@ garante, por si só, **autenticidade**: o manifesto viaja dentro da mesma pasta 
 não é assinado, pelo que quem consiga escrever nessa pasta altera a *wheel* e o manifesto no
 mesmo gesto.
 
-A autenticidade é assegurada fora do instalador, por **controlo de acesso**: a pasta da
-partilha de rede onde o pacote é publicado tem escrita restrita a quem prepara o pacote e
-leitura para as estações, configurada pelo Instituto de Informática, que assegura a
-transferência dessa responsabilidade quando a pessoa que a detém deixar o organismo. A
-decisão, o que cobre e o que não cobre estão no
+A via decidida para a autenticidade fica fora do instalador, no **controlo de acesso**: a
+pasta da partilha de rede onde o pacote é publicado deve ter escrita restrita a quem prepara
+o pacote e leitura para as estações, configurada pelo Instituto de Informática, a quem cabe
+também transferir essa responsabilidade quando a pessoa que a detém deixar o organismo. A
+decisão, o que cobre, o que não cobre e o pré-requisito a confirmar estão no
 [ADR-0020](docs/adr/0020-integridade-dos-artefactos-de-instalacao.md).
 
-A garantia a declarar, perante uma auditoria, é integridade verificada por hashes sobre um
-canal de distribuição com controlo de acesso. Não é prova criptográfica de autenticidade, e
-depende de essas permissões estarem efectivamente configuradas.
+**Esse controlo ainda não está confirmado**, e é externo ao repositório: não há código,
+teste ou job de CI que o demonstre. Até haver confirmação escrita, com responsável e data, a
+garantia a declarar perante uma auditoria é apenas integridade verificada por hashes.
 
 No CI não se usa `--require-hashes`, por decisão registada no
 [ADR-0020](docs/adr/0020-integridade-dos-artefactos-de-instalacao.md): obrigaria a fixar a
@@ -97,10 +97,10 @@ versões que o CI testou; um pacote sem `manifesto.json` deixou de instalar, sal
 explícita; e uma *wheel* que esteja na pasta sem constar do manifesto faz parar, porque o
 pip a resolveria como dependência sem nunca a ter conferido.
 
-A que não dependia de código, a autenticação do manifesto, foi fechada por decisão
-institucional: controlo de acesso à partilha, como descrito acima. As alternativas
-criptográficas foram ponderadas e rejeitadas por não serem operáveis com regularidade neste
-contexto, o que está fundamentado no ADR-0020.
+A que não depende de código, a autenticação do manifesto, continua aberta, com via decidida:
+controlo de acesso à partilha, como descrito acima, a confirmar antes de poder ser dada por
+fechada. As alternativas criptográficas foram ponderadas e rejeitadas por não serem
+operáveis com regularidade neste contexto, o que está fundamentado no ADR-0020.
 
 ## Auditoria de dependências
 

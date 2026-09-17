@@ -144,13 +144,13 @@ passa a ser zero. Os pontos que uma auditoria interna tenderá a perguntar:
    é assinado, pelo que sozinho não resiste a quem altere as duas coisas de
    propósito. A autenticidade é assegurada fora do instalador, pelo ponto
    seguinte.
-3. **Controlo de acesso à partilha.** A pasta onde o pacote é publicado tem
-   escrita restrita a quem o prepara e leitura para as estações, configurada
-   pelo Instituto de Informática, que assegura a transferência dessa
+3. **Controlo de acesso à partilha, a montar.** A pasta onde o pacote é publicado
+   deve ter escrita restrita a quem o prepara e leitura para as estações,
+   configurada pelo Instituto de Informática, a quem cabe também transferir essa
    responsabilidade quando a pessoa que a detém deixar o organismo. É isto que
    impede que alguém substitua uma biblioteca entre a preparação e a instalação.
-   **Se estas permissões não estiverem configuradas, a garantia baixa** para o
-   que os hashes sozinhos dão — ver
+   **Enquanto estas permissões não estiverem configuradas e confirmadas, a
+   garantia é apenas** a que os hashes sozinhos dão — ver
    [ADR-0020](../adr/0020-integridade-dos-artefactos-de-instalacao.md).
 4. **Versões.** O pacote é preparado e instalado com as *constraints* em
    `requirements/`, as mesmas que o CI usa, pelo que a estação recebe as versões

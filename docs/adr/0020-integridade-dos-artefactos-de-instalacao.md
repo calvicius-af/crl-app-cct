@@ -59,12 +59,12 @@ Em concreto:
 3. O algoritmo é SHA-256 em todo o projeto, através de `cct/proveniencia.py`,
    tal como já acontece nos manifestos de corrida do ADR-0014. Não se introduz
    um segundo mecanismo.
-4. A autenticidade do pacote é assegurada por **controlo de acesso à partilha de
-   rede**, não por assinatura nem por procedimento manual. É um requisito
-   operacional, não uma opção: sem essas permissões, a garantia baixa para o que
-   os hashes sozinhos dão.
+4. A via escolhida para a autenticidade é o **controlo de acesso à partilha de
+   rede**, não a assinatura nem um procedimento manual. É um requisito
+   operacional a montar fora deste repositório, e enquanto não estiver montado e
+   confirmado a garantia é apenas a que os hashes sozinhos dão.
 
-4. **`--require-hashes` também não entra no pacote offline.** Seria possível:
+5. **`--require-hashes` também não entra no pacote offline.** Seria possível:
    o preparador tem todas as *wheels* e podia gerar um ficheiro de requisitos
    com um `--hash` por distribuição. Mas esse ficheiro viajaria na mesma pasta,
    com a mesma raiz de confiança do manifesto, pelo que trocaria quem faz a
@@ -76,14 +76,16 @@ Em concreto:
    que `--require-hashes` passaria a acrescentar alguma coisa.
 
 Das quatro lacunas reconhecidas na primeira redacção deste ADR, três ficaram
-fechadas e uma continua aberta, com o trabalho a ser seguido no issue #56:
+fechadas em código. A quarta tem via decidida, mas **não está fechada**: depende
+de uma configuração externa a este repositório, que ainda não foi confirmada. O
+seguimento está no issue #56.
 
 | Lacuna | Estado |
 |---|---|
 | O preparador lê `requirements.txt`, com mínimos, e não as *constraints* | **Fechada.** `preparar_pacote_offline.py` e `instalar_offline.py` aplicam `-c requirements/runtime.txt`, mais `dev.txt` quando o pacote inclui o pytest. O manifesto regista que *constraints* foram usadas, e o SHA-256 de cada uma |
 | A ausência de `manifesto.json` faz o instalador avisar e continuar | **Fechada.** Passou a parar. A saída explícita `--aceitar-sem-manifesto` existe para pacotes preparados por versões anteriores, e obriga quem a usa a declarar o que está a dispensar |
 | Uma *wheel* fora do manifesto podia ser instalada sem ser conferida | **Fechada.** O instalador compara a pasta com o manifesto nos dois sentidos, e recusa ficheiros a mais tal como recusa ficheiros a menos |
-| O manifesto não é autenticado | **Fechada por controlo de acesso, não por código.** Ver a secção seguinte |
+| O manifesto não é autenticado | **Aberta, com via decidida.** A resposta é controlo de acesso à partilha, não código. Fecha quando as permissões estiverem configuradas e a confirmação registada no issue #56, com responsável e data. Ver a secção seguinte |
 
 ### A autenticidade resolve-se na partilha, não no instalador
 
@@ -97,13 +99,29 @@ cuja formação informática é de utilizador, e com acesso directo ao Git vedad
 pelas protecções do proxy nas máquinas de serviço. Uma medida de segurança que
 depende de alguém se lembrar de a cumprir não é uma medida de segurança.
 
-**A decisão é fechar esta lacuna com controlo de acesso:** a pasta da partilha
-de rede onde o pacote é publicado tem escrita restrita a quem prepara o pacote e
-leitura para as estações, configurada pelo Instituto de Informática. Com isso, o
-canal entre a preparação e a instalação deixa de ser modificável por terceiros, e
-o manifesto deixa de precisar de autenticar-se a si próprio. O Instituto de
-Informática assegura a transferência dessa responsabilidade quando a pessoa que
-a detém deixar o organismo, pelo que o controlo não fica preso a um indivíduo.
+**A via escolhida para fechar esta lacuna é o controlo de acesso:** a pasta da
+partilha de rede onde o pacote é publicado deve ter escrita restrita a quem
+prepara o pacote e leitura para as estações, configurada pelo Instituto de
+Informática. Com isso, o canal entre a preparação e a instalação deixa de ser
+modificável por terceiros, e o manifesto deixa de precisar de autenticar-se a si
+próprio. A transferência dessa responsabilidade, quando a pessoa que a detém
+deixar o organismo, cabe igualmente ao Instituto de Informática, para que o
+controlo não fique preso a um indivíduo.
+
+**Nada disto está montado à data deste ADR, e o ADR não o substitui.** Esta
+secção regista uma decisão sobre o caminho a seguir, não um controlo em vigor:
+as permissões são externas ao repositório e não são demonstráveis por código,
+testes ou CI. Até a configuração existir e ser confirmada, a autenticidade não
+está assegurada, e afirmá-la seria repetir o erro que este ADR foi escrito para
+corrigir.
+
+Pré-requisito operacional, a confirmar antes de se poder declarar a lacuna
+fechada:
+
+| O que | Quem | Evidência |
+|---|---|---|
+| Escrita restrita a quem prepara o pacote, leitura para as estações, na pasta da partilha onde o pacote é publicado | Instituto de Informática, a pedido do CRL | Confirmação escrita no issue #56, com data e identificação de quem configurou |
+| Transferência da responsabilidade de escrita quando a pessoa que a detém sair | Instituto de Informática | O mesmo registo, actualizado na altura |
 
 O que isto cobre e o que não cobre, dito sem arredondar:
 
@@ -113,12 +131,17 @@ O que isto cobre e o que não cobre, dito sem arredondar:
 | Corrupção, truncagem e cópia incompleta, que a verificação de hashes já apanhava | Erro ou acto deliberado de quem detém a escrita na pasta |
 | Uma *wheel* acrescentada à pasta, que o instalador recusa por não constar do manifesto | Falha ou má configuração das permissões, que ninguém verifica automaticamente |
 
-A garantia a declarar passa a ser **integridade verificada por hashes, sobre um
-canal de distribuição com controlo de acesso**. Não é prova criptográfica de
-autenticidade, e não deve ser apresentada como tal. É o controlo que a maioria
-das instituições usa para este problema, e é proporcionado ao risco: o cenário
-que sobra exige alguém com escrita autorizada na partilha a agir
-deliberadamente.
+A garantia a declarar depende de em que ponto se está, e não deve ser antecipada:
+
+1. **Hoje, sem as permissões confirmadas:** integridade verificada por hashes.
+   Apanha corrupção, truncagem, cópia incompleta e ficheiros a mais na pasta.
+   Não resiste a adulteração deliberada.
+2. **Depois de confirmadas:** integridade verificada por hashes, sobre um canal
+   de distribuição com controlo de acesso. Continua a não ser prova
+   criptográfica de autenticidade, e não deve ser apresentada como tal. É o
+   controlo que a maioria das instituições usa para este problema, e é
+   proporcionado ao risco: o cenário que sobra exige alguém com escrita
+   autorizada na partilha a agir deliberadamente.
 
 ## Alternativas consideradas
 
