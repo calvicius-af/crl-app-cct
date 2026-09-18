@@ -1,0 +1,52 @@
+# ISSUE-0018: o título do último anexo sai depois dos dados da tabela
+
+- **Estado:** Aberta
+- **Data:** 2026-09-18
+- **GitHub:** (a criar)
+- **Onde dói:** `cct/extractor_docling.py` (`ordenar_por_leitura`, `documento_para_texto`)
+
+## O que acontece
+
+No `26_PR_006_BTE_31_EmpresaMetropolitana_SINTAP`, o título do último anexo é mal lido e
+colocado **depois** dos dados da tabela:
+
+```text
+... Correspondencia ao Nível Remuneratório da TUR 5
+
+ANEXO III - Maia, 14 de julho de 2026.
+Pela Empresa Metropolitana de Estacionamento da Maia, EM:
+António Domingos Silva Tiago , presidente do conselho de administração, na qualidade
+de mandatário.
+```
+
+`ANEXO III - Maia, 14 de julho de 2026.` não é o título do anexo: é a **data de outorga**
+(`Maia, 14 de julho de 2026.`) que ficou colada ao rótulo `ANEXO III`, e o conjunto
+aparece depois da tabela, quando devia estar antes. O título real do anexo (o mapa
+remuneratório) perdeu-se ou ficou antes da tabela.
+
+## O que devia acontecer
+
+- O rótulo `ANEXO III` no início do anexo, com o seu título próprio.
+- A data de outorga (`Maia, 14 de julho de 2026.`) no bloco de assinaturas, não colada
+  ao rótulo do anexo.
+
+## Como reproduzir
+
+```bash
+.venv/bin/python -m cct.pipeline_tema \
+    --pdfs data/raw/bte/bte_2026 --codebook codebooks/demo_fase0.yaml \
+    --extrator docling --out results/runs/2026/anexos
+# procurar "ANEXO III" no TXT do 26_PR_006
+```
+
+## Notas
+
+- Duas causas prováveis, a confirmar:
+  1. **Ordem de leitura**: a geometria do docling colocou o item do rótulo depois da
+     tabela (`ordenar_por_leitura` ordena por página/coluna/distância ao topo — uma
+     tabela que ocupa a página pode empurrar o rótulo para baixo).
+  2. **Fusão rótulo+data**: `_normalizar_rotulo` junta o cabeçalho à linha seguinte
+     quando esta é `_titulo_candidato`; `Maia, 14 de julho de 2026.` casa com
+     `RE_DATA_OUTORGA`, que devia impedir a fusão — verificar por que não impediu.
+- Relacionada com a ISSUE-0015 (bloco de assinaturas): a data de outorga pertence lá.
+- Relacionada com a ISSUE-0006 (ordem de leitura em layouts difíceis).
