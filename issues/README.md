@@ -52,7 +52,7 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 
 ## Ronda de 2026-09-18: qualidade da extração (linting e renomeação)
 
-Nove issues (0015-0022) levantadas na revisão dos 14 documentos do BTE 31/2026, depois
+Oito issues (0015-0022) levantadas na revisão dos 14 documentos do BTE 31/2026, depois
 da importação para MAXQDA. Nenhuma impede a leitura qualitativa; todas reduzem a
 credibilidade da extração, que é o que se quer demonstrar. Foram escritas para poderem
 ser executadas **independentemente por modelos diferentes** — cada uma tem o documento

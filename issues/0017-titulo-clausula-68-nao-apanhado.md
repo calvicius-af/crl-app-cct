@@ -34,7 +34,7 @@ relação de trabalho e preenchimento de vagas` no EMEM).
 
 ```bash
 .venv/bin/python -m cct.pipeline_tema \
-    --pdfs data/raw/bte/bte_2026 --codebook codebooks/fase0.yaml \
+    --pdfs data/raw/bte/bte_2026 --codebook codebooks/demo_fase0.yaml \
     --extrator docling --out results/runs/2026/titulos
 # procurar "Cláusula 68" no TXT do 26_PR_005
 ```
