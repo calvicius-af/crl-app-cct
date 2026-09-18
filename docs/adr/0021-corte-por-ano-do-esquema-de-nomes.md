@@ -31,10 +31,13 @@ esquema RNC como a convenção corrente. A ISSUE-0022 registou a confusão: o RE
   anterior a 2026 — pede-o explicitamente com `--esquema pipeline`.
 - O caso concreto que motivou este ADR foi corrigido por recolha: os 14 ficheiros do
   BTE 31/2026 nomeados com o esquema de 2025, os PDF intermédios e as execuções do
-  pipeline geradas a partir deles foram apagados (nenhum estava versionado; todos sob
-  `data/` e `results/`, ignorados pelo Git), para que a próxima recolha do BTE 31/2026
-  já nomeie com `--esquema rnc`. O índice do BTE (`BTE31_2026.xlsx`) manteve-se, por ser
-  a fonte, não um artefacto de nomeação.
+  pipeline geradas a partir deles foram apagados e recolhidos de novo, já com
+  `--esquema rnc`, na estação onde este ADR foi escrito. **Nada disto está versionado**
+  (`data/` e `results/` são ignorados pelo Git), pelo que fazer merge deste ADR **não
+  propaga a limpeza** para outra estação ou clone: quem tiver uma cópia do corpus de
+  2026 nomeada com o esquema de 2025 tem de a apagar e recolher de novo, à parte, depois
+  de atualizar o código. O índice do BTE (`BTE31_2026.xlsx`) mantém-se, por ser a fonte,
+  não um artefacto de nomeação.
 
 ## Alternativas consideradas
 

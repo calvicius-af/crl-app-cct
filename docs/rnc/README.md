@@ -545,9 +545,11 @@ Reproduzível com `python -m pytest tests/test_rnc.py`.
 **v4.1, 18/09/2026.** Clarificado o corte entre os dois esquemas de nome: até 2025
 mantém-se o nome atribuído; a partir do corpus de 2026, inclusive, o esquema RNC é
 obrigatório, sem período de transição ([ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md), ISSUE-0022).
-`python -m cct.nomeacao` passa a usar `--esquema rnc` por omissão. Os 14 ficheiros do
-BTE 31/2026, nomeados antes desta clarificação com o esquema de 2025, foram apagados
-para nova recolha.
+`python -m cct.nomeacao` e `python -m cct.aquisicao` passam a usar `--esquema rnc` por
+omissão. Os 14 ficheiros do BTE 31/2026, nomeados antes desta clarificação com o
+esquema de 2025, foram apagados e recolhidos de novo na estação onde esta versão foi
+escrita — como `data/` e `results/` não estão versionados, quem tiver uma cópia antiga
+do corpus tem de repetir essa limpeza localmente, o merge do ADR não a propaga.
 
 **v4.0, 17/09/2026.** Documento renumerado, sem secções `bis` e `ter`. Registo de alterações condensado nesta secção, com a fundamentação de cada decisão remetida para os ADR. Corrigida a correspondência com as pastas da aplicação (ver 3.1): `1_fontes/bte_completo/` corresponde a `data/raw/bte/bte_<ano>/` e não a uma pasta `bte_completo` inexistente; `1_fontes/externas/` não tem pasta correspondente; e `2_processamento/texto/` e `precodificado/` não recebem ficheiros, porque o pipeline mantém o intermédio em memória. Corrigida a tabela de migração (ver 10). Secção «O que falta fazer» reduzida ao que efetivamente falta.
 

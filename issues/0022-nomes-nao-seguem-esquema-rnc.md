@@ -77,16 +77,24 @@ aplicação. Ficheiros de corpos até 2025 mantêm o nome que já têm. A partir
 
 Executado:
 
-1. `docs/rnc/README.md` §4.1 e §10 passam a dizer explicitamente a partir de quando o
+1. `docs/rnc/README.md` §4.1 e §10, `docs/dados/README.md` e
+   `docs/operacao/guia-operacao.md` passam a dizer explicitamente a partir de quando o
    esquema RNC se aplica, em vez de só apresentá-lo como a convenção corrente.
-2. `python -m cct.nomeacao` passa a ter `--esquema rnc` por omissão
-   (`cct/nomeacao.py`), alinhado com `cct/catalogo.py`, que já assumia `rnc`. Quem
-   precisar do esquema de 2025 pede-o com `--esquema pipeline`.
+2. `python -m cct.nomeacao` **e** `python -m cct.aquisicao` (o encadeamento normal, que
+   é o que a app gráfica lança) passam a ter `--esquema rnc` por omissão, alinhados com
+   `cct/catalogo.py`, que já assumia `rnc`. A primeira versão desta correção só tinha
+   mudado `cct.nomeacao`; `cct.aquisicao` chamava `nomear()` sem indicar esquema e
+   continuava a produzir nomes de 2025 — falha apanhada na revisão do PR #69, antes do
+   merge. Quem precisar do esquema de 2025 pede-o com `--esquema pipeline`.
 3. Os 14 ficheiros do BTE 31/2026 nomeados com o esquema de 2025, os PDF intermédios da
-   recolha e as execuções do pipeline geradas a partir deles foram apagados — nenhum
-   estava versionado — para que a próxima recolha do BTE 31/2026 já nomeie com o esquema
-   RNC. O índice `BTE31_2026.xlsx` manteve-se.
+   recolha e as execuções do pipeline geradas a partir deles foram apagados e
+   recolhidos de novo com `--esquema rnc`, já nomeados corretamente. Nada disto está
+   versionado (`data/` e `results/` são ignorados pelo Git): quem tiver uma cópia do
+   corpus de 2026 com o esquema de 2025 tem de repetir esta limpeza e recolha
+   localmente — o merge desta correção não a propaga.
 
-Consequência a acompanhar: as ISSUE-0015 a ISSUE-0021 continuam válidas quanto ao
-defeito de extração que descrevem, mas citam nomes de ficheiro do esquema antigo que
-ficam desatualizados até à nova recolha e reprocessamento.
+Consequência a acompanhar: as ISSUE-0015 a ISSUE-0021 citavam nomes de ficheiro do
+esquema antigo (`26_PR_NNN_…`); com o corpus renomeado, passam a referir-se aos nomes
+RNC equivalentes (ex.: `26_PR_006_BTE_31_EmpresaMetropolitana_SINTAP` →
+`2026_SPE_382_AE_47252_BTE_31_EmpresaMetropolitana-SINTAP`). O defeito de extração que
+descrevem não muda.

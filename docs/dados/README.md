@@ -146,8 +146,11 @@ O que acontece, em duas fases ([SPEC-0001](../../specs/0001-recolha-e-nomeacao-d
    `Last-Modified` de cada documento, e a segunda corrida sobre o mesmo índice não faz
    um único pedido de rede.
 2. **Nomeação** (`cct/nomeacao.py`) — copia cada PDF para
-   `data/raw/bte/bte_<ano>/` já com o nome do esquema
-   (`26_PR_003_BTE_31_AEVP_FESAHT.pdf`). As portarias de extensão e os avisos vão para
+   `data/raw/bte/bte_<ano>/convencoes/{PRI,SPE,APU}/` já com o nome do esquema RNC
+   (`2026_PRI_379_CCT-ALT_26651_BTE_31_AEVP-FESAHT.pdf`), obrigatório a partir do
+   corpus de 2026 ([ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md)). Um
+   corpo anterior a 2026, no esquema de 2025 (`26_PR_003_BTE_31_AEVP_FESAHT.pdf`), só se
+   reprocessa com `--esquema pipeline`. As portarias de extensão e os avisos vão para
    a subpasta `extensoes/`, para não entrarem no `glob("*.pdf")` do pipeline.
 
 A rede está **desligada por omissão** e só liga com `--confirmar-rede`
