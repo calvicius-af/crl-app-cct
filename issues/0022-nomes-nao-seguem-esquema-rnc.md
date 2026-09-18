@@ -1,6 +1,6 @@
 # ISSUE-0022: os nomes dos ficheiros não seguem o esquema definido em docs/rnc/README.md
 
-- **Estado:** Aberta
+- **Estado:** Resolvida — 2026-09-18
 - **Data:** 2026-09-18
 - **GitHub:** (a criar)
 - **Onde dói:** `cct/nomeacao.py` (`nome_documento`, `ESQUEMAS`), `docs/rnc/README.md` §4
@@ -66,3 +66,27 @@ python -m cct.nomeacao --esquema rnc --destino /tmp/teste   # simula o esquema n
   é de equipa, não técnica.
 - Relacionada com a ISSUE-0011 (nomeação e `--siglas`) e com o ADR-0016 (esquema de
   nomes).
+
+## Decisão e o que foi feito
+
+Decisão de equipa: o corte é pelo **ano do corpus**, não pela data em que se corre a
+aplicação. Ficheiros de corpos até 2025 mantêm o nome que já têm. A partir do corpus de
+2026, inclusive, o esquema RNC é obrigatório, sem período de transição — logo o BTE
+31/2026 está abrangido. Fundamentação completa em
+[ADR-0021](../docs/adr/0021-corte-por-ano-do-esquema-de-nomes.md).
+
+Executado:
+
+1. `docs/rnc/README.md` §4.1 e §10 passam a dizer explicitamente a partir de quando o
+   esquema RNC se aplica, em vez de só apresentá-lo como a convenção corrente.
+2. `python -m cct.nomeacao` passa a ter `--esquema rnc` por omissão
+   (`cct/nomeacao.py`), alinhado com `cct/catalogo.py`, que já assumia `rnc`. Quem
+   precisar do esquema de 2025 pede-o com `--esquema pipeline`.
+3. Os 14 ficheiros do BTE 31/2026 nomeados com o esquema de 2025, os PDF intermédios da
+   recolha e as execuções do pipeline geradas a partir deles foram apagados — nenhum
+   estava versionado — para que a próxima recolha do BTE 31/2026 já nomeie com o esquema
+   RNC. O índice `BTE31_2026.xlsx` manteve-se.
+
+Consequência a acompanhar: as ISSUE-0015 a ISSUE-0021 continuam válidas quanto ao
+defeito de extração que descrevem, mas citam nomes de ficheiro do esquema antigo que
+ficam desatualizados até à nova recolha e reprocessamento.

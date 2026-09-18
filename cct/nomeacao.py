@@ -593,9 +593,10 @@ def main(argv=None):
                    help="CSV de siglas fixadas ('nome;sigla', ou o "
                         "vocabularios/siglas_organizacoes.csv). Repetível: em "
                         "caso de conflito ganha o primeiro ficheiro indicado.")
-    p.add_argument("--esquema", choices=ESQUEMAS, default=ESQUEMA_OMISSAO,
-                   help="esquema de nome: 'pipeline' (o de 2025) ou 'rnc' "
-                        "(o da gestão documental do RNC)")
+    p.add_argument("--esquema", choices=ESQUEMAS, default="rnc",
+                   help="esquema de nome: 'rnc' (obrigatório a partir do "
+                        "corpus de 2026, ver ADR-0021) ou 'pipeline' (o de "
+                        "2025, só para corpos anteriores)")
     p.add_argument("--ambitos", help="CSV 'nome;ambito' de empregadores com "
                                      "âmbito conhecido (só com --esquema rnc)")
     p.add_argument("--familias", default="convencao,extensao,aviso,adesao")

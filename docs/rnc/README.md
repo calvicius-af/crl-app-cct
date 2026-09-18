@@ -1,6 +1,6 @@
 # RNC: organização e nomenclatura dos ficheiros
 
-Relatório da Negociação Coletiva · Centro de Relações Laborais · Versão 4.0 · 17 de setembro de 2026
+Relatório da Negociação Coletiva · Centro de Relações Laborais · Versão 4.1 · 18 de setembro de 2026
 
 Substitui `README.Estrutura_RNC_2027.docx` (v2.1), `README_Estrutura_RNC_2026.md` (v1) e as secções 2 e 3 do `SOP_Gestao_Documental_RNC_2026.docx` (v1.0). O registo de alterações está no final; a fundamentação de cada decisão está nos ADR referidos ao longo do texto.
 
@@ -149,7 +149,13 @@ O número sequencial é o atribuído pela DGCP, sem o ano, por decisão de compa
 
 O campo `_BTE_{NN}` é um acrescento face à convenção publicada na v2.1, fundamentado em [ADR-0016](../adr/0016-esquema-de-nomes-do-rnc.md). Permite voltar do ficheiro ao boletim sem consultar o catálogo e é o que a aplicação lê para emparelhar versões.
 
-Os dois esquemas de nome coexistem. Um corpus pode ter nomes de 2025 (`26_PR_003_BTE_31_ACRAL_CESP`) e deste esquema, e a aplicação lê ambos.
+O corte entre os dois esquemas é pelo **ano do corpus**, não pela data em que se corre a
+aplicação: ficheiros de corpos **até 2025** mantêm o nome que já têm
+(`26_PR_003_BTE_31_ACRAL_CESP`); **a partir do corpus de 2026, inclusive, o esquema RNC é
+obrigatório**, sem exceção nem período de transição. A aplicação lê os dois esquemas, mas
+só escreve o antigo quando pedido explicitamente com `--esquema pipeline`; por omissão,
+`python -m cct.nomeacao` usa `--esquema rnc`. Fundamentação em
+[ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md).
 
 ### 4.2 Nomes das outras famílias de ficheiro
 
@@ -449,7 +455,15 @@ Nenhuma destas tarefas impede começar o ciclo de 2026. Apenas as tarefas 1, 2 e
 
 Na árvore da aplicação, o esquema de 2025 reunia tudo o que não era convenção numa única pasta `data/raw/bte/bte_AAAA/extensoes/`. Ao migrar, esses ficheiros separam-se pelo token de família do nome: `PE` e `AV` para `portarias_extensao/`, `AA` para `acordos_adesao/`. Os avisos deixam de ter ficheiro e passam a constar do catálogo.
 
-**Os nomes não se alteram.** Os ficheiros do ciclo de 2025 mantêm o nome que têm, no formato `26_PR_003_BTE_31_ACRAL_CESP.pdf`, e a aplicação continua a lê-los. O esquema novo aplica-se ao que entra de novo. Migrar a estrutura de pastas é seguro; migrar nomes quebra o trabalho já feito no MAXQDA, que referencia os documentos pelo nome.
+**Os nomes não se alteram.** Os ficheiros do ciclo de 2025 mantêm o nome que têm, no formato `26_PR_003_BTE_31_ACRAL_CESP.pdf`, e a aplicação continua a lê-los. Migrar a estrutura de pastas é seguro; migrar nomes quebra o trabalho já feito no MAXQDA, que referencia os documentos pelo nome.
+
+**O esquema novo aplica-se ao que entra de novo, a partir do corpus de 2026, sem
+exceção.** Não chega ter começado a recolher um corpus de 2026 antes desta decisão: um
+BTE de 2026 nomeado com o esquema de 2025 está fora de conformidade e tem de ser
+recolhido de novo com `--esquema rnc`, não apenas documentado como estando "ainda no
+esquema antigo". Foi o que aconteceu com o BTE 31/2026 (ver [ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md) e ISSUE-0022): os
+14 ficheiros tinham sido nomeados com o esquema de 2025 antes desta clarificação, e
+foram apagados para nova recolha, já com o esquema RNC.
 
 ---
 
@@ -528,6 +542,13 @@ Reproduzível com `python -m pytest tests/test_rnc.py`.
 
 ## Registo de alterações
 
+**v4.1, 18/09/2026.** Clarificado o corte entre os dois esquemas de nome: até 2025
+mantém-se o nome atribuído; a partir do corpus de 2026, inclusive, o esquema RNC é
+obrigatório, sem período de transição ([ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md), ISSUE-0022).
+`python -m cct.nomeacao` passa a usar `--esquema rnc` por omissão. Os 14 ficheiros do
+BTE 31/2026, nomeados antes desta clarificação com o esquema de 2025, foram apagados
+para nova recolha.
+
 **v4.0, 17/09/2026.** Documento renumerado, sem secções `bis` e `ter`. Registo de alterações condensado nesta secção, com a fundamentação de cada decisão remetida para os ADR. Corrigida a correspondência com as pastas da aplicação (ver 3.1): `1_fontes/bte_completo/` corresponde a `data/raw/bte/bte_<ano>/` e não a uma pasta `bte_completo` inexistente; `1_fontes/externas/` não tem pasta correspondente; e `2_processamento/texto/` e `precodificado/` não recebem ficheiros, porque o pipeline mantém o intermédio em memória. Corrigida a tabela de migração (ver 10). Secção «O que falta fazer» reduzida ao que efetivamente falta.
 
 **v3.x, 16/09/2026.** Compatibilização com a AppCCT, integrada em [PR #43](https://github.com/calvicius-af/crl-app-cct/pull/43):
@@ -553,6 +574,7 @@ Reproduzível com `python -m pytest tests/test_rnc.py`.
 | [ADR-0017](../adr/0017-regra-de-desambiguacao-de-siglas.md) | Regra de desambiguação de siglas |
 | [ADR-0018](../adr/0018-familias-documentais-em-pastas-separadas.md) | Famílias documentais em pastas separadas |
 | [ADR-0019](../adr/0019-lista-do-ine-como-sinal-de-ambito.md) | Lista do INE como sinal de âmbito |
+| [ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md) | O esquema RNC é obrigatório a partir do corpus de 2026 |
 | [SPEC-0003](../../specs/0003-compatibilizacao-com-a-gestao-documental-do-rnc.md) | O que se construiu, e como se verificou |
 | [SPEC-0001](../../specs/0001-recolha-e-nomeacao-do-bte.md) | Recolha e nomeação, antes desta compatibilização |
 | [`pastas/`](pastas/) | Um README por pasta principal da árvore |
