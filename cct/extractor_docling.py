@@ -22,6 +22,11 @@ from .extractor import MARCA_TABELA_FIM, MARCA_TABELA_INI, estruturar
 # mobiliário do BTE que aparece no corpo da página
 RE_BTE_CABECALHO = re.compile(r"^Boletim do Trabalho e Emprego\b")
 RE_BTE_DATA = re.compile(r"^\d{1,2}\s+(?:de\s+)?[a-zç]+\s+(?:de\s+)?\d{4}$")
+# fragmento do cabeçalho partido pelo docling (ISSUE-0019): a linha do
+# cabeçalho corrido às vezes chega em item(ns) próprio(s) e sobra só "BE"
+# ou "BTE" isolado, sem pontuação. Regra estreita de propósito — "BE" pode
+# ser sigla legítima de uma entidade — para não apanhar siglas reais.
+RE_BTE_FRAGMENTO = re.compile(r"^BT?E$")
 # hífen de translineação que sobrou com espaço: "profis -sional"
 RE_HIFEN_SOLTO = re.compile(r"([a-zà-ú]) -([a-zà-ú])")
 # item de lista que já traz marcador próprio no texto ("1- …", "a) …",
@@ -36,14 +41,15 @@ def limpar_texto_item(texto: str) -> str | None:
     """Normaliza o texto de um item; devolve None se for para descartar.
 
     Descarta mobiliário do BTE (cabeçalho corrido, data da edição,
-    número de página solto) e repara a translineação que o docling deixa
-    com espaço antes do hífen.
+    número de página solto, fragmento "BE"/"BTE" isolado) e repara a
+    translineação que o docling deixa com espaço antes do hífen.
     """
     texto = (texto or "").replace("\n", " ").replace("\t", " ")
     texto = re.sub(r"\s{2,}", " ", texto).strip()
     if not texto:
         return None
     if (RE_BTE_CABECALHO.match(texto) or RE_BTE_DATA.match(texto)
+            or RE_BTE_FRAGMENTO.fullmatch(texto)
             or re.fullmatch(r"\d+", texto)):
         return None
     return RE_HIFEN_SOLTO.sub(r"\1\2", texto)
