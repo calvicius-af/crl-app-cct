@@ -186,11 +186,18 @@ def juntar_linhas(texto: str) -> str:
 
 
 def _titulo_candidato(linha: str) -> bool:
-    """Linha curta que serve de título a um cabeçalho (ex.: "Âmbito")."""
+    """Linha curta que serve de título a um cabeçalho (ex.: "Âmbito").
+
+    Uma data de outorga nunca é título (ISSUE-0018): quando a tabela de um
+    anexo não produz conteúdo, o cabeçalho ("ANEXO III") fica seguido, sem
+    nada entre os dois, pela data que assina o documento ("Maia, 14 de
+    julho de 2026.") — sem este guarda, essa data virava o título do anexo.
+    """
     linha = linha.strip()
     return (0 < len(linha) <= 90
             and not _e_cabecalho(linha)
-            and not RE_MARCADOR_LISTA.match(linha))
+            and not RE_MARCADOR_LISTA.match(linha)
+            and not RE_DATA_OUTORGA.match(linha))
 
 
 def _normalizar_rotulo(tipo: str, m: re.Match, titulo_extra: str | None) -> str:
