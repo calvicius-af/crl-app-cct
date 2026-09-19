@@ -4,12 +4,16 @@ Segunda fase da aquisição (a primeira é `cct/recolha.py`). Corre inteiramente
 offline e pode repetir-se à vontade: lê o registo, atribui a cada documento um
 ordinal estável, deriva as siglas dos outorgantes e copia o PDF para
 
-    data/raw/bte/bte_2026/26_PR_003_BTE_31_ACRAL_CESP.pdf          convenções
-    data/raw/bte/bte_2026/extensoes/26_PE_001_BTE_31_….pdf         portarias e avisos
+    data/raw/bte/bte_2026/convencoes/PRI/2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf
+    data/raw/bte/bte_2026/extensoes/26_PE_001_BTE_31_….pdf         esquema de 2025
+
+Esquema RNC por omissão, obrigatório a partir do corpus de 2026 (ADR-0021); o
+esquema de 2025 (`26_PR_003_BTE_31_ACRAL_CESP.pdf`) só se pede com `--esquema
+pipeline`, para reprocessar um corpo anterior a 2026.
 
 O nome não é decorativo: o `cct/localizador.py` lê dele o ano, o número do BTE e
 os tokens das partes; o `cct/comparar.py` deduz o ano; e o cruzamento com as
-variáveis do MaxQDA é feito pelos primeiros caracteres. Ver docs/dados/README.md.
+variáveis do MaxQDA é feito pelos primeiros caracteres. Ver docs/rnc/README.md.
 
 Uso:
   python -m cct.nomeacao --destino data/raw/bte             # simulação
@@ -593,9 +597,10 @@ def main(argv=None):
                    help="CSV de siglas fixadas ('nome;sigla', ou o "
                         "vocabularios/siglas_organizacoes.csv). Repetível: em "
                         "caso de conflito ganha o primeiro ficheiro indicado.")
-    p.add_argument("--esquema", choices=ESQUEMAS, default=ESQUEMA_OMISSAO,
-                   help="esquema de nome: 'pipeline' (o de 2025) ou 'rnc' "
-                        "(o da gestão documental do RNC)")
+    p.add_argument("--esquema", choices=ESQUEMAS, default="rnc",
+                   help="esquema de nome: 'rnc' (obrigatório a partir do "
+                        "corpus de 2026, ver ADR-0021) ou 'pipeline' (o de "
+                        "2025, só para corpos anteriores)")
     p.add_argument("--ambitos", help="CSV 'nome;ambito' de empregadores com "
                                      "âmbito conhecido (só com --esquema rnc)")
     p.add_argument("--familias", default="convencao,extensao,aviso,adesao")

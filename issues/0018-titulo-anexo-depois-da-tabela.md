@@ -1,6 +1,7 @@
 # ISSUE-0018: o título do último anexo sai depois dos dados da tabela
 
-- **Estado:** Resolvida — 2026-09-19
+- **Estado:** Em curso — a fusão rótulo+data corrigida em 2026-09-19; falta recuperar
+  o título próprio do anexo (ver "O que foi feito")
 - **Data:** 2026-09-18
 - **GitHub:** (a criar)
 - **Onde dói:** `cct/extractor_docling.py` (`ordenar_por_leitura`, `documento_para_texto`)
@@ -69,7 +70,13 @@ foi implementado. Acrescentado o guarda: uma linha que corresponda a `RE_DATA_OU
 nunca é aceite como título de um cabeçalho.
 
 Verificado com o pipeline real sobre `2026_SPE_382`: `"ANEXO III"` sai agora na sua
-própria linha, sem a data colada. **Fica por resolver**, como caso à parte: o título
-real do anexo (o mapa remuneratório) continua sem aparecer, porque a tabela desse
-anexo não produz conteúdo extraível — problema de leitura de tabela, não de rótulo,
-relacionado com a família de defeitos da ISSUE-0020.
+própria linha, sem a data colada.
+
+**Fica por resolver, e é por isso que a issue continua "Em curso" e não "Resolvida"**
+(apontado na revisão do PR #74): o "O que devia acontecer" pede duas coisas — a data
+fora do rótulo (feito) e `"ANEXO III"` **com o seu título próprio** (ainda não). O
+título real do anexo (o mapa remuneratório) continua sem aparecer, porque a tabela
+desse anexo não produz conteúdo extraível — problema de leitura de tabela, não de
+rótulo, relacionado com a família de defeitos da ISSUE-0020. O teste novo
+(`test_data_de_outorga_nao_vira_titulo_do_anexo`) cobre só a parte da data; falta um
+teste e uma correção para a recuperação do título quando a tabela devolve conteúdo.

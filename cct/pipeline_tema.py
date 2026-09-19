@@ -24,6 +24,31 @@ from .sanidade import verificar as verificar_sanidade
 from .schemas import validar_doc, validar_anotacoes
 from .proveniencia import agora_utc, construir_manifesto, escrever_manifesto
 
+# âmbitos processáveis do esquema RNC (ADR-0021) — APU fica de fora: a
+# aplicação recolhe-o mas ainda não o processa (docs/rnc/README.md §4.3)
+_AMBITOS_PROCESSAVEIS = ("PRI", "SPE")
+
+
+def _pdfs_da_pasta(pasta: Path) -> list[Path]:
+    """PDFs de convenções em `pasta`, direto ou nas subpastas RNC por âmbito.
+
+    O esquema RNC arruma os PDFs em `convencoes/{PRI,SPE,APU}/`, não direto
+    na pasta do ano (`bte_2026/`) — mas apontar `--pdfs` para essa pasta,
+    como o guia de operação sempre ensinou, continua a funcionar: procura-se
+    primeiro direto (esquema de 2025, ou já a pasta de âmbito), e só depois
+    nas subpastas de âmbito processável.
+    """
+    diretos = sorted(pasta.glob("*.pdf"))
+    if diretos:
+        return diretos
+    convencoes = pasta / "convencoes"
+    if not convencoes.is_dir():
+        return []
+    achados: list[Path] = []
+    for ambito in _AMBITOS_PROCESSAVEIS:
+        achados.extend((convencoes / ambito).glob("*.pdf"))
+    return sorted(achados)
+
 
 def _novidades_via_versoes(pasta_versoes: Path, pdf: Path, doc: dict,
                            texto: str, problemas: list) -> set[str] | None:
@@ -67,7 +92,9 @@ def _novidades_via_versoes(pasta_versoes: Path, pdf: Path, doc: dict,
 def main():
     inicio_utc = agora_utc()
     p = argparse.ArgumentParser()
-    p.add_argument("--pdfs", required=True, help="pasta com PDFs individuais de convenções")
+    p.add_argument("--pdfs", required=True,
+                   help="pasta com PDFs individuais de convenções — a pasta "
+                        "do ano (bte_2026) ou já convencoes/PRI ou SPE")
     p.add_argument("--codebook", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--variaveis", help="VariaveisDocumento*.xlsx do MaxQDA (subtipo, CAE, …)")
@@ -104,9 +131,11 @@ def main():
     if args.metricas:
         aptos = codigos_auto(json.loads(Path(args.metricas).read_text(encoding="utf-8")))
 
-    pdfs = sorted(Path(args.pdfs).glob("*.pdf"))
+    pdfs = _pdfs_da_pasta(Path(args.pdfs))
     if not pdfs:
-        raise SystemExit(f"Sem PDFs em {args.pdfs}")
+        raise SystemExit(
+            f"Sem PDFs em {args.pdfs} (procurado direto e em "
+            f"convencoes/{{{','.join(_AMBITOS_PROCESSAVEIS)}}})")
 
     # Uma portaria de extensão ou um acordo de adesão não têm o articulado que a
     # codificação temática pressupõe. Se um deles entrar aqui, não dá erro: dá

@@ -13,6 +13,7 @@ import sys
 import time
 from pathlib import Path
 
+from . import ambito as mod_ambito
 from . import nomeacao, recolha
 from .proveniencia import agora_utc, construir_manifesto, escrever_manifesto
 from .recolha import (DESTINO_OMISSAO, FAMILIAS_POR_OMISSAO, INDICES_OMISSAO,
@@ -37,6 +38,12 @@ def main(argv=None):
                    help="pasta data/raw/bte, onde ficam os PDFs já nomeados")
     p.add_argument("--registo", default=str(REGISTO_OMISSAO))
     p.add_argument("--siglas", help="CSV opcional 'nome;sigla'")
+    p.add_argument("--esquema", choices=nomeacao.ESQUEMAS, default="rnc",
+                   help="esquema de nome: 'rnc' (obrigatório a partir do "
+                        "corpus de 2026, ver ADR-0021) ou 'pipeline' (o de "
+                        "2025, só para corpos anteriores)")
+    p.add_argument("--ambitos", help="CSV 'nome;ambito' de empregadores com "
+                                     "âmbito conhecido (só com --esquema rnc)")
     p.add_argument("--familias", default=",".join(FAMILIAS_POR_OMISSAO))
     p.add_argument("--confirmar-rede", action="store_true")
     p.add_argument("--aplicar", action="store_true")
@@ -64,9 +71,12 @@ def main(argv=None):
     print(texto1)
 
     tabela = nomeacao.carregar_siglas(Path(args.siglas)) if args.siglas else None
+    voc_ambito = (mod_ambito.carregar_vocabulario(Path(args.ambitos))
+                  if args.ambitos else mod_ambito.carregar_vocabulario())
     r2 = nomeacao.nomear(registo, Path(args.destino), aplicar=args.aplicar,
                          tabela=tabela, familias=familias,
-                         aceitar_heuristicas=args.aceitar_heuristicas)
+                         aceitar_heuristicas=args.aceitar_heuristicas,
+                         esquema=args.esquema, vocabulario_ambito=voc_ambito)
     texto2 = nomeacao.texto_resumo(r2, aplicar=args.aplicar)
     print(texto2)
 
