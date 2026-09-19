@@ -92,6 +92,40 @@ def test_corrida_produz_manifest_json(tmp_path, monkeypatch):
     assert manifesto["outputs"]
 
 
+def test_pipeline_tema_encontra_os_pdfs_que_a_aquisicao_escreveu(
+        tmp_path, monkeypatch, capsys):
+    """A pasta que a aquisição escreve tem de ser a mesma que o pipeline lê.
+
+    Bloqueante apontado na revisão do PR #69: com o esquema RNC, a
+    aquisição arruma os PDFs em `bte_2026/convencoes/{PRI,SPE}/`, mas a
+    app gráfica e o guia de operação continuam a apontar `--pdfs` para
+    `bte_2026` (a pasta do ano) — e `cct.pipeline_tema` só procurava com
+    `glob("*.pdf")`, sem descer às subpastas. `_pdfs_da_pasta` tem de
+    encontrar os PDFs nos dois casos."""
+    from cct import pipeline_tema
+
+    monkeypatch.setattr(recolha, "abridor_urllib", AbridorFalso())
+    aquisicao.main(_argumentos(tmp_path) +
+                   ["--confirmar-rede", "--aplicar", "--aceitar-heuristicas"])
+
+    pasta_ano = tmp_path / "bte" / "bte_2026"
+    assert not list(pasta_ano.glob("*.pdf")), \
+        "pré-condição: o esquema RNC não escreve PDFs direto na pasta do ano"
+
+    codebook = tmp_path / "cb.yaml"
+    codebook.write_text("tema: ensaio\ncodigos: []\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "sys.argv",
+        ["cct.pipeline_tema", "--pdfs", str(pasta_ano),
+         "--codebook", str(codebook), "--out", str(tmp_path / "out")])
+
+    pipeline_tema.main()  # não pode dar SystemExit("Sem PDFs em …")
+
+    manifesto = json.loads((tmp_path / "out" / "manifest.json").read_text(
+        encoding="utf-8"))
+    assert manifesto["summary"]["documentos_encontrados"] == 6
+
+
 def test_repetir_a_corrida_nao_descarrega_nem_reescreve(tmp_path, monkeypatch):
     monkeypatch.setattr(recolha, "abridor_urllib", AbridorFalso())
     args = _argumentos(tmp_path) + ["--confirmar-rede", "--aplicar"]

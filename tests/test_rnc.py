@@ -633,6 +633,42 @@ def test_o_pipeline_recusa_o_que_nao_e_convencao(tmp_path, monkeypatch):
     assert "convencoes" in mensagem, "a mensagem tem de dizer para onde apontar"
 
 
+def test_pdfs_da_pasta_encontra_direto_e_nas_subpastas_de_ambito(tmp_path):
+    """`--pdfs` continua a aceitar a pasta do ano (ADR-0021, PR #69)."""
+    from cct.pipeline_tema import _pdfs_da_pasta
+
+    # esquema de 2025, ou já a pasta de um âmbito: direto, sem procurar mais
+    direta = tmp_path / "direta"
+    direta.mkdir()
+    (direta / "26_PR_001_BTE_31_ACRAL_CESP.pdf").write_bytes(b"%PDF-1.4\n")
+    assert _pdfs_da_pasta(direta) == [direta / "26_PR_001_BTE_31_ACRAL_CESP.pdf"]
+
+    # esquema RNC: nada direto na pasta do ano, mas convencoes/PRI e SPE têm
+    ano = tmp_path / "bte_2026"
+    for ambito in ("PRI", "SPE", "APU"):
+        (ano / "convencoes" / ambito).mkdir(parents=True)
+    (ano / "convencoes" / "PRI" / "2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf"
+     ).write_bytes(b"%PDF-1.4\n")
+    (ano / "convencoes" / "SPE" / "2026_SPE_382_AE_47252_BTE_31_EMEM-SINTAP.pdf"
+     ).write_bytes(b"%PDF-1.4\n")
+    (ano / "convencoes" / "APU" / "2026_APU_999_ACEP_1_BTE_31_X-Y.pdf"
+     ).write_bytes(b"%PDF-1.4\n")
+
+    achados = _pdfs_da_pasta(ano)
+    assert [f.name for f in achados] == [
+        "2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf",
+        "2026_SPE_382_AE_47252_BTE_31_EMEM-SINTAP.pdf",
+    ], "APU não é processável (README §4.3) — não entra na descoberta automática"
+
+
+def test_pdfs_da_pasta_sem_nada_devolve_lista_vazia(tmp_path):
+    from cct.pipeline_tema import _pdfs_da_pasta
+
+    vazia = tmp_path / "vazia"
+    vazia.mkdir()
+    assert _pdfs_da_pasta(vazia) == []
+
+
 # ------------------------ a lista do INE como sinal, não como autoridade (ADR-0019)
 
 INE = [
