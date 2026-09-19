@@ -232,3 +232,17 @@ def test_prosa_com_previa_nao_rouba_o_corpo_da_clausula():
     doc, _ = estruturar(texto, "t")
     cl = [n for n in doc["nos"] if n["tipo"] == "clausula"]
     assert [n["rotulo"] for n in cl] == ["Cláusula 3.ª - Subsídio de refeição"]
+
+
+# ---------- data de outorga nunca é título (ISSUE-0018) ----------
+
+def test_data_de_outorga_nao_vira_titulo_do_anexo():
+    # EmpresaMetropolitana_SINTAP: quando a tabela do anexo não produz
+    # conteúdo, o cabeçalho "ANEXO III" fica seguido, sem nada entre os
+    # dois, pela data que assina o documento — que não é o título do anexo
+    texto = ("ANEXO III\nMaia, 14 de julho de 2026.\n"
+             "Pela Empresa Exemplo, EM:\nJoão Silva , na qualidade de mandatário.\n")
+    doc, final = estruturar(texto, "t")
+    anexo = [n for n in doc["nos"] if n["tipo"] == "anexo"]
+    assert anexo[0]["rotulo"] == "ANEXO III"
+    assert "Maia, 14 de julho de 2026." in final
