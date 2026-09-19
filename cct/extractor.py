@@ -143,9 +143,18 @@ def juntar_linhas(texto: str) -> str:
             resultado.append(atual)
             continue
         anterior = resultado[-1]
-        # linha curta imediatamente após cabeçalho = título ("Âmbito")
+        # linha curta imediatamente após cabeçalho = título ("Âmbito").
+        # O limite é 90, o mesmo de `_titulo_candidato` (ISSUE-0017): um
+        # limite mais apertado aqui, sem razão para ser diferente, fundia
+        # títulos legítimos com o corpo só por terem mais de 60 caracteres
+        # ("Organização de serviços de segurança, higiene e saúde no
+        # trabalho", com 65, virava início da Cláusula 68.ª sem título).
+        # A vírgula final continua a excluir: um título não deixa a frase a
+        # meio, ao contrário do início de um parágrafo de corpo (memo 23:
+        # "Cumpre … qualquer organização,\npressupõe respostas coletivas.")
         e_titulo = (_e_cabecalho(anterior) and atual
-                    and len(atual) <= 60
+                    and len(atual) <= 90
+                    and not atual.endswith(",")
                     and not RE_PONTUACAO_FORTE.search(atual)
                     and not _e_cabecalho(atual)
                     and not RE_MARCADOR.match(atual))

@@ -234,6 +234,35 @@ def test_prosa_com_previa_nao_rouba_o_corpo_da_clausula():
     assert [n["rotulo"] for n in cl] == ["Cláusula 3.ª - Subsídio de refeição"]
 
 
+# ---------- título com mais de 60 caracteres (ISSUE-0017) ----------
+
+def test_titulo_entre_60_e_90_caracteres_nao_se_funde_ao_corpo():
+    # ACIBARCELOS_IndependenteSector: o docling dá o título e o corpo já
+    # separados, mas o limite de 60 caracteres do "é título?" na junção de
+    # linhas era mais apertado do que o de _titulo_candidato (90), e um
+    # título de 65 caracteres fundia-se com a frase seguinte
+    titulo = "Organização de serviços de segurança, higiene e saúde no trabalho"
+    assert len(titulo) == 65
+    texto = (f"Cláusula 68.ª\n{titulo}\n"
+             "Independentemente do número de trabalhadores, a entidade "
+             "empregadora é obrigada a organizar serviços de segurança.\n")
+    doc, final = estruturar(texto, "t")
+    cl = [n for n in doc["nos"] if n["tipo"] == "clausula"]
+    assert cl[0]["rotulo"] == f"Cláusula 68.ª - {titulo}"
+    assert "Independentemente do número" in final
+
+
+def test_paragrafo_de_corpo_com_virgula_continua_a_juntar_se():
+    # memo 23: alargar o limite não pode voltar a fundir um parágrafo do
+    # corpo com a linha seguinte só por ser curto — a vírgula final é o
+    # sinal de que a frase continua, não um título
+    texto = ("Preâmbulo\n"
+             "Cumpre em primeiro lugar referir que a existência de qualquer organização,\n"
+             "pressupõe respostas colectivas.")
+    saida = juntar_linhas(texto)
+    assert "organização, pressupõe" in saida
+
+
 # ---------- "Declaração" como início de bloco (ISSUE-0015, ponto 3) ----------
 
 def test_declaracao_nao_se_cola_ao_nome_anterior():
