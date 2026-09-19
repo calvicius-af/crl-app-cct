@@ -61,8 +61,11 @@ _RE_HEADINGS = [
 
 # marcadores que justificam manter a quebra de linha antes deles
 _MARCADOR_LISTA = r"\d+\s*[-–—.)]|[a-z]\)|[ivxl]+\)|[-–—•§]\s?"
+# "Declaração" (ISSUE-0015, ponto 3): quando uma parte assina em representação
+# de outras, o PDF traz uma declaração própria a identificá-las — sem isto,
+# cola-se ao nome do signatário anterior, como se fosse o mesmo bloco
 _MARCADOR_ESTRUTURAL = (r"Cl[aá]usula\s|Artigo\s|CAP[IÍ]TULO\s|SEC[ÇC][AÃ]O\s"
-                        r"|ANEXO\b|NOTA\b")
+                        r"|ANEXO\b|NOTA\b|Declara[çc][ãa]o\b")
 RE_MARCADOR = re.compile(
     rf"^(?:{_MARCADOR_LISTA}|{_MARCADOR_ESTRUTURAL})", re.IGNORECASE)
 # só os de lista: uma linha que comece por "Cláusula" mas não seja um

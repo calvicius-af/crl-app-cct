@@ -79,6 +79,21 @@ def test_isola_o_bloco_de_tabela():
     assert "\n\nAssinaturas seguem-se" in saida
 
 
+def test_insere_linha_em_branco_antes_das_assinaturas():
+    """ISSUE-0015, ponto 1: o bloco ASSINATURAS ganha a mesma linha em
+    branco que já separa cláusulas e tabelas — hoje sai colado ao último
+    parágrafo do corpo porque `_destacar_assinaturas` cria um nó "bloco",
+    tipo que `pontos_de_espacamento` não espaçava."""
+    texto = ("Cláusula 1.ª - Âmbito\n"
+             "1- O presente acordo aplica-se a todos os trabalhadores.\n"
+             "Pela Empresa Exemplo, Lda.:\n"
+             "João Silva , na qualidade de mandatário.\n")
+    doc, texto = estruturar(texto, "teste")
+    assert any(n["rotulo"] == "ASSINATURAS" for n in doc["nos"])
+    saida = espacar(texto, pontos_de_espacamento(texto, doc))
+    assert "\n\nPela Empresa Exemplo" in saida
+
+
 # ---------- falsos positivos: prosa com " | " não é tabela ----------
 
 TEXTO_PROSA = ("Cláusula 21.ª - Retribuição\n"

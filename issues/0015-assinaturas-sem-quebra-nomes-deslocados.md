@@ -1,6 +1,6 @@
 # ISSUE-0015: o bloco de assinaturas sai sem quebra, com nomes deslocados e sem destaque
 
-- **Estado:** Aberta
+- **Estado:** Em curso — pontos 1 e 3 resolvidos em 2026-09-19; ponto 2 fica aberto
 - **Data:** 2026-09-18
 - **GitHub:** (a criar)
 - **Onde dói:** `cct/extractor.py` (`_destacar_assinaturas`, `_inicio_assinaturas`),
@@ -60,9 +60,10 @@ dos seguintes sindicatos:
 
 ```bash
 .venv/bin/python -m cct.pipeline_tema \
-    --pdfs data/raw/bte/bte_2026 --codebook codebooks/demo_fase0.yaml \
+    --pdfs data/raw/bte/bte_2026/convencoes/PRI --codebook codebooks/demo_fase0.yaml \
     --extrator docling --out results/runs/2026/assinaturas
-# abrir o TXT do 26_PR_003_BTE_31_AEVP_FESAHT no QDPX e ver o fim
+# abrir o TXT do 2026_PRI_379_CCT-ALT_26651_BTE_31_AEVP-FESAHT no QDPX e ver o fim
+# (nome RNC; era 26_PR_003_BTE_31_AEVP_FESAHT no esquema de 2025 — ver ISSUE-0022)
 ```
 
 ## Notas
@@ -76,3 +77,37 @@ dos seguintes sindicatos:
   qualidade de"), não só de posição — ver `_inicio_assinaturas` para o padrão já usado.
 - Relacionada com a ISSUE-0002 (quebras de linha em blocos de título) pela mesma
   família de correções de legibilidade.
+
+## O que foi feito
+
+**Pontos 1 e 3 resolvidos:**
+
+1. `pontos_de_espacamento` (`cct/qdpx.py`) passa a espaçar também os nós com
+   `rotulo == "ASSINATURAS"`, não só os tipos estruturais
+   (`capitulo`/`seccao`/`anexo`/`clausula`/`artigo`). O bloco de assinaturas ganha a
+   mesma linha em branco antes que já separava cláusulas e tabelas.
+3. `"Declaração"` passa a constar de `_MARCADOR_ESTRUTURAL` (`cct/extractor.py`), o
+   que faz `juntar_linhas` manter a quebra antes dela. Deixa de se colar ao nome do
+   signatário anterior, e o resto do texto da declaração continua a juntar-se
+   normalmente (não vira um cabeçalho a sério — só protege a quebra antes).
+
+Verificado com o pipeline real sobre `2026_PRI_379` e `2026_PRI_380`
+(`AEVP-FESAHT`): a linha em branco aparece antes de "Lisboa, 22 de julho de 2026." e
+"Declaração" passa a estar na sua própria linha nos dois documentos. Testado em
+`tests/test_qdpx_espacamento.py::test_insere_linha_em_branco_antes_das_assinaturas` e
+`tests/test_extractor_nuances.py::test_declaracao_nao_se_cola_ao_nome_anterior`.
+
+**Ponto 2 continua aberto.** Investigação com os tipos reais do docling (ver
+ADR-relacionado ISSUE-0016) mostrou a causa exata: quando duas qualificações
+("na qualidade de mandatário.") vêm num único item do docling que abrange
+verticalmente as posições de dois nomes distintos, a ordenação por geometria
+(`ordenar_por_leitura`) desempata pela ordem de inserção original do docling, não
+pela leitura visual — o item de qualificações fica colado ao primeiro nome, e o
+segundo nome aparece isolado mais abaixo, sem a sua qualificação. Uma correção por
+padrão de texto (juntar N nomes soltos com N qualificações repetidas na linha
+seguinte) foi considerada e descartada nesta ronda: no caso real, o nome em falta
+aparece **depois**, colado ao início da "Declaração" que se corrigiu no ponto 3, não
+imediatamente a seguir às qualificações — um heurística de linhas adjacentes não
+teria apanhado este caso, e uma mais ampla arriscava juntar nomes errados noutros
+documentos. Fica como trabalho de investigação geométrica separado, não como
+correção de texto.
