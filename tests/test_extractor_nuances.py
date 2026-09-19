@@ -246,3 +246,22 @@ def test_data_de_outorga_nao_vira_titulo_do_anexo():
     anexo = [n for n in doc["nos"] if n["tipo"] == "anexo"]
     assert anexo[0]["rotulo"] == "ANEXO III"
     assert "Maia, 14 de julho de 2026." in final
+
+
+# ---------- "Declaração" como início de bloco (ISSUE-0015, ponto 3) ----------
+
+def test_declaracao_nao_se_cola_ao_nome_anterior():
+    # AEVP-FESAHT: quando um sindicato assina em representação de outros, o
+    # PDF traz uma "Declaração" própria — sem a quebra, cola-se ao nome do
+    # signatário anterior, escondendo a representação de terceiros
+    texto = "José Eduardo Pereira Andrade\nDeclaração A FESAHT representa também:\n"
+    assert juntar_linhas(texto) == \
+        "José Eduardo Pereira Andrade\nDeclaração A FESAHT representa também:\n"
+
+
+def test_declaracao_continua_a_juntar_o_que_vem_a_seguir():
+    # a quebra é só antes de "Declaração" — o resto da frase junta-se como
+    # qualquer outro parágrafo, sem se tornar um cabeçalho a sério
+    texto = "Declaração A FESAHT representa também os seguintes\nsindicatos:\n"
+    assert juntar_linhas(texto) == \
+        "Declaração A FESAHT representa também os seguintes sindicatos:\n"

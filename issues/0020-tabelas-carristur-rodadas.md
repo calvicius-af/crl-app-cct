@@ -1,14 +1,15 @@
 # ISSUE-0020: as tabelas dos CARRISTUR estão rodadas 90º e saem invertidas
 
-- **Estado:** Aberta
+- **Estado:** Resolvida — 2026-09-19
 - **Data:** 2026-09-18
 - **GitHub:** (a criar)
 - **Onde dói:** `cct/extractor.py` (`_extrair_pagina`, `_formatar_tabela`),
-  `cct/extractor_docling.py` (`_linhas_de_tabela`)
+  `cct/extractor_docling.py` (`_linhas_de_tabela`), `cct/auditoria.py`
 
 ## O que acontece
 
-Nos quatro documentos CARRISTUR (`26_PR_011` a `26_PR_014`), as tabelas estão rodadas
+Nos quatro documentos CARRISTUR (`26_PR_011` a `26_PR_014` no esquema de 2025; agora
+`2026_SPE_387` a `2026_SPE_390` no esquema RNC — ver ISSUE-0022), as tabelas estão rodadas
 90º no sentido contrário ao dos ponteiros do relógio. O extrator não o deteta e o texto
 sai invertido, carácter a carácter:
 
@@ -34,7 +35,9 @@ se fosse conteúdo válido.
 ```bash
 .venv/bin/python - <<'PY'
 import pdfplumber
-with pdfplumber.open("data/raw/bte/bte_2026/26_PR_011_BTE_31_CARRISTUR_ASPTC.pdf") as p:
+with pdfplumber.open(
+    "data/raw/bte/bte_2026/convencoes/SPE/"
+    "2026_SPE_387_AE-ALT-RECT_47109_BTE_31_CARRISTUR-ASPTC.pdf") as p:
     for i, pg in enumerate(p.pages):
         for tab in pg.find_tables():
             print(f"p{i+1}", tab.bbox, tab.extract()[0][:3])
@@ -55,3 +58,24 @@ PY
   `altura > 2 × largura` numa tabela é barato e não arrisca falsos positivos graves.
 - Relacionada com a ISSUE-0014 (os mesmos quatro documentos CARRISTUR, que também não
   produzem cláusulas).
+
+## O que foi feito
+
+Implementada a via do aviso (segunda opção da nota 2), não a deteção-e-correção: o
+docling já lê estas tabelas bem, e é o extrator recomendado para tabelas desde a ronda
+de 2026-09-17; corrigir a rotação no pdfplumber duplicaria trabalho que a aplicação já
+resolve de outra forma.
+
+Nova função `tabelas_rodadas_pdfplumber` em `cct/auditoria.py`, no mesmo espírito das
+auditorias que já lá vivem (divergência de contagem entre extratores, anexos de
+remuneração sem tabela): abre o PDF só para consultar `find_tables()` (não extrai
+texto, não é um segundo extrator), e avisa quando `altura > 2 × largura` — exatamente
+o limiar que a nota 3 propôs. Ligada ao `cct.pipeline_tema`, só quando o extrator em
+uso é o pdfplumber (`--extrator docling` já lê bem, não há o que avisar).
+
+Verificado com o pipeline real: a corrida com `--extrator pdfplumber` (omissão) sobre
+os quatro CARRISTUR (`2026_SPE_387` a `390`) produz o aviso `"tabela com 315×672 pt
+(...) — provavelmente rodada 90º (...) usar --extrator docling"` no relatório; a
+corrida equivalente com `--extrator docling` não produz nenhum. O texto invertido
+continua a sair no QDPX quando se usa pdfplumber — o aviso não o corrige, só o torna
+visível, como a issue aceitava como solução mínima.
