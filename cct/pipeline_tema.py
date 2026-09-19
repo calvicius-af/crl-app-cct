@@ -214,6 +214,18 @@ def main():
                 problemas.append(
                     f"{pdf.stem}: [auditoria] não foi possível verificar "
                     f"as tabelas ({e}) — documento mantido")
+            # tabelas rodadas 90º (ISSUE-0020): defeito específico do
+            # pdfplumber, que lê o texto invertido sem se queixar — com
+            # --extrator docling a tabela já sai correta, não há o que avisar
+            if args.extrator != "docling":
+                try:
+                    from .auditoria import tabelas_rodadas_pdfplumber
+                    for aviso in tabelas_rodadas_pdfplumber(pdf):
+                        problemas.append(f"{pdf.stem}: [auditoria] {aviso}")
+                except Exception as e:
+                    problemas.append(
+                        f"{pdf.stem}: [auditoria] não foi possível verificar "
+                        f"tabelas rodadas ({e}) — documento mantido")
             anot = codificar(doc, texto, codebook)
             if args.semantica:
                 from .semantico import codificar_semantico, backend_lmstudio

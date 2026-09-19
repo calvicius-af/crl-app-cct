@@ -46,7 +46,7 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0017](0017-titulo-clausula-68-nao-apanhado.md) | O título da Cláusula 68.ª não é apanhado | Aberta |
 | [0018](0018-titulo-anexo-depois-da-tabela.md) | O título do último anexo sai depois dos dados da tabela | Aberta |
 | [0019](0019-residuo-be-do-cabecalho.md) | Resíduo "BE" do cabeçalho do BTE no corpo do texto | Aberta |
-| [0020](0020-tabelas-carristur-rodadas.md) | As tabelas dos CARRISTUR estão rodadas 90º e saem invertidas | Aberta |
+| [0020](0020-tabelas-carristur-rodadas.md) | As tabelas dos CARRISTUR estão rodadas 90º e saem invertidas | Resolvida |
 | [0021](0021-alternativas-tabelas-maxqda.md) | Alternativas para tabelas melhor formatadas no MAXQDA | Aberta |
 | [0022](0022-nomes-nao-seguem-esquema-rnc.md) | Os nomes dos ficheiros não seguem o esquema definido em docs/rnc/README.md | Aberta |
 

@@ -4,7 +4,8 @@ O que se protege aqui: uma tabela perdida na extração tem de ser
 visível no relatório — como divergência entre extratores ou como anexo
 de remuneração sem tabela — em vez de desaparecer em silêncio.
 """
-from cct.auditoria import contar_blocos_tabela, divergencias, tabelas_esperadas
+from cct.auditoria import (_aviso_tabela_rodada, contar_blocos_tabela,
+                          divergencias, tabelas_esperadas)
 from cct.extractor import estruturar
 
 
@@ -124,6 +125,27 @@ def test_anexo_sem_termos_de_tabela_nao_da_aviso():
         "Anexo II - Regulamento interno",
         "Parágrafo primeiro.")
     assert tabelas_esperadas(doc, texto) == []
+
+
+# -------------------------------------------- tabelas rodadas (ISSUE-0020)
+
+def test_deteta_tabela_muito_mais_alta_que_larga():
+    # o caso real do CARRISTUR: bbox 315×672 pt
+    aviso = _aviso_tabela_rodada(2, (120.7, 99.2, 435.5, 771.0))
+    assert aviso is not None
+    assert "p2" in aviso and "docling" in aviso
+
+
+def test_nao_marca_tabela_com_proporcao_normal():
+    # uma tabela salarial normal é mais larga do que alta
+    aviso = _aviso_tabela_rodada(1, (80.0, 100.0, 500.0, 250.0))
+    assert aviso is None
+
+
+def test_tabela_quadrada_nao_e_marcada():
+    # o limiar é 2×, não qualquer altura > largura
+    aviso = _aviso_tabela_rodada(1, (80.0, 100.0, 280.0, 280.0))
+    assert aviso is None
 
 
 # --------------------------------------- integração: sanidade chama canário
