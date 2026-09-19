@@ -1,6 +1,6 @@
 # ISSUE-0016: marcadores de parágrafo e alínea perdidos ou trocados por hífens
 
-- **Estado:** Aberta
+- **Estado:** Resolvida — 2026-09-19
 - **Data:** 2026-09-18
 - **GitHub:** (a criar)
 - **Onde dói:** `cct/extractor.py` (`RE_NUMERO_SEM_SEPARADOR`, `RE_MARCADOR_LISTA`,
@@ -93,3 +93,34 @@ cobre `3Idade`, em que o número perdeu o separador).
   acrescentado. Confirmar caso a caso antes de generalizar a correção.
 - Testes a estender: `tests/test_extractor_docling.py` (marcadores de lista) e
   `tests/test_extractor_f1b.py` (numeração).
+- Nomes de ficheiro atualizados para o esquema RNC (ISSUE-0022): `26_PR_006` →
+  `2026_SPE_382_AE_47252_BTE_31_EmpresaMetropolitana-SINTAP`; `26_PR_007` →
+  `2026_PRI_383_AE_47253_BTE_31_IBERCOURIER-SNTCT`; `26_PR_008` →
+  `2026_PRI_384_AE-ALT_47120_BTE_31_AWP-STAS`.
+
+## O que foi feito
+
+Investigação com o docling real (`doc.iterate_items()`) confirmou três causas
+distintas, não uma só:
+
+1. **6a e 10** (alíneas → hífen): o docling separa o marcador para o campo próprio
+   `ListItem.marker` (ex.: `'g)'`) e deixa `item.text` **sem** o marcador — não é um
+   caso de "marcador já no texto sem separador" como a nota original supunha.
+   `documento_para_texto` agora usa `item.marker` quando presente, em vez de assumir
+   sempre `- `.
+2. **8 e 11** (número colado, `3Idade…`): confirmado — `ListItem.marker` vem vazio e o
+   número está mesmo colado ao texto. Nova regra `RE_NUMERO_COLADO_LISTA` repõe o
+   separador (`3Idade` → `3- Idade`) em vez de acrescentar `- ` por cima.
+3. **6b** (`n)` colada a `m)`): causa diferente das outras — o docling funde as duas
+   alíneas no mesmo `TextItem`, sem as separar em items distintos. Nova regra
+   `RE_ALINEA_FUNDIDA` (estreita: `; letra) Maiúscula`) repõe a quebra de linha.
+4. **7** (`3A EMEM` do lado pdfplumber): `RE_NUMERO_SEM_SEPARADOR` exigia maiúscula
+   **seguida de minúscula**, o que falhava quando a palavra colada era uma sigla ou
+   artigo de uma letra (`3A EMEM`, em que "A" é seguido de espaço). Relaxada para só
+   exigir a maiúscula.
+
+Testado com casos novos em `tests/test_docling_integracao.py` (tipos reais do
+docling) e `tests/test_extractor_nuances.py`, e verificado de novo com o pipeline
+real sobre os três documentos: `2026_SPE_382` (alíneas g/h/i e m/n do Preâmbulo,
+Cláusula 17.ª), `2026_PRI_383` (cláusulas 42.ª/43.ª) e `2026_PRI_384` (Cláusula 6.ª) —
+todos corrigidos.
