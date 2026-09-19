@@ -33,18 +33,21 @@ def test_simulacao_nao_liga_a_rede_nem_escreve(tmp_path, monkeypatch, capsys):
 
 def test_corrida_completa_escreve_so_os_documentos_sem_aviso(tmp_path, monkeypatch):
     """Por omissão (sem --aceitar-heuristicas), os documentos com sigla
-    derivada por heurística ficam por confirmar — ver PR #35, achado nº5."""
+    derivada por heurística ficam por confirmar — ver PR #35, achado nº5.
+
+    Por omissão, `--esquema` é `rnc` (ADR-0021): os nomes já saem no formato
+    do RNC, não no de 2025."""
     monkeypatch.setattr(recolha, "abridor_urllib", AbridorFalso())
     codigo = aquisicao.main(_argumentos(tmp_path) + ["--confirmar-rede", "--aplicar"])
 
     assert codigo == 0
-    pdfs = sorted(p.name for p in (tmp_path / "bte" / "bte_2026").glob("*.pdf"))
-    assert pdfs == ["26_PR_001_BTE_31_ACRAL_CESP.pdf",
-                    "26_PR_002_BTE_31_CNIS_FNSTFPS.pdf",
-                    "26_PR_003_BTE_31_AEVP_FESAHT.pdf"]
+    pdfs = sorted(p.name for p in (tmp_path / "bte" / "bte_2026").rglob("*.pdf"))
+    assert pdfs == ["2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf",
+                    "2026_PRI_378_CCT-ALT_26760_BTE_31_CNIS-FNSTFPS.pdf",
+                    "2026_PRI_379_CCT-ALT_26651_BTE_31_AEVP-FESAHT.pdf"]
     relatorio = next((tmp_path / "relatorios").glob("relatorio_*.txt")).read_text(
         encoding="utf-8")
-    assert "26_PR_001_BTE_31_ACRAL_CESP" in relatorio
+    assert "2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP" in relatorio
     assert "Rede: autorizada" in relatorio
     assert "por_confirmar: 3" in relatorio
 
@@ -56,16 +59,16 @@ def test_corrida_completa_produz_a_pasta_do_pipeline_com_aceitar_heuristicas(
                             ["--confirmar-rede", "--aplicar", "--aceitar-heuristicas"])
 
     assert codigo == 0
-    pdfs = sorted(p.name for p in (tmp_path / "bte" / "bte_2026").glob("*.pdf"))
-    assert pdfs == ["26_PR_001_BTE_31_ACRAL_CESP.pdf",
-                    "26_PR_002_BTE_31_CNIS_FNSTFPS.pdf",
-                    "26_PR_003_BTE_31_AEVP_FESAHT.pdf",
-                    "26_PR_004_BTE_31_EmpresaMetropolitana_SINTAP.pdf",
-                    "26_PR_005_BTE_31_APSolutionsGMBH_STAS.pdf",
-                    "26_PR_006_BTE_31_CARRISTUR_Transportes.pdf"]
+    pdfs = sorted(p.name for p in (tmp_path / "bte" / "bte_2026").rglob("*.pdf"))
+    assert pdfs == ["2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf",
+                    "2026_PRI_378_CCT-ALT_26760_BTE_31_CNIS-FNSTFPS.pdf",
+                    "2026_PRI_379_CCT-ALT_26651_BTE_31_AEVP-FESAHT.pdf",
+                    "2026_PRI_385_AE-ALT_47140_BTE_31_APSolutionsGMBH-STAS.pdf",
+                    "2026_SPE_382_AE_47252_BTE_31_EmpresaMetropolitana-SINTAP.pdf",
+                    "2026_SPE_387_AE-ALT-RECT_47109_BTE_31_CARRISTUR-Transportes.pdf"]
     relatorio = next((tmp_path / "relatorios").glob("relatorio_*.txt")).read_text(
         encoding="utf-8")
-    assert "26_PR_001_BTE_31_ACRAL_CESP" in relatorio
+    assert "2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP" in relatorio
     assert "Rede: autorizada" in relatorio
 
 
@@ -87,6 +90,40 @@ def test_corrida_produz_manifest_json(tmp_path, monkeypatch):
     # entradas (índices) e saídas (relatório, registo) hasheadas para auditoria
     assert manifesto["inputs"]
     assert manifesto["outputs"]
+
+
+def test_pipeline_tema_encontra_os_pdfs_que_a_aquisicao_escreveu(
+        tmp_path, monkeypatch, capsys):
+    """A pasta que a aquisição escreve tem de ser a mesma que o pipeline lê.
+
+    Bloqueante apontado na revisão do PR #69: com o esquema RNC, a
+    aquisição arruma os PDFs em `bte_2026/convencoes/{PRI,SPE}/`, mas a
+    app gráfica e o guia de operação continuam a apontar `--pdfs` para
+    `bte_2026` (a pasta do ano) — e `cct.pipeline_tema` só procurava com
+    `glob("*.pdf")`, sem descer às subpastas. `_pdfs_da_pasta` tem de
+    encontrar os PDFs nos dois casos."""
+    from cct import pipeline_tema
+
+    monkeypatch.setattr(recolha, "abridor_urllib", AbridorFalso())
+    aquisicao.main(_argumentos(tmp_path) +
+                   ["--confirmar-rede", "--aplicar", "--aceitar-heuristicas"])
+
+    pasta_ano = tmp_path / "bte" / "bte_2026"
+    assert not list(pasta_ano.glob("*.pdf")), \
+        "pré-condição: o esquema RNC não escreve PDFs direto na pasta do ano"
+
+    codebook = tmp_path / "cb.yaml"
+    codebook.write_text("tema: ensaio\ncodigos: []\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "sys.argv",
+        ["cct.pipeline_tema", "--pdfs", str(pasta_ano),
+         "--codebook", str(codebook), "--out", str(tmp_path / "out")])
+
+    pipeline_tema.main()  # não pode dar SystemExit("Sem PDFs em …")
+
+    manifesto = json.loads((tmp_path / "out" / "manifest.json").read_text(
+        encoding="utf-8"))
+    assert manifesto["summary"]["documentos_encontrados"] == 6
 
 
 def test_repetir_a_corrida_nao_descarrega_nem_reescreve(tmp_path, monkeypatch):

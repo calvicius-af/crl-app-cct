@@ -20,8 +20,10 @@ data/
 │   │   ├── bte_2021/             48 números completos do BTE de 2021
 │   │   ├── bte_2022/             240 convenções de 2022, uma por ficheiro
 │   │   ├── bte_2025/             corpus disponível de 2025; pode ser parcial
-│   │   ├── bte_2026/             convenções de 2026
-│   │   │   └── extensoes/        portarias e avisos (fora do glob do pipeline)
+│   │   ├── bte_2026/             esquema RNC (ADR-0021)
+│   │   │   ├── convencoes/{PRI,SPE,APU}/    o que o pipeline lê
+│   │   │   ├── portarias_extensao/          fora do glob do pipeline
+│   │   │   └── acordos_adesao/              fora do glob do pipeline
 │   │   └── bte2_2025.pdf         número completo usado pelos testes de extração
 │   ├── maxqda/                   exports do MaxQDA (ver abaixo)
 │   └── textos_consolidados/      21 pastas, uma por convenção, com as versões anteriores
@@ -146,9 +148,16 @@ O que acontece, em duas fases ([SPEC-0001](../../specs/0001-recolha-e-nomeacao-d
    `Last-Modified` de cada documento, e a segunda corrida sobre o mesmo índice não faz
    um único pedido de rede.
 2. **Nomeação** (`cct/nomeacao.py`) — copia cada PDF para
-   `data/raw/bte/bte_<ano>/` já com o nome do esquema
-   (`26_PR_003_BTE_31_AEVP_FESAHT.pdf`). As portarias de extensão e os avisos vão para
-   a subpasta `extensoes/`, para não entrarem no `glob("*.pdf")` do pipeline.
+   `data/raw/bte/bte_<ano>/convencoes/{PRI,SPE,APU}/` já com o nome do esquema RNC
+   (`2026_PRI_379_CCT-ALT_26651_BTE_31_AEVP-FESAHT.pdf`), obrigatório a partir do
+   corpus de 2026 ([ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md)). Um
+   corpo anterior a 2026, no esquema de 2025 (`26_PR_003_BTE_31_AEVP_FESAHT.pdf`), só se
+   reprocessa com `--esquema pipeline`. As portarias de extensão vão para
+   `data/raw/bte/bte_<ano>/portarias_extensao/`, os acordos de adesão para
+   `acordos_adesao/`, e os avisos não têm ficheiro — ficam só como metadado no
+   catálogo (ver [ADR-0018](../adr/0018-familias-documentais-em-pastas-separadas.md)).
+   Nenhuma destas famílias entra no `glob("*.pdf")` do `cct.pipeline_tema`, que só lê
+   `convencoes/`.
 
 A rede está **desligada por omissão** e só liga com `--confirmar-rede`
 ([ADR-0015](../adr/0015-recolha-em-rede-desligada-por-omissao.md)). Numa rede fechada,
