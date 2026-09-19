@@ -30,6 +30,21 @@ def test_descarta_mobiliario_bte():
     assert limpar_texto_item("   ") is None
 
 
+def test_descarta_fragmento_be_ou_bte_isolado():
+    """ISSUE-0019: o cabeçalho corrido chega às vezes partido pelo docling,
+    e sobra "BE" ou "BTE" isolado entre dois parágrafos do corpo."""
+    assert limpar_texto_item("BE") is None
+    assert limpar_texto_item("BTE") is None
+
+
+def test_nao_descarta_sigla_real_parecida_com_be():
+    """A regra é estreita de propósito: só a linha inteira "BE"/"BTE", sem
+    pontuação nem texto à volta — nunca uma sigla legítima."""
+    assert limpar_texto_item("BE - Banco Espírito Santo") is not None
+    assert limpar_texto_item("A BE assinou em representação") is not None
+    assert limpar_texto_item("ABE") is not None
+
+
 def test_mantem_texto_util():
     assert limpar_texto_item("1- O trabalhador tem direito.") == \
         "1- O trabalhador tem direito."
