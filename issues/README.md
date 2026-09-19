@@ -41,12 +41,12 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0012](0012-ci-nao-cobre-windows-nem-python-313.md) | O CI não corre em Windows nem em Python 3.13 | Aberta |
 | [0013](0013-proveniencia-sem-git-na-estacao.md) | A proveniência perde o commit quando não há git na estação | Aberta |
 | [0014](0014-carristur-sem-clausulas-nem-nota-de-deposito.md) | Quatro documentos CARRISTUR produzem zero cláusulas | Aberta |
-| [0015](0015-assinaturas-sem-quebra-nomes-deslocados.md) | O bloco de assinaturas sai sem quebra, com nomes deslocados e sem destaque | Aberta |
+| [0015](0015-assinaturas-sem-quebra-nomes-deslocados.md) | O bloco de assinaturas sai sem quebra, com nomes deslocados e sem destaque | Em curso |
 | [0016](0016-marcadores-paragrafo-alinea-perdidos.md) | Marcadores de parágrafo e alínea perdidos ou trocados por hífens | Resolvida |
 | [0017](0017-titulo-clausula-68-nao-apanhado.md) | O título da Cláusula 68.ª não é apanhado | Resolvida |
 | [0018](0018-titulo-anexo-depois-da-tabela.md) | O título do último anexo sai depois dos dados da tabela | Aberta |
 | [0019](0019-residuo-be-do-cabecalho.md) | Resíduo "BE" do cabeçalho do BTE no corpo do texto | Resolvida |
-| [0020](0020-tabelas-carristur-rodadas.md) | As tabelas dos CARRISTUR estão rodadas 90º e saem invertidas | Aberta |
+| [0020](0020-tabelas-carristur-rodadas.md) | As tabelas dos CARRISTUR estão rodadas 90º e saem invertidas | Resolvida |
 | [0021](0021-alternativas-tabelas-maxqda.md) | Alternativas para tabelas melhor formatadas no MAXQDA | Aberta |
 | [0022](0022-nomes-nao-seguem-esquema-rnc.md) | Os nomes dos ficheiros não seguem o esquema definido em docs/rnc/README.md | Resolvida |
 

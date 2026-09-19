@@ -33,6 +33,46 @@ def contar_tabelas_pdfplumber(pdf_path: Path) -> int:
     return total
 
 
+# uma tabela de remunerações genuína não é quase 2× mais alta do que larga;
+# quando é, o mais provável é estar rodada 90º no PDF (ISSUE-0020) — o
+# pdfplumber não deteta a rotação e lê o texto invertido, carácter a
+# carácter, sem se queixar
+LIMIAR_PROPORCAO_RODADA = 2.0
+
+
+def _aviso_tabela_rodada(pagina: int, bbox: tuple[float, float, float, float]
+                         ) -> str | None:
+    """Aviso para uma tabela cuja bbox (x0, top, x1, bottom) sugere rotação."""
+    x0, top, x1, bottom = bbox
+    largura, altura = x1 - x0, bottom - top
+    if largura > 0 and altura > LIMIAR_PROPORCAO_RODADA * largura:
+        return (f"p{pagina}: tabela com {largura:.0f}×{altura:.0f} pt "
+                f"(muito mais alta do que larga) — provavelmente rodada "
+                f"90º; o pdfplumber lê-a invertida, usar --extrator docling")
+    return None
+
+
+def tabelas_rodadas_pdfplumber(pdf_path: Path) -> list[str]:
+    """Tabelas cuja bbox sugere rotação 90º, por página (auditor, não segundo extrator).
+
+    O docling lê estas tabelas na orientação correta (verificado nos quatro
+    documentos CARRISTUR do BTE 31/2026); o pdfplumber não deteta a rotação
+    e emite o texto invertido como se fosse conteúdo válido. Isto não
+    corrige a leitura — só avisa, para quem vir a tabela invertida no QDPX
+    saber que a causa é conhecida e que `--extrator docling` a lê bem.
+    """
+    import pdfplumber
+
+    avisos = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for i, pag in enumerate(pdf.pages, 1):
+            for tab in pag.find_tables():
+                aviso = _aviso_tabela_rodada(i, tab.bbox)
+                if aviso:
+                    avisos.append(aviso)
+    return avisos
+
+
 def contar_blocos_tabela(texto: str) -> int:
     """Blocos de tabela que sobreviveram no texto extraído.
 

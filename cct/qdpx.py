@@ -59,7 +59,9 @@ def pontos_de_espacamento(texto: str, doc: dict) -> list[int]:
     """
     pontos = set()
     for no in doc.get("nos", []):
-        if no.get("tipo") in _TIPOS_ESPACADOS and no.get("char_start", 0) > 0:
+        espacado = (no.get("tipo") in _TIPOS_ESPACADOS
+                    or no.get("rotulo") == "ASSINATURAS")
+        if espacado and no.get("char_start", 0) > 0:
             pontos.add(no["char_start"])
     # duas passagens: primeiro marcar as linhas de tabela (bloco ≥2),
     # depois espaçar nas transições prosa↔tabela
