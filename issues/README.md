@@ -48,7 +48,7 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0019](0019-residuo-be-do-cabecalho.md) | Resíduo "BE" do cabeçalho do BTE no corpo do texto | Aberta |
 | [0020](0020-tabelas-carristur-rodadas.md) | As tabelas dos CARRISTUR estão rodadas 90º e saem invertidas | Aberta |
 | [0021](0021-alternativas-tabelas-maxqda.md) | Alternativas para tabelas melhor formatadas no MAXQDA | Aberta |
-| [0022](0022-nomes-nao-seguem-esquema-rnc.md) | Os nomes dos ficheiros não seguem o esquema definido em docs/rnc/README.md | Aberta |
+| [0022](0022-nomes-nao-seguem-esquema-rnc.md) | Os nomes dos ficheiros não seguem o esquema definido em docs/rnc/README.md | Resolvida |
 
 ## Ronda de 2026-09-18: qualidade da extração (linting e renomeação)
 
