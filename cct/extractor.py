@@ -74,8 +74,11 @@ RE_PONTUACAO_FORTE = re.compile(r"""[.!?:;][)\]»”"']*\s*$""")
 # ordinal separado do número pelo PDF: "Artigo 1. º", "12. º ano"
 RE_ORDINAL_SEPARADO = re.compile(r"(\d)\s*\.\s+([ºª])")
 # número de parágrafo que perdeu o separador: "3São considerados…" (o PDF
-# tem "3- São"); exige maiúscula a seguir para não tocar em "12.º" ou "2025"
-RE_NUMERO_SEM_SEPARADOR = re.compile(r"(?m)^(\d+(?:\.\d+)?)([A-ZÀ-Ú][a-zà-ú])")
+# tem "3- São"); exige maiúscula a seguir para não tocar em "12.º" ou "2025".
+# A maiúscula sozinha basta — não se exige uma minúscula a seguir a ela, para
+# apanhar também siglas/palavras de uma letra coladas ao número (ISSUE-0016,
+# ponto 7: "3A EMEM deve…", em que "A" fica isolado antes do espaço)
+RE_NUMERO_SEM_SEPARADOR = re.compile(r"(?m)^(\d+(?:\.\d+)?)(?=[A-ZÀ-Ú])")
 # fim do bloco de título de uma convenção: o BTE fecha-o sempre com o
 # subtipo oficial, e o que vier a seguir já é o corpo do documento
 RE_FIM_TITULO_CONVENCAO = re.compile(
@@ -207,7 +210,7 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
     # duas metades ("Artigo 1. - º") e escondia o ordinal no corpo
     texto = RE_ORDINAL_SEPARADO.sub(r"\1.\2", texto)
     # "3São considerados…" → "3- São considerados…" (repõe o que o PDF tem)
-    texto = RE_NUMERO_SEM_SEPARADOR.sub(r"\1- \2", texto)
+    texto = RE_NUMERO_SEM_SEPARADOR.sub(r"\1- ", texto)
     linhas = [l for l in juntar_linhas(texto).split("\n")
               if l.strip() and l not in (MARCA_TABELA_INI, MARCA_TABELA_FIM)]
 

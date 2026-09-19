@@ -34,8 +34,12 @@ Projeto_CRL_AppCCT/                ← corre os comandos SEMPRE a partir daqui
 │       ├── indices/               ← índices .xlsx do BTE, para a recolha automática
 │       ├── bte/
 │       │   └── bte_2026/          ← PDFs das convenções, UM POR CONVENÇÃO
-│       │       ├── 26_PR_001_BTE_01_AHP_SITESE.pdf
-│       │       └── …
+│       │       └── convencoes/
+│       │           ├── PRI/
+│       │           │   ├── 2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf
+│       │           │   └── …
+│       │           └── SPE/
+│       │               └── …
 │       ├── maxqda/                ← exportados do MaxQDA (ver 3.2)
 │       │   ├── VariaveisDocumento2026.xlsx
 │       │   └── MAXQDA_…Lista de Códigos.qdc
@@ -64,18 +68,24 @@ python -m cct.aquisicao --indices data/raw/indices                       # simul
 python -m cct.aquisicao --indices data/raw/indices --confirmar-rede --aplicar
 ```
 
-Os PDFs aparecem em `data/raw/bte/bte_<ano>/` já com o nome certo, e o relatório da
-corrida fica em `results/aquisicao/`. **Ler sempre a lista "a confirmar"**: são as siglas
-que a aplicação teve de inventar e os documentos com vários outorgantes do mesmo lado.
-Correr uma segunda vez não descarrega nem reescreve nada.
+Os PDFs aparecem em `data/raw/bte/bte_<ano>/convencoes/{PRI,SPE,APU}/` já com o nome
+certo, e o relatório da corrida fica em `results/aquisicao/`. **Ler sempre a lista "a
+confirmar"**: são as siglas que a aplicação teve de inventar e os documentos com vários
+outorgantes do mesmo lado. Correr uma segunda vez não descarrega nem reescreve nada.
 
 ### Regras de nomes (importante!)
-- **PDFs das convenções**: `AA_PR_NNN_BTE_NN_Partes_Sindicato.pdf`
-  (AA = ano com 2 dígitos). O nome deve ser IGUAL ao usado no MaxQDA
-  (sem o sufixo `_TXT`). Sem espaços no início/fim.
+- **PDFs das convenções, a partir do corpus de 2026**: esquema RNC, obrigatório
+  ([ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md)) —
+  `{ANO}_{AMBITO}_{SEQ}_{TIPO}_{CODIRCT}_BTE_{NN}_{SIGLAS}.pdf`, ex.:
+  `2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf`. Sete campos, descritos em
+  [docs/rnc/README.md §4.1](../rnc/README.md#41-a-regra). O nome deve ser IGUAL ao
+  usado no MaxQDA (sem o sufixo `_TXT`). Sem espaços no início/fim.
+- **PDFs de corpos anteriores a 2026**: mantêm o esquema de 2025,
+  `AA_PR_NNN_BTE_NN_Partes_Sindicato.pdf` (AA = ano com 2 dígitos) — não se renomeiam.
 - **Subpastas de versões**: o nome da subpasta tem de estar CONTIDO no nome
-  do PDF da convenção (ex.: subpasta `ACIP_FESAHT` ↔ PDF
-  `26_PR_003_BTE_02_ACIP_FESAHT.pdf`). É assim que o pipeline as encontra.
+  do PDF da convenção (ex.: subpasta `AEVP_FESAHT` ↔ PDF
+  `2026_PRI_379_CCT-ALT_26651_BTE_31_AEVP-FESAHT.pdf`). É assim que o pipeline as
+  encontra.
 - **Versões anteriores** dentro da subpasta: o nome deve começar pelo ano —
   `2021_...pdf`, `24122_...pdf` (24 = 2024), `ACIP_FESAHT_2009.pdf`.
   Ficheiros `Comparei_*.pdf` e `Diferencas_*.docx` são ignorados.

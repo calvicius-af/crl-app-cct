@@ -52,6 +52,7 @@ seguir*.
 | [0018](0018-familias-documentais-em-pastas-separadas.md) | Cada família documental na sua pasta; só as convenções no pipeline | Aceite |
 | [0019](0019-lista-do-ine-como-sinal-de-ambito.md) | A lista do INE é um sinal de âmbito, nunca uma decisão | Aceite |
 | [0020](0020-integridade-dos-artefactos-de-instalacao.md) | A integridade dos artefactos vive no pacote offline, não no CI | Aceite |
+| [0021](0021-corte-por-ano-do-esquema-de-nomes.md) | O esquema RNC é obrigatório a partir do corpus de 2026 | Aceite |
 
 Os dez primeiros foram escritos **retroativamente**, em agosto de 2026, a partir do
 histórico do desenvolvimento (fases 0 a 5, entre janeiro e julho de 2026). Registam
