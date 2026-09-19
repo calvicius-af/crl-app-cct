@@ -1,6 +1,6 @@
 # ISSUE-0017: o título da Cláusula 68.ª não é apanhado
 
-- **Estado:** Aberta
+- **Estado:** Resolvida — 2026-09-19
 - **Data:** 2026-09-18
 - **GitHub:** (a criar)
 - **Onde dói:** `cct/extractor.py` (`estruturar`, `_titulo_candidato`, `_normalizar_rotulo`)
@@ -34,9 +34,11 @@ relação de trabalho e preenchimento de vagas` no EMEM).
 
 ```bash
 .venv/bin/python -m cct.pipeline_tema \
-    --pdfs data/raw/bte/bte_2026 --codebook codebooks/demo_fase0.yaml \
+    --pdfs data/raw/bte/bte_2026/convencoes/PRI --codebook codebooks/demo_fase0.yaml \
     --extrator docling --out results/runs/2026/titulos
-# procurar "Cláusula 68" no TXT do 26_PR_005
+# procurar "Cláusula 68" no TXT do 2026_PRI_381_CCT-ALT_26957_BTE_31_ACIBARCEL-AEDVC-Independe
+# (nome RNC; era 26_PR_005_BTE_31_ACIBARCELOS_IndependenteSector no esquema de 2025 —
+# ver ISSUE-0022)
 ```
 
 ## Notas
@@ -51,3 +53,24 @@ relação de trabalho e preenchimento de vagas` no EMEM).
   contrário.
 - Verificar se o docling emite o título como item próprio (aí a fusão é do
   `documento_para_texto`) ou já fundido (aí é do PDF). A correção difere.
+
+## O que foi feito
+
+A hipótese da nota 1 estava certa, mas a causa era outra: o docling **não** funde o
+título com o corpo — dá os três (`"Cláusula 68.ª"`, o título, o corpo) como itens
+`TextItem`/`SectionHeaderItem` distintos (confirmado com `doc.iterate_items()`). A
+fusão acontecia depois, em `juntar_linhas`: a marca "é este um título?" usada ali
+(`e_titulo`) tinha um limite de **60 caracteres**, diferente e mais apertado do que o
+de `_titulo_candidato` (90), usado para a mesma decisão mais à frente no pipeline. O
+título da Cláusula 68.ª tem 65 caracteres — cabia em `_titulo_candidato` mas não no
+limite duplicado de `juntar_linhas`, pelo que a linha não ficava protegida e juntava-se
+ao parágrafo seguinte.
+
+Alinhado o limite de `juntar_linhas` para 90, com uma salvaguarda nova: uma linha que
+termine em vírgula nunca é título, porque isso significa que a frase continua (memo 23:
+"Cumpre … qualquer organização,\npressupõe respostas coletivas." deixaria de se juntar
+sem esta salvaguarda). Testado com os dois casos em
+`tests/test_extractor_nuances.py` (`test_titulo_entre_60_e_90_caracteres_nao_se_funde_ao_corpo`
+e `test_paragrafo_de_corpo_com_virgula_continua_a_juntar_se`), e verificado de novo no
+documento real: `Cláusula 68.ª - Organização de serviços de segurança, higiene e saúde
+no trabalho` sai com o rótulo completo.
