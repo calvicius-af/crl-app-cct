@@ -33,6 +33,14 @@ RE_HIFEN_SOLTO = re.compile(r"([a-zà-ú]) -([a-zà-ú])")
 # "-Executar …" — este último dava "- -Executar" com a bala do docling)
 RE_MARCADOR_PROPRIO = re.compile(
     r"^(?:\d+\s*[-–—.)]|[a-zà-ú]\)|[ivxl]+\)|[-–—•·])")
+# ListItem em que o docling separou o número do início do texto, sem
+# repor separador: "3Idade…", "2Sem prejuízo…" (ISSUE-0016, pontos 8 e 11)
+RE_NUMERO_COLADO_LISTA = re.compile(r"^(\d+)(?=[A-ZÀ-Ú])")
+# alínea fundida ao parágrafo anterior no mesmo item de texto, sem quebra
+# entre as duas: "…da empresa; n) O presente…" (ISSUE-0016, ponto 6b) — a
+# regra é estreita (letra única + ")" + maiúscula logo a seguir ao ";") para
+# não confundir com uma referência legítima a meio de frase
+RE_ALINEA_FUNDIDA = re.compile(r";\s+([a-zà-ú]\)\s+[A-ZÀ-Ú])")
 
 _conversor = None
 
@@ -210,9 +218,19 @@ def documento_para_texto(documento) -> str:
         texto = limpar_texto_item(item.text)
         if texto is None:
             continue
+        texto = RE_ALINEA_FUNDIDA.sub(r";\n\1", texto)
         if isinstance(item, ListItem) and not RE_MARCADOR_PROPRIO.match(texto):
-            texto = f"- {texto}"
-        linhas.append(texto)
+            marcador = (getattr(item, "marker", "") or "").strip()
+            if marcador:
+                # o docling separou o marcador (ex.: "g)") do texto,
+                # em vez de o deixar no início (ISSUE-0016, pontos 6a e 10)
+                texto = f"{marcador} {texto}"
+            elif RE_NUMERO_COLADO_LISTA.match(texto):
+                # número colado ao texto, sem separador: "3Idade…" → "3- Idade…"
+                texto = RE_NUMERO_COLADO_LISTA.sub(r"\1- ", texto)
+            else:
+                texto = f"- {texto}"
+        linhas.extend(texto.split("\n"))
     return "\n".join(linhas) + "\n"
 
 
