@@ -39,16 +39,29 @@ def registo_ficheiro(caminho: Path, raiz: Path) -> dict:
 
 
 def estado_git(raiz: Path) -> dict:
+    """Estado do git, distinguindo porque é que não há commit (ISSUE-0013).
+
+    Nas estações do CRL o git não está instalado: o caso em que a proveniência
+    mais importa é precisamente aquele em que ela se degradava em silêncio,
+    com um `null` sem explicação. Um null com motivo vale muito mais do que
+    um null mudo.
+    """
     try:
         commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=raiz, text=True,
             stderr=subprocess.DEVNULL).strip()
-        alteracoes = subprocess.check_output(
-            ["git", "status", "--porcelain"], cwd=raiz, text=True,
-            stderr=subprocess.DEVNULL)
-        return {"commit": commit, "dirty": bool(alteracoes.strip())}
-    except (OSError, subprocess.CalledProcessError):
-        return {"commit": None, "dirty": None}
+    except FileNotFoundError:
+        # git não está no PATH (estação institucional sem git)
+        return {"commit": None, "dirty": None, "motivo": "git_ausente"}
+    except subprocess.CalledProcessError:
+        # git existe mas a pasta não é um repositório (ou HEAD não existe)
+        return {"commit": None, "dirty": None, "motivo": "fora_de_repositorio"}
+    except OSError:
+        return {"commit": None, "dirty": None, "motivo": "erro"}
+    alteracoes = subprocess.check_output(
+        ["git", "status", "--porcelain"], cwd=raiz, text=True,
+        stderr=subprocess.DEVNULL)
+    return {"commit": commit, "dirty": bool(alteracoes.strip())}
 
 
 def construir_manifesto(*, raiz: Path, inicio_utc: str, parametros: dict,

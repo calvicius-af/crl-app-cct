@@ -134,6 +134,13 @@ ou: `python -m cct.app`. Preencher os campos e carregar em "Correr".
     --pasta-versoes data/raw/textos_consolidados \
     --out results/runs/2026/2026_4_08
 ```
+Em Windows, o interpretador é `.venv\Scripts\python`:
+```
+.venv\Scripts\python -m cct.pipeline_tema ^
+    --pdfs data\raw\bte\bte_2026 ^
+    --codebook codebooks\4_08_protecao_dados.yaml ^
+    --out results\runs\2026\2026_4_08
+```
 Só `--pdfs`, `--codebook` e `--out` são obrigatórios; o resto melhora o
 resultado mas pode faltar.
 
@@ -142,6 +149,7 @@ extração. Recupera tabelas de anexos (tabelas salariais, perfis de função)
 e layouts difíceis que o extrator clássico perde, ao custo de ser mais
 lento (~1-1,7 s/página) e de exigir instalação à parte:
 `.venv/bin/python -m pip install docling`
+(Windows: `.venv\Scripts\python -m pip install docling`)
 (≈4 GB com PyTorch; em Mac Apple Silicon o Python tem de ser arm64 —
 `python3 -c "import platform; print(platform.machine())"` deve dizer
 `arm64`). A primeira corrida descarrega os modelos de layout.

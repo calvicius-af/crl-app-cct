@@ -51,8 +51,12 @@ pesado.
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt   # Windows: .venv\Scripts\python
-.venv/bin/python -m cct.doctor                        # verifica o ambiente, em português
+.venv/bin/python -m cct.doctor                        # idem: .venv\Scripts\python -m cct.doctor
 ```
+
+O `cct.doctor` diz sempre com que interpretador está a correr; se o projeto
+tiver um `.venv` que não esteja a ser usado, é esse o problema a resolver
+antes de qualquer outro.
 
 **Em rede fechada** (o caso das estações do CRL, onde o proxy bloqueia o pip): as
 bibliotecas preparam-se uma vez numa máquina com acesso e instalam-se sem qualquer pedido

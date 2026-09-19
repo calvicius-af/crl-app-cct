@@ -25,12 +25,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-RAIZ = Path(__file__).resolve().parent.parent
+# abspath em vez de resolve(): em Windows, resolve() sobre um ficheiro numa
+# unidade mapeada de rede devolve o caminho UNC de destino (L:\... vira
+# \\servidor\...), e é essa forma que o pip depois não consegue abrir
+# (ISSUE-0009). abspath normaliza sem seguir o mapeamento, preservando a
+# letra de unidade com que a estação chegou ao projeto.
+RAIZ = Path(os.path.abspath(__file__)).parent.parent
 WHEELS = RAIZ / "vendor" / "wheels"
 VENV = RAIZ / ".venv"
 
 sys.path.insert(0, str(RAIZ))
 from cct.proveniencia import sha256
+from cct.subprocesso import ambiente_utf8
 from scripts.preparar_pacote_offline import (
     argumentos_de_constraints, ficheiros_de_constraints,
     pacotes_de_requirements,
@@ -47,6 +53,17 @@ def python_do_venv() -> Path:
     if os.name == "nt":
         return VENV / "Scripts" / "python.exe"
     return VENV / "bin" / "python"
+
+
+def pip_do_venv() -> Path:
+    """O pip tem de existir no .venv reaproveitado (ISSUE-0009, notas).
+
+    Um .venv deixado a meio por uma falha anterior pode ter o interpretador
+    mas não o pip; reaproveitá-lo levava a uma instalação parcial silenciosa.
+    """
+    if os.name == "nt":
+        return VENV / "Scripts" / "pip.exe"
+    return VENV / "bin" / "pip"
 
 
 def parar(mensagem: str, solucao: str) -> None:
@@ -141,20 +158,35 @@ def verificar_integridade(aceitar_sem_manifesto: bool = False) -> None:
     print(f"  ✓ {len(registos)} ficheiro(s) conferidos contra o manifesto")
 
 
+def aviso_unc() -> None:
+    """Avisa quando o projeto está num caminho UNC (\\\\servidor\\...).
+
+    A instalação a partir de um caminho UNC é conhecida por falhar no pip
+    (ISSUE-0009); as correcções de RAIZ e do --find-links em URI devem
+    resolver o caso comum, mas o aviso transforma uma eventual falha num
+    diagnóstico imediato em vez de um erro obscuro.
+    """
+    if str(RAIZ).startswith("\\\\"):
+        print(f"  · atenção: o projeto está num caminho de rede ({RAIZ}).")
+        print("    Se a instalação falhar, copiar o projeto para um disco")
+        print("    local (ou usar a letra da unidade mapeada) e repetir.")
+
+
 def criar_venv(refazer: bool) -> None:
     print("== Ambiente isolado (.venv)")
     if VENV.exists():
         if refazer:
             print("  · a apagar o .venv anterior")
             shutil.rmtree(VENV)
-        elif python_do_venv().exists():
+        elif python_do_venv().exists() and pip_do_venv().exists():
             print("  ✓ já existe (a reaproveitar; usar --refazer para recomeçar)")
             return
         else:
             print("  · .venv existente está incompleto — a refazer")
             shutil.rmtree(VENV)
     r = subprocess.run([sys.executable, "-m", "venv", str(VENV)], text=True,
-                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                       env=ambiente_utf8())
     if r.returncode != 0:
         print(r.stdout)
         parar("não foi possível criar o ambiente isolado",
@@ -179,24 +211,52 @@ def instalar() -> None:
     comando = [
         str(python_do_venv()), "-m", "pip", "install",
         "--no-index",                       # nunca contacta o PyPI nem o proxy
-        "--find-links", str(WHEELS),        # só o que está nesta pasta
+        # URI em vez de caminho: o pip normaliza caminhos de sistema de
+        # ficheiros e, com um prefixo UNC, perde o componente do servidor
+        # (ISSUE-0009). A forma file:/// passa intacta.
+        "--find-links", WHEELS.as_uri(),
         "--disable-pip-version-check",
         "--no-cache-dir",
         *argumentos_de_constraints(constraints),
         *pacotes,
     ]
     r = subprocess.run(comando, text=True, stdout=subprocess.PIPE,
-                       stderr=subprocess.STDOUT)
+                       stderr=subprocess.STDOUT, env=ambiente_utf8())
     if r.returncode != 0:
         print(r.stdout)
         parar("o pip não conseguiu instalar a partir de vendor/wheels/",
-              "se a mensagem falar em versão de Python ou plataforma, o pacote "
-              "offline foi preparado para outra versão: voltar a correr "
-              "preparar_pacote_offline.py com o alvo certo "
-              "(ver docs/institucional/instalacao-offline.md, secção 5)")
+              diagnostico_do_pip(r.stdout))
     for linha in r.stdout.splitlines():
         if linha.startswith("Successfully installed"):
             print("  ✓ " + linha.strip())
+
+
+def diagnostico_do_pip(saida: str) -> str:
+    """Classifica a falha do pip em famílias de causa, com a saída certa.
+
+    A mensagem única de antes apontava sempre para versão/plataforma, o que
+    no gate de 2026-09-17 mandou procurar no sítio errado: a causa era um
+    caminho de rede (ISSUE-0009). O stdout do pip já foi impresso; falta a
+    orientação estar alinhada com ele.
+    """
+    s = saida.lower()
+    if "no such file or directory" in s or "errno 2" in s or "unc" in s:
+        return ("a causa parece ser o caminho das bibliotecas, não as "
+                "bibliotecas: se o projeto estiver numa unidade de rede "
+                "(\\\\servidor\\... ou letra mapeada), copiá-lo para um disco "
+                "local e repetir a instalação")
+    if "access is denied" in s or "permission" in s:
+        return ("a causa parece ser permissões: confirmar que a conta tem "
+                "escrita na pasta do projeto e no .venv, e repetir")
+    if ("python" in s and "version" in s) or "platform" in s \
+            or "not a supported wheel" in s or "incompatible" in s:
+        return ("o pacote offline foi preparado para outra versão de Python "
+                "ou plataforma: voltar a correr preparar_pacote_offline.py "
+                "com o alvo certo (ver docs/institucional/instalacao-offline.md, "
+                "secção 5)")
+    return ("repetir a instalação e, se voltar a falhar, enviar a saída "
+            "completa acima junto com o resultado de: "
+            f"{python_do_venv()} -m cct.doctor")
 
 
 def confirmar() -> int:
@@ -234,6 +294,7 @@ def main() -> int:
     print("Instalação offline da AppCCT")
     print(f"Pasta do projeto: {RAIZ}")
     print()
+    aviso_unc()
     verificar_pre_requisitos()
     verificar_integridade(args.aceitar_sem_manifesto)
     criar_venv(args.refazer)

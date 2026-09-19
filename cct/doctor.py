@@ -2,8 +2,21 @@
 
 Uso: python -m cct.doctor
 """
+import os
 import sys
 from pathlib import Path
+
+# Mapeamento módulo -> pacote, partilhado com o instalador offline para não
+# haver duas listas a divergir uma da outra (ISSUE-0010).
+MODULOS = [("pdfplumber", "pdfplumber"), ("openpyxl", "openpyxl"),
+           ("yaml", "pyyaml"), ("jsonschema", "jsonschema")]
+
+
+def _python_do_venv() -> Path:
+    raiz = Path(os.path.abspath(__file__)).parent.parent
+    if os.name == "nt":
+        return raiz / ".venv" / "Scripts" / "python.exe"
+    return raiz / ".venv" / "bin" / "python"
 
 
 def verificar() -> int:
@@ -23,20 +36,37 @@ def verificar() -> int:
     else:
         falha(f"Python {sys.version.split()[0]} é antigo",
               "instalar Python 3.11 ou superior (python.org)")
+    # ISSUE-0010: dizer sempre com que interpretador se está a correr, e
+    # detectar o .venv do projeto que não está a ser usado — sem isto, o
+    # doctor corrido com o Python do sistema reporta como em falta
+    # bibliotecas que estão instaladas no .venv.
+    print(f"  · interpretador: {sys.executable}")
+    raiz = Path(os.path.abspath(__file__)).parent.parent
+    venv = raiz / ".venv"
+    venv_em_uso = sys.prefix != sys.base_prefix and venv.as_posix() in sys.prefix
+    if venv.is_dir() and not venv_em_uso:
+        print(f"  · o projeto tem um .venv ({venv}) que não está a ser usado")
+        print(f"    → correr com o Python do projeto: "
+              f"{_python_do_venv()} -m cct.doctor")
 
     print("== Bibliotecas")
-    for mod, pacote in [("pdfplumber", "pdfplumber"), ("openpyxl", "openpyxl"),
-                        ("yaml", "pyyaml"), ("jsonschema", "jsonschema")]:
+    for mod, pacote in MODULOS:
         try:
             __import__(mod)
             ok(pacote)
         except ImportError:
-            falha(f"falta a biblioteca {pacote}",
-                  "instalar as dependências: duplo clique em "
-                  "scripts/instalar_offline.bat (Windows) ou "
-                  "scripts/instalar_offline.command (macOS) — instalação sem internet, "
-                  "ver docs/institucional/instalacao-offline.md; "
-                  f"com acesso à internet basta: python -m pip install {pacote}")
+            if venv.is_dir() and not venv_em_uso:
+                falha(f"falta a biblioteca {pacote} (ou está no .venv que "
+                      "não está a ser usado)",
+                      f"correr com o Python do projeto: "
+                      f"{_python_do_venv()} -m cct.doctor")
+            else:
+                falha(f"falta a biblioteca {pacote}",
+                      "instalar as dependências: duplo clique em "
+                      "scripts/instalar_offline.bat (Windows) ou "
+                      "scripts/instalar_offline.command (macOS) — instalação sem internet, "
+                      "ver docs/institucional/instalacao-offline.md; "
+                      f"com acesso à internet basta: python -m pip install {pacote}")
     try:
         import tkinter  # noqa: F401
         ok("tkinter (app gráfica)")

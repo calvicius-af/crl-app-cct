@@ -22,9 +22,20 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # ISSUE-0012: as estações do CRL são Windows 11 com Python 3.13, e a
+      # matriz não cobria nem o sistema nem a versão. O mínimo defensável:
+      # acrescentar windows-latest/3.13 às combinações existentes. Limite
+      # honesto: um runner Windows não reproduz uma estação do CRL (sem
+      # unidades de rede mapeadas, região portuguesa, políticas de proxy) —
+      # os gates manuais continuam a ser necessários
+      # (docs/validacao/instalacao-estacao-crl-2026-09-17.md).
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python: ["3.11", "3.12"]
+        include:
+          # a combinação em falta, sem multiplicar a matriz inteira:
+          - os: windows-latest
+            python: "3.13"
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

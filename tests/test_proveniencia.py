@@ -1,8 +1,55 @@
 import json
+import subprocess
 from pathlib import Path
 
 from cct.proveniencia import (construir_manifesto, escrever_manifesto,
-                              registo_ficheiro)
+                              estado_git, registo_ficheiro)
+
+
+# ---------------------------------------------- estado_git (ISSUE-0013)
+
+def test_estado_git_distingue_git_ausente(monkeypatch, tmp_path):
+    """Estação sem git: o null tem de vir com o motivo, não mudo."""
+    def sem_git(*_a, **_k):
+        raise FileNotFoundError("git")
+    monkeypatch.setattr(subprocess, "check_output", sem_git)
+    estado = estado_git(tmp_path)
+    assert estado == {"commit": None, "dirty": None, "motivo": "git_ausente"}
+
+
+def test_estado_git_distingue_fora_de_repositorio(monkeypatch, tmp_path):
+    def fora_de_repositorio(*_a, **_k):
+        raise subprocess.CalledProcessError(128, "git")
+    monkeypatch.setattr(subprocess, "check_output", fora_de_repositorio)
+    estado = estado_git(tmp_path)
+    assert estado["motivo"] == "fora_de_repositorio"
+
+
+def test_estado_git_com_repositorio_devolve_commit_e_dirty(monkeypatch, tmp_path):
+    respostas = iter(["abc123\n", "M ficheiro.py\n"])
+
+    def falso_check_output(comando, **_k):
+        return next(respostas)
+    monkeypatch.setattr(subprocess, "check_output", falso_check_output)
+    estado = estado_git(tmp_path)
+    assert estado == {"commit": "abc123", "dirty": True}
+
+
+def test_manifesto_regista_o_motivo_quando_nao_ha_commit(monkeypatch, tmp_path):
+    """O manifesto de uma corrida sem git tem de explicar o null."""
+    def sem_git(*_a, **_k):
+        raise FileNotFoundError("git")
+    monkeypatch.setattr(subprocess, "check_output", sem_git)
+    manifesto = construir_manifesto(
+        raiz=tmp_path,
+        inicio_utc="2026-09-19T10:00:00+00:00",
+        parametros={},
+        entradas=[],
+        saidas=[],
+        resumo={},
+        problemas=[],
+    )
+    assert manifesto["environment"]["git"]["motivo"] == "git_ausente"
 
 
 def test_registo_tem_caminho_portavel_tamanho_e_hash(tmp_path):

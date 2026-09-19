@@ -204,3 +204,90 @@ def test_manifesto_ilegivel_para(monkeypatch, tmp_path):
     (wheels / "manifesto.json").write_text("{isto não é json", encoding="utf-8")
     with pytest.raises(SystemExit):
         instalar_offline.verificar_integridade()
+
+
+# ---------- ISSUE-0009: caminhos de rede (UNC) ----------
+
+def test_find_links_e_passado_como_uri(monkeypatch, tmp_path):
+    """O pip perde o prefixo do servidor ao normalizar um caminho UNC.
+
+    A forma file:/// passa intacta, pelo que o --find-links tem de ser um
+    URI e não um caminho de sistema de ficheiros.
+    """
+    comandos = []
+
+    class Resultado:
+        returncode = 0
+        stdout = "Successfully installed pdfplumber\n"
+
+    def falso_run(comando, **_):
+        comandos.append(comando)
+        return Resultado()
+
+    _preparar_wheels(monkeypatch, tmp_path)
+    monkeypatch.setattr(instalar_offline.subprocess, "run", falso_run)
+    instalar_offline.instalar()
+    comando = comandos[0]
+    i = comando.index("--find-links")
+    assert comando[i + 1].startswith("file:///")
+    assert str(instalar_offline.WHEELS) not in comando
+
+
+def test_aviso_unc_aparece_com_caminho_de_rede(monkeypatch, capsys):
+    """Um caminho UNC é conhecido por falhar: o aviso tem de sair antes."""
+    monkeypatch.setattr(instalar_offline, "RAIZ",
+                        __import__("pathlib").PureWindowsPath(
+                            r"\\servidor\partilha\crl-app-cct"))
+    instalar_offline.aviso_unc()
+    out = capsys.readouterr().out
+    assert "caminho de rede" in out
+
+
+def test_aviso_unc_silencia_com_caminho_local(monkeypatch, capsys):
+    monkeypatch.setattr(instalar_offline, "RAIZ",
+                        __import__("pathlib").Path("/tmp/projeto"))
+    instalar_offline.aviso_unc()
+    assert capsys.readouterr().out == ""
+
+
+# ---------- ISSUE-0009: diagnóstico da falha do pip ----------
+
+@pytest.mark.parametrize("padrao,esperado", [
+    ("ERROR: Could not install packages due to an OSError: "
+     "[Errno 2] No such file or directory: '\\\\C$\\\\wheels'", "caminho"),
+    ("ERROR: Could not find a version that satisfies the requirement "
+     "(Access is denied)", "permiss"),
+    ("ERROR: pdfplumber-0.11.10-cp311-win_amd64.whl is not a supported "
+     "wheel on this platform", "outra versão"),
+    ("ERROR: algo completamente diferente", "enviar a saída"),
+])
+def test_diagnostico_do_pip_distingue_familias_de_causa(padrao, esperado):
+    solucao = instalar_offline.diagnostico_do_pip(padrao)
+    assert esperado in solucao
+
+
+# ---------- ISSUE-0009: .venv reaproveitado tem de ter pip ----------
+
+def test_venv_sem_pip_e_refeito(monkeypatch, tmp_path, capsys):
+    """Um .venv deixado a meio pode ter o python mas não o pip."""
+    venv = tmp_path / ".venv"
+    scripts = venv / ("Scripts" if __import__("os").name == "nt" else "bin")
+    scripts.mkdir(parents=True)
+    (scripts / ("python.exe" if __import__("os").name == "nt" else "python")) \
+        .write_text("#!fake", encoding="utf-8")
+    monkeypatch.setattr(instalar_offline, "VENV", venv)
+
+    comandos = []
+
+    class Resultado:
+        returncode = 0
+        stdout = ""
+
+    def falso_run(comando, **_):
+        comandos.append(comando)
+        return Resultado()
+
+    monkeypatch.setattr(instalar_offline.subprocess, "run", falso_run)
+    instalar_offline.criar_venv(refazer=False)
+    assert "a refazer" in capsys.readouterr().out
+    assert comandos  # o venv foi recriado
