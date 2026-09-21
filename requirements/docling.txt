@@ -6,4 +6,4 @@
 # fora do CI e fora da instalação base — ver requirements.txt.
 #
 #     python -m pip install -r requirements/docling.txt -c requirements/docling.txt
-docling-core==2.97.0
+docling-core==2.97.1
