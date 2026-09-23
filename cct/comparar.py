@@ -44,7 +44,8 @@ def escolher_par(candidatos: list[tuple[str, int]]) -> tuple[str, str, list[str]
     """
     avisos: list[str] = []
     max_len = max(n for _, n in candidatos)
-    completo = lambda n: n >= max_len * 0.5
+    def completo(n):
+        return n >= max_len * 0.5
 
     de_2025 = [(nome, n) for nome, n in candidatos if _ano(nome) == 2025]
     if not de_2025:

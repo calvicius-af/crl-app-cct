@@ -68,7 +68,16 @@ python scripts/verificar_seguranca.py --verboso
 
 # nada de links ou caminhos documentais quebrados (nem sensíveis a maiúsculas/minúsculas)
 python scripts/verificar_referencias.py --verboso
+
+# lint e tipos, os mesmos do job "análise estática" do CI (issue #27);
+# instalar uma vez com: python -m pip install -c requirements/dev.txt ruff mypy types-PyYAML
+python -m ruff check cct scripts tests
+python -m mypy cct
 ```
+
+Os testes tratam como falha um aviso de depreciação ou um ficheiro por fechar no
+código do projeto (`pytest.ini`, issue #8). Os avisos das bibliotecas externas
+continuam visíveis, mas não fazem falhar a corrida.
 
 `scripts/verificar_seguranca.py` é a mesma barreira que corre no CI (job
 *segurança*) e só usa a biblioteca padrão, pelo que corre em qualquer máquina sem
@@ -127,8 +136,10 @@ Para subir uma versão:
 
 1. altera o `==` no ficheiro de *constraints* correspondente (e o `>=` em
    `requirements.txt` apenas se o mínimo deixar de ser suportado);
-2. corre a suite nas **duas** versões do Python da matriz, 3.11 e 3.12 — uma
-   versão nova que já não suporte 3.11 parte o CI em metade dos jobs;
+2. corre a suite em todas as versões do Python da matriz do CI
+   ([`.github/workflows/testes.yml`](.github/workflows/testes.yml)), a começar
+   pela mais antiga, que é o mínimo declarado em `pyproject.toml` — uma versão
+   nova que já não a suporte parte o CI em parte dos jobs;
 3. confirma que a instalação leve continua a funcionar sem Docling: a suite tem
    de passar sem `docling-core` instalado (os testes respectivos declaram-se
    `skipped`);

@@ -13,7 +13,7 @@ from cct.nomeacao import (ESQUEMA_2025, MAX_NOME, MAX_SIGLA, carregar_siglas,
                           separar_outorgantes, sigla)
 from cct.recolha import Registo, recolher
 
-from .test_recolha import URL, AbridorFalso, escrever_indice
+from .test_recolha import AbridorFalso, escrever_indice
 
 NOMES_ESPERADOS = [
     "26_PR_001_BTE_31_ACRAL_CESP",

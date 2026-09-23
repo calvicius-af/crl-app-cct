@@ -1,6 +1,6 @@
 # ISSUE-0012: o CI não corre em Windows nem em Python 3.13, que é o que as estações usam
 
-- **Estado:** Aberta
+- **Estado:** Resolvida — 2026-09-23 (verificação)
 - **Data:** 2026-09-17
 - **GitHub:** #61 (sub-issue de #58)
 - **Onde dói:** `.github/workflows/testes.yml` (L26-27)
@@ -56,3 +56,10 @@ O que a cobertura dá é a camada de baixo: que o código corre em Windows e em 
 camada de cima — o ambiente institucional — continua a precisar de gates manuais como o
 de 2026-09-17, e isso deve ficar escrito para que ninguém confunda CI verde com instalação
 verificada.
+
+## Verificação (2026-09-23)
+
+Adotada a opção 1: `windows-latest` com Python 3.13 na matriz de
+`.github/workflows/testes.yml`, além de Linux, macOS e Windows em 3.11 e 3.12. O CI do
+PR #87 passou em todas as combinações. O limite registado nas notas mantém-se: CI verde
+não é instalação verificada numa estação do CRL.

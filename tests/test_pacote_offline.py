@@ -291,3 +291,21 @@ def test_venv_sem_pip_e_refeito(monkeypatch, tmp_path, capsys):
     instalar_offline.criar_venv(refazer=False)
     assert "a refazer" in capsys.readouterr().out
     assert comandos  # o venv foi recriado
+
+
+def test_manifesto_regista_versao_e_commit_da_aplicacao(monkeypatch, tmp_path):
+    """As estações não têm git: é daqui que a corrida tira o commit (ISSUE-0013)."""
+    destino = tmp_path / "wheels"
+    destino.mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "appcct"\nversion = "9.9.9"\n', encoding="utf-8")
+    monkeypatch.setattr(preparar_pacote_offline, "DESTINO", destino)
+    monkeypatch.setattr(preparar_pacote_offline, "RAIZ", tmp_path)
+    monkeypatch.setattr(preparar_pacote_offline, "estado_git",
+                        lambda raiz: {"commit": "abc123", "dirty": False})
+
+    preparar_pacote_offline.escrever_manifesto([("win_amd64", "311")], [])
+    dados = json.loads((destino / "manifesto.json").read_text(encoding="utf-8"))
+
+    assert dados["aplicacao"] == {"versao": "9.9.9", "commit": "abc123",
+                                  "alteracoes_por_commitar": False}

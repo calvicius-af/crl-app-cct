@@ -25,7 +25,7 @@ from .nomeacao import (ESQUEMA_2025, FAMILIAS_COM_AMBITO,
                        NomeRNCInvalido, carregar_siglas, nome_documento,
                        resolver_convencoes_base, separar_outorgantes,
                        sequencial_bte, tipo_normalizado)
-from .recolha import INDICES_OMISSAO, RAIZ, familia, ler_indice
+from .recolha import INDICES_OMISSAO, familia, ler_indice
 
 # Colunas produzidas pelo script. A ordem é a do documento de gestão documental.
 COLUNAS_AUTOMATICAS = [

@@ -12,13 +12,14 @@ import difflib
 import re
 import unicodedata
 
+from .numeracao import chave_numero
+
 LIMIAR_IGUAL = 0.995
 LIMIAR_RENUMERACAO = 0.75
 # um match pelo número só é aceite se o conteúdo for minimamente parecido;
 # senão trata-se de renumeração (outra cláusula ocupa aquele número)
 LIMIAR_MESMO_NUMERO = 0.5
 
-RE_NUMERO = re.compile(r"(cl[aá]usula|artigo)\s+(\d+)", re.IGNORECASE)
 
 
 def _norm(t: str) -> str:
@@ -28,8 +29,9 @@ def _norm(t: str) -> str:
 
 
 def _chave_numero(no: dict) -> str | None:
-    m = RE_NUMERO.search(no["rotulo"])
-    return f"{m.group(1).lower()[:2]}{int(m.group(2))}" if m else None
+    """`cl12` tanto para «Cláusula 12.ª» como para «Cláusula décima segunda»;
+    `cl16A` para a cláusula inserida «16.ª-A» (ver cct/numeracao.py)."""
+    return chave_numero(no["rotulo"])
 
 
 def _titulo(no: dict) -> str:

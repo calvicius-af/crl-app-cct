@@ -13,12 +13,13 @@ QDC = Path(__file__).parent.parent / "data" / "raw" / "maxqda" / "MAXQDA_RNC_202
 NS = {"q": "urn:QDA-XML:project:1.0"}
 
 
+@pytest.fixture(scope="module")
+def reg():
+    return carregar_qdc(QDC)
+
+
 @pytest.mark.skipif(not QDC.exists(), reason="QDC master não disponível")
 class TestMaster:
-    @pytest.fixture(scope="class")
-    def reg(self):
-        return carregar_qdc(QDC)
-
     def test_carrega_e_indexa_por_id(self, reg):
         r = procurar_codigo(reg, "4.03")
         assert r and "492" in r["nome"]

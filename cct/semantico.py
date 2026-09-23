@@ -41,7 +41,9 @@ def _resumo_codebook(codebook: dict) -> str:
 
 def _montar_lotes(candidatas: list[dict], texto: str,
                   max_chars: int = MAX_CHARS_LOTE) -> list[list[dict]]:
-    lotes, atual, tamanho = [], [], 0
+    lotes: list[list[dict]] = []
+    atual: list[dict] = []
+    tamanho = 0
     for no in candidatas:
         n_chars = no["char_end"] - no["char_start"]
         if atual and tamanho + n_chars > max_chars:
@@ -115,7 +117,7 @@ def codificar_semantico(doc: dict, texto: str, codebook: dict, backend,
             # modelos pequenos); rótulo exato como recurso
             no = None
             try:
-                idx = int(item.get("id"))
+                idx = int(item.get("id"))  # type: ignore[arg-type]  # None → TypeError, apanhado abaixo
                 if 1 <= idx <= len(lote):
                     no = lote[idx - 1]
             except (TypeError, ValueError):

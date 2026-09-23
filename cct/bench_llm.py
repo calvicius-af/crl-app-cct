@@ -9,8 +9,8 @@ Uso:
   .venv/bin/python -m cct.bench_llm --modelos "microsoft/phi-4-mini-reasoning" "google/gemma-4-e2b"
 """
 import argparse
-import json
 import time
+from typing import Any
 
 from .semantico import backend_lmstudio, _extrair_json, PROMPT_BASE
 
@@ -65,7 +65,7 @@ CASOS = [
 
 
 def avaliar_modelo(modelo: str, base_url: str) -> dict:
-    resultados = {"modelo": modelo, "casos": [], "json_invalido": 0,
+    resultados: dict[str, Any] = {"modelo": modelo, "casos": [], "json_invalido": 0,
                   "acertos": 0, "fp": 0, "fn": 0, "latencias": []}
     for rotulo, texto, esperado in CASOS:
         prompt = PROMPT_BASE.format(tema="4.08", codebook=CODEBOOK_RESUMO,

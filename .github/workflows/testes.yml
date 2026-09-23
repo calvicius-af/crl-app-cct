@@ -85,6 +85,45 @@ jobs:
         # (Linux) o que passa despercebido em macOS/Windows.
         run: python scripts/verificar_referencias.py --verboso
 
+  estatica:
+    # Gates rápidos de manutenção (issue #27), separados dos testes: lint,
+    # tipos e espaços em branco. Só leem o código; não instalam o produto
+    # nem o Docling. Configuração em pyproject.toml.
+    name: análise estática (ruff, mypy, espaços)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # o histórico da base é preciso para comparar só o que o PR muda
+          fetch-depth: 0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar as ferramentas
+        # O mypy precisa das bibliotecas do produto para ver os seus tipos
+        # (pdfplumber traz os seus); as versões são as das constraints.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt \
+            -c requirements/runtime.txt -c requirements/dev.txt
+          python -m pip install -c requirements/dev.txt ruff mypy types-PyYAML
+
+      - name: Lint (ruff)
+        run: python -m ruff check cct scripts tests
+
+      - name: Tipos (mypy)
+        run: python -m mypy cct
+
+      - name: Espaços em branco no que o PR muda
+        # Só o diff do PR: os documentos de investigação usam dois espaços no
+        # fim da linha como quebra de linha Markdown, e isso não é erro.
+        if: github.event_name == 'pull_request'
+        run: git diff --check "origin/${{ github.base_ref }}...HEAD" -- . ':(exclude)docs/research/*'
+
   auditoria:
     # Auditoria das dependências instaladas contra a base de dados de
     # vulnerabilidades do PyPI/OSV. Política em SECURITY.md.

@@ -20,6 +20,8 @@ from .nomeacao import FAMILIAS_PROCESSAVEIS, familia_do_nome
 from .qdpx import exportar_qdpx
 from .export_xlsx import exportar_xlsx
 from .triagem import codigos_auto, triar
+from .localizador import interpretar_nome_rnc
+from .sanidade import RE_RETIFICACAO
 from .sanidade import verificar as verificar_sanidade
 from .schemas import validar_doc, validar_anotacoes
 from .proveniencia import agora_utc, construir_manifesto, escrever_manifesto
@@ -211,7 +213,6 @@ def main():
     # e isso desliga o controlo da nota de depósito. O tipo do registo
     # (código IRCT) traduz-se no subtipo do schema; o que não encaixa
     # fica "desconhecido" e o tipo original viaja no doc para a sanidade.
-    SUBTIPOS_RETIFICACAO = ("CCT-RECT", "AE-RECT", "CCT-ALT-RECT", "AE-ALT-RECT")
     tipo_do_registo: dict[str, str] = {}
     REGISTO_OMISSAO = Path(__file__).resolve().parent.parent / "data" / "registo" / "registo_bte.jsonl"
     if REGISTO_OMISSAO.exists():
@@ -228,11 +229,20 @@ def main():
                 continue
 
     def _subtipo_do(doc_id: str, das_variaveis: str | None) -> tuple[str, str]:
-        """Subtipo do schema; o tipo IRCT viaja no doc como 'tipo_registo'."""
+        """Subtipo do schema; o tipo IRCT viaja no doc como 'tipo_registo'.
+
+        O tipo vem do registo da recolha e, sem ele, do próprio nome: os
+        esquemas RNC (ADR-0016 e ADR-0022) trazem-no. Sem isto, correr o
+        pipeline numa máquina sem o registo tratava uma retificação como
+        convenção e dava-a como truncada (ISSUE-0014).
+        """
         tipo = tipo_do_registo.get(doc_id, "")
+        if not tipo:
+            meta = interpretar_nome_rnc(doc_id)
+            tipo = (meta or {}).get("tipo") or ""
         if das_variaveis:
             return das_variaveis, tipo
-        if tipo in SUBTIPOS_RETIFICACAO:
+        if RE_RETIFICACAO.search(tipo):
             return "retificacao", tipo
         return "desconhecido", tipo
 

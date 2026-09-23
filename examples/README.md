@@ -1,4 +1,4 @@
-# Exemplos completos: do PDF do BTE ao projeto MaxQDA
+# Exemplos: do PDF do BTE ao projeto MaxQDA
 
 Esta pasta responde a uma pergunta simples — **o que entra e o que sai desta aplicação?** —
 com dois casos reais. É a única parte de dados/resultados que está versionada no
@@ -17,6 +17,34 @@ comprimento de cada substituição é igual ao do nome original, pelo que os off
 erro de extração, comparação ou exportação. O procedimento verificável está em
 `scripts/anonimizar_exemplos.py --check` e é decidido pelo
 [ADR-0013](../docs/adr/0013-anonimizacao-dos-exemplos-publicados.md).
+
+## O que se consegue reproduzir, e com quê
+
+Os exemplos demonstram o comportamento da aplicação; não são uma reprodução bit a bit que
+qualquer clone consiga refazer. Há três níveis, e convém não os confundir (issue #4):
+
+| Nível | O que é preciso | Garantia |
+|---|---|---|
+| **Executar** | os PDF oficiais do BTE, obtidos na origem (ver cada exemplo) | a corrida completa funciona e produz os mesmos tipos de artefacto |
+| **Verificar os artefactos publicados** | só o repositório | a coerência interna, não a fidelidade ao PDF (ver abaixo) |
+| **Reproduzir exatamente as saídas publicadas** | os PDF oficiais e os exports internos do MaxQDA (`--variaveis` e `--master`), que não são publicados | deve dar as mesmas contagens e os mesmos ficheiros, a menos da anonimização; não é verificado automaticamente |
+
+O que se verifica só com o repositório, e corre no CI:
+
+1. `python scripts/anonimizar_exemplos.py --check` confirma que nenhum artefacto
+   publicado contém os nomes de signatários conhecidos. Procura uma lista fixa de nomes;
+   não compara os textos com o PDF.
+2. `tests/test_exemplos.py` confirma que os números desta página (caracteres, nós,
+   cláusulas, segmentos, códigos) batem com os artefactos, que cada cláusula e artigo do
+   `.doc.json` aponta para o próprio rótulo no `.txt`, e que o texto dentro do QDPX é o
+   `.txt` byte a byte.
+
+Nenhuma das duas compara os textos publicados com uma nova extração dos PDF: isso exige
+os PDF oficiais e é o terceiro nível.
+
+Sem os exports internos, as diferenças esperadas estão descritas em cada exemplo, em
+«Como regenerar»: os códigos saem sem as descrições oficiais e o subtipo da convenção fica
+«desconhecido», o que pode mudar a contagem de anotações.
 
 Cada exemplo tem a mesma organização:
 

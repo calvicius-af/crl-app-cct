@@ -1,6 +1,6 @@
 # ISSUE-0014: quatro documentos CARRISTUR produzem zero cláusulas
 
-- **Estado:** Aberta
+- **Estado:** Resolvida no código — 2026-09-23; falta confirmar na próxima corrida sobre o BTE 31/2026
 - **Data:** 2026-09-17
 - **GitHub:** #64 (sub-issue de #24)
 - **Onde dói:** extração e validação (`cct/extractor*.py`, deteção da nota de depósito)
@@ -68,3 +68,42 @@ relação com este.
 
 Sem relação com a instalação. Registado a partir do mesmo gate apenas porque foi aí que
 apareceu — ver [o registo do gate](../docs/validacao/instalacao-estacao-crl-2026-09-17.md).
+
+## Resolução (2026-09-23)
+
+**Hipótese 1 confirmada pelos dados do índice que estão no repositório.** Dos quatro
+documentos, dois constam do índice do BTE 31/2026 com o tipo `AE-ALT-RECT` (387/2026,
+CARRISTUR e ASPTC; 390/2026, CARRISTUR e SNMOT), e os outros dois trazem «Retificação»
+no título (SITRA e FECTRANS; ver `tests/test_recolha.py` e `tests/test_nomeacao.py`).
+São retificações: corrigem outra convenção e não têm articulado próprio. Zero cláusulas
+é o resultado certo.
+
+O defeito estava em dois sítios:
+
+1. **O tipo só se lia do registo da recolha.** O `pipeline_tema` corria numa estação sem
+   `data/registo/registo_bte.jsonl` e tratava a retificação como convenção, pelo que a
+   sanidade exigia a nota de depósito e dizia «truncado?». O tipo passa a ler-se também
+   do nome, que nos esquemas RNC (ADR-0016 e ADR-0022) o traz. A lista fixa de quatro
+   tipos de retificação foi substituída pelo padrão que a sanidade já usava.
+2. **Zero cláusulas não tinha diagnóstico próprio.** A sanidade passa a dizer uma de duas
+   coisas, sem ambiguidade:
+   a) numa retificação: «retificação sem articulado próprio: zero cláusulas é o esperado»;
+   b) noutro documento: «nenhuma cláusula ou artigo reconhecido: estrutura não
+      reconhecida pelo extrator, ou documento sem articulado — verificar o PDF».
+
+Testes em `tests/test_sanidade.py`, incluindo uma corrida do pipeline sobre um nome
+`…_AE-ALT-RECT_…` sem registo, que falha com o código anterior.
+
+**Revisão do PR #88 (2026-09-23).** Corrida real do BTE 31/2026: 14/14 PDF, 292 cláusulas,
+101 anotações; os quatro CARRISTUR com nomes RNC deram zero cláusulas e a nota de
+retificação, sem o aviso de truncagem. Mas o mesmo PDF com o nome da corrida original
+(`26_PR_011_BTE_31_CARRISTUR_ASPTC`, esquema de 2025, hash igual) voltava a receber
+«documento truncado?», porque esse esquema não traz o tipo e não havia registo. A
+retificação passa também a reconhecer-se pelo título do documento («… - Retificação»,
+procurado só no bloco do título, antes do primeiro cabeçalho), o que não depende do nome
+nem do registo. Teste com esse nome em `tests/test_sanidade.py`, que falha sem a correção.
+
+**Falta:** repetir a corrida com os PDF reais nomeados no esquema de 2025, para confirmar
+a deteção pelo título no texto extraído. O sintoma de `Artigo 1.º: corpo sem frase
+terminada em ponto` (26_PR_008 e 26_PR_009) não é tratado aqui e continua registado nas
+notas acima.

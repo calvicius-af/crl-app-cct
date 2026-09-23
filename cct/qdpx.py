@@ -38,7 +38,7 @@ def _caminho(codigo: str) -> list[str]:
         else:
             caminho.append(parte)
     # remover duplicados consecutivos preservando a ordem
-    unicos = []
+    unicos: list[str] = []
     for c in caminho:
         if not unicos or unicos[-1] != c:
             unicos.append(c)
@@ -202,7 +202,7 @@ def exportar_qdpx(itens: list[tuple[dict, str, dict]], destino: Path,
                     d.text = reg["descricao"]
                 elemento_por_caminho[chave] = el
             pai_el = elemento_por_caminho[chave]
-        return pai_el.get("guid")
+        return pai_el.attrib["guid"]        # posto em todos os Code criados acima
 
     for _doc, _texto, anot in itens:
         for a in anot["anotacoes"]:

@@ -25,6 +25,7 @@ import re
 import shutil
 import time
 from pathlib import Path
+from typing import Any
 
 from . import ambito as mod_ambito
 from .localizador import _sem_acentos
@@ -266,7 +267,7 @@ def sequencial_bte(entrada: dict) -> int | None:
     return int(m.group(0)) if (m := re.match(r"^\d+$", bruto)) else None
 
 
-def tipo_normalizado(tipo: str) -> str:
+def tipo_normalizado(tipo: str | None) -> str:
     """`CCT-ALT-RECT` a partir do que vier no índice; `SEMTIPO` se vier vazio."""
     limpo = re.sub(r"[^A-Z0-9-]", "", _sem_acentos(tipo or "").upper())
     limpo = re.sub(r"-{2,}", "-", limpo).strip("-")
@@ -566,8 +567,8 @@ def atribuir_ordinais(registo: Registo, familias=("convencao", "extensao",
     for e in entradas:
         grupos.setdefault((e.get("ano"), e.get("familia")), []).append(e)
     for (_ano, _fam), grupo in grupos.items():
-        usados = {(e.get("nomeacao") or {}).get("ordinal")
-                  for e in grupo if (e.get("nomeacao") or {}).get("ordinal")}
+        usados = {o for e in grupo
+                  if (o := (e.get("nomeacao") or {}).get("ordinal"))}
         proximo = max(usados) + 1 if usados else 1
         por_atribuir = [e for e in grupo
                         if not (e.get("nomeacao") or {}).get("ordinal")]
@@ -655,7 +656,7 @@ def _e_nome_adr0016(nome: str) -> bool:
     from .localizador import interpretar_nome_rnc
 
     meta = interpretar_nome_rnc(nome or "")
-    return bool(meta) and meta["esquema"] == "adr0016"
+    return meta is not None and meta["esquema"] == "adr0016"
 
 
 def _concluir_migracao(entrada: dict, anterior: Path, alvo: Path,
@@ -732,7 +733,7 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
     if esquema not in ESQUEMAS:
         raise ValueError(f"esquema de nome desconhecido: {esquema!r} "
                          f"(conhecidos: {', '.join(ESQUEMAS)})")
-    resumo = {"ordinais_novos": atribuir_ordinais(registo, familias),
+    resumo: dict[str, Any] = {"ordinais_novos": atribuir_ordinais(registo, familias),
               "por_estado": {}, "avisos": [], "problemas": [], "nomes": [],
               "migracoes": []}
     if esquema == "rnc":
@@ -814,7 +815,7 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
             if esquema == "rnc":
                 fam = e.get("familia")
                 pasta = (destino / f"bte_{e['ano']}"
-                         / PASTA_FAMILIA.get(fam, PASTA_FAMILIA_DESCONHECIDA))
+                         / PASTA_FAMILIA.get(fam or "", PASTA_FAMILIA_DESCONHECIDA))
                 if fam in FAMILIAS_COM_AMBITO:
                     pasta = pasta / nomeacao.get("ambito", mod_ambito.OMISSAO)
             else:
@@ -826,8 +827,8 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
             resumo["nomes"].append((e["chave"], nome))
             resumo["avisos"].extend(f"{nome}: {a}" for a in avisos)
 
-            anterior = Path(nomeacao.get("caminho_anterior") or "")
-            if not anterior.name or anterior == alvo:
+            anterior: Path | None = Path(nomeacao.get("caminho_anterior") or "")
+            if anterior is not None and (not anterior.name or anterior == alvo):
                 anterior = None
 
             if alvo.exists():
@@ -988,4 +989,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

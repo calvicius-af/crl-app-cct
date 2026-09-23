@@ -74,17 +74,73 @@ def deposito_no_fim(texto: str, e_retificacao: bool = False) -> str | None:
     return None
 
 
+AVISO_RETIFICACAO_SEM_ARTICULADO = (
+    "retificação sem articulado próprio: zero cláusulas é o esperado")
+AVISO_SEM_ESTRUTURA = (
+    "nenhuma cláusula ou artigo reconhecido: estrutura não reconhecida pelo "
+    "extrator, ou documento sem articulado — verificar o PDF")
+
+
+# O título do BTE fecha com o subtipo depois de um travessão: «Acordo de
+# empresa entre a CARRISTUR … e a ASPTC - Retificação». Procura-se só no
+# bloco do título, antes do primeiro cabeçalho estrutural, para que uma
+# menção a «retificação» no corpo de uma convenção não conte.
+RE_TITULO_RETIFICACAO = re.compile(r"\s[-–—]\s*re(?:c)?tifica[çc][ãa]o\b", re.IGNORECASE)
+RE_CABECALHO_ESTRUTURAL = re.compile(
+    r"^(?:Cl[aá]usula|CL[AÁ]USULA|Artigo|ARTIGO|CAP[IÍ]TULO|T[IÍ]TULO)\b")
+MAX_LINHAS_TITULO = 8
+
+
+def titulo_de_retificacao(texto: str) -> bool:
+    """O título do documento diz «- Retificação»?"""
+    linhas: list[str] = []
+    for linha in texto.split("\n"):
+        linha = linha.strip()
+        if not linha:
+            continue
+        if RE_CABECALHO_ESTRUTURAL.match(linha) or len(linhas) >= MAX_LINHAS_TITULO:
+            break
+        linhas.append(linha)
+    return any(RE_TITULO_RETIFICACAO.search(l) for l in linhas)
+
+
+def e_retificacao(doc: dict, texto: str = "") -> bool:
+    """Pelo subtipo do schema, pelo tipo IRCT (AE-ALT-RECT etc., que o
+    pipeline põe no doc como 'tipo_registo') ou pelo título do documento.
+
+    O título é o que não depende do nome do ficheiro nem do registo da
+    recolha: um corpus nomeado no esquema de 2025 (`26_PR_011_…`) não traz o
+    tipo no nome, e a retificação tem de ser reconhecida na mesma (revisão do
+    PR #88).
+    """
+    return bool(RE_RETIFICACAO.search(doc.get("subtipo", ""))
+                or RE_RETIFICACAO.search(doc.get("tipo_registo", ""))
+                or titulo_de_retificacao(texto))
+
+
+def sem_articulado(doc: dict, texto: str = "") -> str | None:
+    """Zero cláusulas nunca fica ambíguo (ISSUE-0014, issue #64).
+
+    Numa retificação é o resultado certo: a retificação corrige outra
+    convenção e não tem articulado próprio. Noutro documento pode ser um
+    defeito do extrator ou um documento sem articulado, e diz-se isso, sem
+    sugerir truncagem.
+    """
+    if any(no.get("tipo") in _TIPOS_COM_CORPO for no in doc.get("nos", [])):
+        return None
+    return (AVISO_RETIFICACAO_SEM_ARTICULADO if e_retificacao(doc, texto)
+            else AVISO_SEM_ESTRUTURA)
+
+
 def verificar(doc: dict, texto: str) -> list[str]:
     """Todos os controlos; devolve a lista de avisos (vazia = tudo bem)."""
     from .auditoria import tabelas_esperadas
 
     avisos = []
-    # retificação: pelo subtipo do schema ou pelo tipo IRCT do registo
-    # (AE-ALT-RECT etc.), que o pipeline põe no doc como 'tipo_registo'
-    e_retificacao = bool(
-        RE_RETIFICACAO.search(doc.get("subtipo", ""))
-        or RE_RETIFICACAO.search(doc.get("tipo_registo", "")))
-    aviso = deposito_no_fim(texto, e_retificacao=e_retificacao)
+    aviso = sem_articulado(doc, texto)
+    if aviso:
+        avisos.append(aviso)
+    aviso = deposito_no_fim(texto, e_retificacao=e_retificacao(doc, texto))
     if aviso:
         avisos.append(aviso)
     vazias = clausulas_sem_corpo(doc, texto)

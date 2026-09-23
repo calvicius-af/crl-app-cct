@@ -64,6 +64,46 @@ def estado_git(raiz: Path) -> dict:
     return {"commit": commit, "dirty": bool(alteracoes.strip())}
 
 
+def versao_aplicacao(raiz: Path) -> str | None:
+    """A versão declarada em `pyproject.toml`, que viaja sempre com o código.
+
+    É o que identifica a aplicação numa estação sem git (ISSUE-0013, ponto 2).
+    """
+    import tomllib
+
+    try:
+        with open(raiz / "pyproject.toml", "rb") as f:
+            return tomllib.load(f)["project"]["version"]
+    except (OSError, KeyError, tomllib.TOMLDecodeError):
+        return None
+
+
+def origem_do_pacote_offline(raiz: Path) -> dict | None:
+    """De que commit foi preparado o pacote offline instalado nesta estação.
+
+    `scripts/preparar_pacote_offline.py` corre numa máquina com git e regista
+    no `vendor/wheels/manifesto.json` a versão e o commit de onde partiu. Uma
+    estação sem git não sabe o seu commit, mas sabe o do pacote que instalou.
+    """
+    try:
+        dados = json.loads((raiz / "vendor" / "wheels" / "manifesto.json")
+                           .read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    origem = dados.get("aplicacao")
+    return origem if isinstance(origem, dict) else None
+
+
+def estado_git_ou_pacote(raiz: Path) -> dict:
+    """`estado_git`, completado pelo commit do pacote offline quando o git falta."""
+    estado = estado_git(raiz)
+    if estado.get("commit") is None:
+        origem = origem_do_pacote_offline(raiz)
+        if origem and origem.get("commit"):
+            estado["commit_do_pacote_offline"] = origem["commit"]
+    return estado
+
+
 def construir_manifesto(*, raiz: Path, inicio_utc: str, parametros: dict,
                          entradas: list[Path], saidas: list[Path],
                          resumo: dict, problemas: list[str],
@@ -81,7 +121,8 @@ def construir_manifesto(*, raiz: Path, inicio_utc: str, parametros: dict,
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),
-            "git": estado_git(raiz),
+            "git": estado_git_ou_pacote(raiz),
+            "app_version": versao_aplicacao(raiz),
         },
         "inputs": [registo_ficheiro(p, raiz) for p in entradas_unicas],
         "outputs": [registo_ficheiro(p, raiz) for p in saidas_unicas],

@@ -30,7 +30,8 @@ Detalhe em [docs/arquitetura/arquitetura.md](docs/arquitetura/arquitetura.md).
 
 Fases 0 a 5 concluídas, mais a aquisição do corpus
 ([SPEC-0001](specs/0001-recolha-e-nomeacao-do-bte.md)), com uma suite automática
-executada no CI em Linux e macOS, Python 3.11 e 3.12. Em uso real: o corpus de 2025
+executada no CI em Linux, macOS e Windows, nas versões do Python definidas em
+[`.github/workflows/testes.yml`](.github/workflows/testes.yml). Em uso real: o corpus de 2025
 (89 convenções do tema 4.8, proteção de dados) foi processado e revisto por peritas em
 cinco rondas sucessivas.
 

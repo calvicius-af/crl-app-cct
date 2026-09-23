@@ -1,6 +1,6 @@
 # ISSUE-0005: programa de qualidade técnica pós-PR #23
 
-- **Estado:** Aberta
+- **Estado:** Em curso — ponto de situação a 2026-09-23 no fim deste documento
 - **Data:** 2026-08-26
 - **GitHub:** #24
 - **Onde dói:** segurança, desempenho, manutenção e garantia de qualidade
@@ -63,3 +63,27 @@ Novas sub-issues:
 - a validação humana no MaxQDA confirma o artefacto final;
 - documentação e exemplos deixam de depender de contagens ou passos manuais
   não verificáveis.
+
+## Ponto de situação (2026-09-23)
+
+| Sub-issue | Estado | O que falta |
+|---|---|---|
+| #4 exemplos reproduzíveis | resolvida no código | nada no código; o README dos exemplos distingue executar, verificar e reproduzir, e `tests/test_exemplos.py` confirma os números que ele afirma |
+| #5 fugas de dados e segredos | fechada no GitHub | — |
+| #6 referências documentais | fechada no GitHub | — |
+| #7 afirmações quantitativas | resolvida no código | nada; a matriz do CI deixou de ser repetida nos documentos |
+| #8 matriz Python e avisos | resolvida no código | nada; o CI cobre Linux, macOS e Windows, e os avisos do código do projeto fazem falhar a suite |
+| #25 isolar e limitar o Docling | aberta | não tratado nesta ronda |
+| #26 desempenho dos extratores | aberta | precisa de um corpus autorizado de PDF para medir |
+| #27 gates estáticos | em curso | feito: Ruff, mypy no pacote `cct`, `git diff --check`; falta: tipos para os objetos do Docling, heurísticas de colunas nomeadas, testes de propriedades dos offsets, cobertura mínima |
+| #28 numeração por extenso | resolvida no código | normalização confirmada num PDF real (LPFP/SJPF, BTE 29/2025); falta um par de versões reais para o emparelhamento (ISSUE-0001) |
+| #29 títulos multilinha | aberta | confirmado na revisão do PR #88: o título inicial da TINITA continua dividido; precisa dos casos reais como fixtures |
+| #30 cadeia de fornecimento | fechada no GitHub | — |
+| #31 validação no MaxQDA | aberta | validação humana no MaxQDA |
+| #56 acesso à partilha do pacote | aberta | configuração pelo Instituto de Informática, fora do repositório |
+| #58 gate de instalação Windows | resolvida no código | ISSUE-0009 a 0013 verificadas; falta repetir o gate numa estação do CRL (ISSUE-0009) |
+| #64 CARRISTUR sem cláusulas | resolvida no código | confirmado na corrida real com nomes RNC; falta repetir com os nomes de 2025, agora cobertos pelo título (ISSUE-0014) |
+
+«Resolvida no código» quer dizer que o defeito está corrigido e coberto por testes, mas
+que o issue tem um critério que só se confirma com pessoas, dados reais ou configuração
+externa, e que por isso não deve ser fechado só com o merge.
