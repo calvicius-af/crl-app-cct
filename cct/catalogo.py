@@ -350,11 +350,27 @@ def _chave(linha: dict) -> str:
 
 
 AVISO_CHAVE_REPETIDA = ("chave repetida no catálogo anterior ou nos índices — "
-                        "colunas da equipa não repostas; verificar à mão")
+                        "colunas da equipa não repostas, verificar à mão")
+
+
+# Estados que a aplicação escreve sozinha. Outro estado foi posto pela equipa.
+ESTADOS_AUTOMATICOS = frozenset({"", "recolhido", "nao_processavel",
+                                 "por_confirmar", "metadado"})
 
 
 def _avisar(linha: dict, aviso: str) -> None:
-    linha["avisos"] = "; ".join(a for a in (aviso, linha.get("avisos", "")) if a)
+    """Acrescenta o aviso uma vez só: a linha volta a passar por aqui em cada
+    regeneração, e o texto não pode crescer de corrida para corrida."""
+    existentes = [a.strip() for a in (linha.get("avisos") or "").split(";")
+                  if a.strip()]
+    if aviso not in existentes:
+        existentes.insert(0, aviso)
+    linha["avisos"] = "; ".join(existentes)
+
+
+def _tem_trabalho_da_equipa(linha: dict) -> bool:
+    return (any((linha.get(c) or "").strip() for c in COLUNAS_EQUIPA)
+            or (linha.get("estado") or "") not in ESTADOS_AUTOMATICOS)
 
 
 def carregar_correspondencia(caminho: Path) -> dict[str, str]:
@@ -407,11 +423,18 @@ def fundir(novas: list[dict], anterior: Path | None,
             for c in COLUNAS_EQUIPA:
                 if velha.get(c):
                     linha[c] = velha[c]
-            if velha.get("estado") and velha["estado"] not in (
-                    "recolhido", "nao_processavel", "por_confirmar"):
+            if velha.get("estado") not in ESTADOS_AUTOMATICOS:
                 linha["estado"] = velha["estado"]
     for chave, grupo in antigas.items():
         for orfa in grupo:
+            # Numa chave repetida que os índices continuam a trazer, uma linha
+            # antiga sem trabalho da equipa é só a cópia gerada na corrida
+            # anterior: a linha nova substitui-a. Mantê-la fazia o catálogo
+            # crescer uma linha por corrida. As que têm trabalho da equipa
+            # ficam, uma vez cada, para revisão.
+            if (chave in ambiguas and chave in contagem_novas
+                    and not _tem_trabalho_da_equipa(orfa)):
+                continue
             linha = {c: orfa.get(c, "") for c in COLUNAS}
             _avisar(linha, AVISO_CHAVE_REPETIDA if chave in ambiguas
                     else "já não consta dos índices lidos — verificar")

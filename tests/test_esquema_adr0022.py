@@ -406,3 +406,40 @@ def test_chave_ambigua_nao_repoe_nem_perde_o_trabalho_da_equipa(tmp_path):
     assert "chave repetida" in novas[0]["avisos"]
     assert sorted(l["perita"] for l in novas[1:]) == ["Dra. A", "Dra. B"]
     assert all("chave repetida" in l["avisos"] for l in novas[1:])
+
+
+def _regerar(novas_fn, anterior, vezes):
+    """Regera o catálogo `vezes` seguidas, como a equipa faria boletim a boletim."""
+    tamanhos = []
+    for _ in range(vezes):
+        linhas = catalogo.fundir(novas_fn(), anterior)
+        catalogo.escrever(linhas, anterior)
+        tamanhos.append(len(linhas))
+    return linhas, tamanhos
+
+
+def test_colisao_nao_faz_crescer_o_catalogo_entre_regeneracoes(tmp_path):
+    """Revisão do PR #87: com duas linhas antigas de chave repetida, cada
+    corrida acrescentava mais uma. O catálogo tem de estabilizar."""
+    anterior = tmp_path / "catalogo.csv"
+    catalogo.escrever([
+        _sem_nome(ano="2026", bte_numero="31", ficheiro_origem="", perita="Dra. A"),
+        _sem_nome(ano="2026", bte_numero="31", ficheiro_origem="", perita="Dra. B"),
+    ], anterior)
+    linhas, tamanhos = _regerar(
+        lambda: [_sem_nome(ano=2026, bte_numero=31, ficheiro_origem="")], anterior, 3)
+
+    assert tamanhos == [3, 3, 3]
+    assert sorted(l["perita"] for l in linhas) == ["", "Dra. A", "Dra. B"], \
+        "as linhas da equipa ficam, uma vez cada"
+    assert all(l["avisos"].count("chave repetida") == 1 for l in linhas), \
+        "o aviso não se acumula de corrida para corrida"
+
+
+def test_orfa_com_aviso_nao_acumula_avisos(tmp_path):
+    anterior = tmp_path / "catalogo.csv"
+    catalogo.escrever([_sem_nome(ano="2026", bte_numero="30", seq_anual="9",
+                                 perita="Dra. A")], anterior)
+    linhas, tamanhos = _regerar(lambda: [], anterior, 3)
+    assert tamanhos == [1, 1, 1]
+    assert linhas[0]["avisos"].count("já não consta") == 1
