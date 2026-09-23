@@ -17,9 +17,7 @@ from cct.catalogo import (acto_negociacao, paginas, separar_alteracoes,
                           separar_sectores)
 from cct.localizador import interpretar_doc_id, interpretar_nome_rnc
 from cct.siglas import atribuir, candidatos, linhagem, palavras_distintivas
-from cct.nomeacao import (AVISO_BASE_PELA_CADEIA, NomeRNCInvalido,
-                          carregar_siglas, nome_documento, referencia_portaria,
-                          resolver_convencoes_base, sequencial_bte,
+from cct.nomeacao import (AVISO_BASE_PELA_CADEIA, carregar_siglas, nome_documento, resolver_convencoes_base, sequencial_bte,
                           siglas_outorgantes, tipo_normalizado)
 from cct.nomeacao import familia_do_nome
 from cct.recolha import FAMILIAS_POR_OMISSAO, familia, ler_indice
@@ -454,7 +452,7 @@ def test_a_unicidade_ignora_maiusculas():
 
 
 def test_nunca_sobram_duplicados_por_muitos_que_sejam():
-    orgs = [_org(f"{i}.1.0", f"ASSOCIACAO COMERCIAL DE ESPINHO", "ACE", "ESPINHO")
+    orgs = [_org(f"{i}.1.0", "ASSOCIACAO COMERCIAL DE ESPINHO", "ACE", "ESPINHO")
             for i in range(1, 9)]
     siglas = list(atribuir(orgs).values())
     assert len({s.upper() for s in siglas}) == len(orgs)
@@ -679,8 +677,8 @@ def test_pdfs_da_pasta_encontra_direto_e_nas_subpastas_de_ambito(tmp_path):
 
     # esquema RNC: nada direto na pasta do ano, mas convencoes/PRI e SPE têm
     ano = tmp_path / "bte_2026"
-    for ambito in ("PRI", "SPE", "APU"):
-        (ano / "convencoes" / ambito).mkdir(parents=True)
+    for sigla_ambito in ("PRI", "SPE", "APU"):
+        (ano / "convencoes" / sigla_ambito).mkdir(parents=True)
     (ano / "convencoes" / "PRI" / "2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf"
      ).write_bytes(b"%PDF-1.4\n")
     (ano / "convencoes" / "SPE" / "2026_SPE_382_AE_47252_BTE_31_EMEM-SINTAP.pdf"

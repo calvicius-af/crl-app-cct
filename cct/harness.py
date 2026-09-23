@@ -10,6 +10,7 @@ Dois níveis (plano, Fase 2):
 `referencia`:  [{doc_id, codigo, segmento}].
 """
 import re
+from typing import Any
 from collections import defaultdict
 
 
@@ -40,7 +41,7 @@ def avaliar(previstos: list[dict], referencia: list[dict]) -> dict:
 
     codigos = {c for _, c in pares_ref} | {c for _, c in pares_prev}
     por_codigo = {}
-    tot = {"vp": 0, "fp": 0, "fn": 0, "vp_segmento": 0}
+    tot: dict[str, Any] = {"vp": 0, "fp": 0, "fn": 0, "vp_segmento": 0}
 
     for cod in sorted(codigos):
         ref_docs = {d for (d, c) in pares_ref if c == cod}
@@ -79,12 +80,14 @@ def relatorio(m: dict) -> str:
     linhas = [f"{'código':<12} {'n_ref':>5} {'VP':>4} {'FP':>4} {'FN':>4} "
               f"{'VPseg':>5} {'prec':>6} {'cob':>6} {'F1':>6}"]
     for cod, r in m["por_codigo"].items():
-        fmt = lambda v: f"{v:.2f}" if isinstance(v, float) else ("--" if v is None else str(v))
+        def fmt(v):
+            return f"{v:.2f}" if isinstance(v, float) else ("--" if v is None else str(v))
         linhas.append(f"{cod:<12} {r['n_referencia']:>5} {r['vp']:>4} {r['fp']:>4} "
                       f"{r['fn']:>4} {r['vp_segmento']:>5} {fmt(r['precisao']):>6} "
                       f"{fmt(r['cobertura']):>6} {fmt(r['f1']):>6}")
     g = m["global"]
-    fmtg = lambda v: f"{v:.2f}" if v is not None else "--"
+    def fmtg(v):
+        return f"{v:.2f}" if v is not None else "--"
     linhas.append(f"{'GLOBAL':<12} {'':>5} {g['vp']:>4} {g['fp']:>4} {g['fn']:>4} "
                   f"{g['vp_segmento']:>5} {fmtg(g['precisao']):>6} {fmtg(g['cobertura']):>6}")
     return "\n".join(linhas)

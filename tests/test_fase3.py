@@ -4,7 +4,6 @@ Convenção do CRL para 2025: o código de nível cláusula (_identif) marca a
 cláusula inteira; os subcódigos marcam números/alíneas (parágrafos).
 As peritas recebem XLSX com o contexto de cada segmento.
 """
-from pathlib import Path
 
 import openpyxl
 

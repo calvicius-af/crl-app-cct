@@ -74,7 +74,8 @@ def palavras_distintivas(denominacao: str) -> list[str]:
     aparecem em meio ramo de actividade. A ordem do resultado é a ordem em que a
     escada as vai experimentar.
     """
-    fortes, fracas = [], []
+    fortes: list[str] = []
+    fracas: list[str] = []
     for bruto in re.split(r"[^\wÀ-ÿ]+", _sem_acentos(denominacao or "")):
         if len(bruto) < 3:
             continue
@@ -152,7 +153,8 @@ def candidatos(base: str, denominacao: str, concelho: str = "",
     return [c for c in dict.fromkeys(escada) if c]
 
 
-def atribuir(organizacoes: list[dict], fixadas: dict[str, str] | None = None
+def atribuir(organizacoes: list[dict],
+             fixadas: dict[tuple[str, str], str] | None = None
              ) -> dict[tuple[str, str], str]:
     """Resolve os duplicados → `{(linhagem, sigla_base): sigla_final}`.
 

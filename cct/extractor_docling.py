@@ -154,7 +154,7 @@ def ordenar_por_leitura(itens: list) -> list:
     página, coluna (quando existem duas) e distância ao topo. Itens sem
     geometria herdam a posição do anterior, ficando onde estavam.
     """
-    paginas = {}
+    paginas: dict = {}
     for indice, (_item, pagina, bbox, _altura, _largura) in enumerate(itens):
         if bbox is not None:
             paginas.setdefault(pagina, []).append(bbox)

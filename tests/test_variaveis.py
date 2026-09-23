@@ -35,12 +35,13 @@ def test_subtipo_pipeline():
     assert subtipo_pipeline("", "") == "desconhecido"
 
 
+@pytest.fixture(scope="module")
+def vars_():
+    return carregar_variaveis(XLSX)
+
+
 @pytest.mark.skipif(not XLSX.exists(), reason="VariaveisDocumento2025.xlsx não disponível")
 class TestReal:
-    @pytest.fixture(scope="class")
-    def vars_(self):
-        return carregar_variaveis(XLSX)
-
     def test_carrega_todos(self, vars_):
         assert len(vars_) >= 270
 

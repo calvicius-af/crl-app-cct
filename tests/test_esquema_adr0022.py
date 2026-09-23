@@ -12,6 +12,7 @@ Correm offline, sobre o índice de ensaio de `tests/test_rnc.py`.
 import csv
 import fnmatch
 import hashlib
+from pathlib import Path
 
 import pytest
 
@@ -273,7 +274,7 @@ def _nomeado_no_adr0016(tmp_path):
     antigo = (tmp_path / "bte" / "bte_2026" / "convencoes" / "PRI"
               / "2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2.pdf")
     antigo.parent.mkdir(parents=True)
-    antigo.write_bytes(open(entrada["descarga"]["caminho"], "rb").read())
+    antigo.write_bytes(Path(entrada["descarga"]["caminho"]).read_bytes())
     entrada["nomeacao"] = {"ordinal": 1, "estado": "nomeado",
                            "doc_id": antigo.stem, "caminho": str(antigo)}
     return registo, entrada, antigo

@@ -16,7 +16,7 @@ docling_core não está instalado.
 from types import SimpleNamespace
 
 from cct.extractor import estruturar
-from cct.extractor_docling import (celulas_da_linha, distancia_ao_topo,
+from cct.extractor_docling import (distancia_ao_topo,
                                    limpar_texto_item, ordenar_por_leitura,
                                    _linhas_de_tabela, RE_MARCADOR_PROPRIO)
 

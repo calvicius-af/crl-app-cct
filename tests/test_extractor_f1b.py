@@ -40,13 +40,14 @@ def test_juntar_nao_toca_em_linhas_de_tabela():
     assert "Nível | Grupo A | Grupo B\nXV | 2728 | 2496" in saida
 
 
+@pytest.fixture(scope="module")
+def extraido():
+    return extrair_pdf(PDF_BTE, paginas=(15, 49),
+                       doc_id="25_CCT_BTE_02_ACIP_FESAHT")
+
+
 @pytest.mark.skipif(not PDF_BTE.exists(), reason="bte2_2025.pdf não disponível")
 class TestPdfReal:
-    @pytest.fixture(scope="class")
-    def extraido(self):
-        return extrair_pdf(PDF_BTE, paginas=(15, 49),
-                           doc_id="25_CCT_BTE_02_ACIP_FESAHT")
-
     def test_sem_rodapes_bte(self, extraido):
         _doc, texto = extraido
         import re

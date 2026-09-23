@@ -45,7 +45,7 @@ def triar(anotacoes: dict, aptos: set[str], doc: dict | None = None,
             novas.append(a)
             continue
         no = nos_por_id.get(a["no_id"])
-        em_consolidado = bool(no) and no.get("origem") == "consolidado"
+        em_consolidado = no is not None and no.get("origem") == "consolidado"
         if em_consolidado and clausula_de(a["no_id"]) not in novidades:
             faixa = "CONSOLIDADO"
         else:

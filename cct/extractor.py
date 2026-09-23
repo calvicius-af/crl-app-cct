@@ -231,11 +231,11 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
         linha = linhas[i].strip()
         tipo_encontrado = None
         rotulo = linha
-        for tipo, rx in _RE_HEADINGS:
+        for tipo_cabecalho, rx in _RE_HEADINGS:
             m = rx.match(linha)
             if not m:
                 continue
-            tipo_encontrado = tipo
+            tipo_encontrado = tipo_cabecalho
             resto = (m.group(2) if m.lastindex and m.lastindex >= 2 else "") or ""
             titulo_extra = None
             if not resto.strip(" -–—:"):
@@ -246,7 +246,7 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
                 if j < len(linhas) and _titulo_candidato(linhas[j]):
                     titulo_extra = linhas[j].strip()
                     i = j  # consome a linha do título
-            rotulo = _normalizar_rotulo(tipo, m, titulo_extra)
+            rotulo = _normalizar_rotulo(tipo_cabecalho, m, titulo_extra)
             break
         eventos.append((tipo_encontrado, rotulo if tipo_encontrado else linhas[i]))
         i += 1
@@ -525,7 +525,7 @@ def _extrair_pagina(pag) -> str:
 
 def _remover_cabecalhos_rodapes(paginas: list[str]) -> list[str]:
     """Remove mobiliário repetido sem tocar nos delimitadores/células de tabelas."""
-    contagem = Counter()
+    contagem: Counter[str] = Counter()
     for pag in paginas:
         fora = set()
         em_tabela = False

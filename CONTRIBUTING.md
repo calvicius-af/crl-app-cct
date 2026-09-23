@@ -68,7 +68,16 @@ python scripts/verificar_seguranca.py --verboso
 
 # nada de links ou caminhos documentais quebrados (nem sensíveis a maiúsculas/minúsculas)
 python scripts/verificar_referencias.py --verboso
+
+# lint e tipos, os mesmos do job "análise estática" do CI (issue #27);
+# instalar uma vez com: python -m pip install -c requirements/dev.txt ruff mypy types-PyYAML
+python -m ruff check cct scripts tests
+python -m mypy cct
 ```
+
+Os testes tratam como falha um aviso de depreciação ou um ficheiro por fechar no
+código do projeto (`pytest.ini`, issue #8). Os avisos das bibliotecas externas
+continuam visíveis, mas não fazem falhar a corrida.
 
 `scripts/verificar_seguranca.py` é a mesma barreira que corre no CI (job
 *segurança*) e só usa a biblioteca padrão, pelo que corre em qualquer máquina sem

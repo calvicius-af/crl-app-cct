@@ -20,6 +20,7 @@ import os
 import time
 import urllib.error
 import urllib.request
+from typing import Any
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
@@ -186,7 +187,7 @@ def ler_indice(xlsx: Path) -> list[dict]:
         if not mapa["titulo"] and not mapa["url"]:
             continue  # folha que não é um índice do BTE
         for posicao, linha in enumerate(linhas, 1):
-            item = {}
+            item: dict[str, Any] = {}
             for campo, indices in mapa.items():
                 valores = [str(linha[i]).strip() for i in indices
                            if i < len(linha) and linha[i] not in (None, "")]
@@ -484,7 +485,7 @@ def recolher(indices: list[Path], destino: Path, registo: Registo, *,
     meio (rede, Ctrl-C, suspensão) não obriga a redescarregar tudo.
     """
     abridor = abridor or abridor_urllib
-    resumo = {"indices": [], "por_estado": {}, "tipos_desconhecidos": {},
+    resumo: dict[str, Any] = {"indices": [], "por_estado": {}, "tipos_desconhecidos": {},
               "problemas": [], "documentos": 0}
     pedidos = 0
 

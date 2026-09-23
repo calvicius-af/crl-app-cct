@@ -171,7 +171,6 @@ def test_auditoria_a_rebentar_nao_exclui_o_documento(tmp_path, monkeypatch):
     pode custar o resultado (bloqueante apontado na revisão do PR #67).
     """
     from cct import pipeline_tema
-    from cct.auditoria import contar_tabelas_pdfplumber
 
     pasta = tmp_path / "pdfs"
     pasta.mkdir()

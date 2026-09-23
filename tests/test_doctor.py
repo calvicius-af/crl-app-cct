@@ -6,9 +6,7 @@ Estes testes verificam que a saída identifica o interpretador em uso e
 distingue os dois casos. O doctor usa só stdlib, pelo que corre em qualquer SO.
 """
 import sys
-from pathlib import Path
-
-import pytest
+import types
 
 from cct import doctor
 
@@ -42,7 +40,6 @@ def _correr_doctor(monkeypatch, tmp_path, capsys, venv_existe=True,
     # O tkinter é do Python e não do projeto: há interpretadores (contentores,
     # algumas builds do Linux) sem ele. Sem este módulo falso, o resultado dos
     # testes dependia da máquina e não do que o doctor faz.
-    import types
     monkeypatch.setitem(sys.modules, "tkinter", types.ModuleType("tkinter"))
     # sys.prefix/base_prefix: simular que NÃO estamos num venv do projeto
     monkeypatch.setattr(doctor.sys, "prefix", "/usr")

@@ -1,6 +1,5 @@
 import json
 import subprocess
-from pathlib import Path
 
 from cct.proveniencia import (construir_manifesto, escrever_manifesto,
                               estado_git, registo_ficheiro)

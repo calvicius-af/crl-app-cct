@@ -75,7 +75,7 @@ def sigla_base(denominacao: str, acronimo: str) -> tuple[str, str]:
     return _camel(denominacao), "recurso"
 
 
-def siglas_fixadas(caminho: Path) -> dict[str, str]:
+def siglas_fixadas(caminho: Path) -> dict[tuple[str, str], str]:
     """As siglas já atribuídas → `{(linhagem, sigla_base): sigla}`.
 
     Uma sigla atribuída não se reatribui, pela mesma razão por que um nome de

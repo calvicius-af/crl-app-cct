@@ -33,7 +33,7 @@ def _tipo_do_rotulo(rotulo: str) -> str:
 
 def adaptar_v2(conteudo: str) -> list[tuple[dict, str]]:
     """Converte o ficheiro completo do V2 (pode conter vários #TEXT)."""
-    docs = []
+    docs: list[tuple[dict, str]] = []
     doc_id = None
     blocos: list[tuple[str, list[str]]] = []
     rotulo_atual = None

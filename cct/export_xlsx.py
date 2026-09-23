@@ -11,8 +11,8 @@ from pathlib import Path
 def _cadeia_contexto(no: dict, por_id: dict) -> tuple[str, str]:
     """Devolve (rótulo da cláusula, contexto acima da cláusula)."""
     clausula = ""
-    acima = []
-    atual = no
+    acima: list[str] = []
+    atual: dict | None = no
     while atual is not None:
         if atual["tipo"] in ("clausula", "artigo"):
             clausula = atual["rotulo"]

@@ -74,8 +74,8 @@ def main():
             continue
 
         anotados = {a["no_id"] for a in lex["anotacoes"]}
-        backend = lambda pr: backend_lmstudio(pr, modelo=args.modelo,
-                                               base_url=args.base_url)
+        def backend(pr):
+            return backend_lmstudio(pr, modelo=args.modelo, base_url=args.base_url)
         sem = codificar_semantico(
             doc, texto, codebook,
             backend=backend,

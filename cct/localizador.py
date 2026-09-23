@@ -175,16 +175,15 @@ def listar_convencoes(pdf_path: Path) -> list[dict]:
     """Devolve [{titulo, pag_ini, pag_fim}] para cada convenção do número (0-based, fim exclusivo)."""
     import pdfplumber
 
-    inicios = []  # (pagina, titulo)
+    inicios: list[tuple[int, str]] = []  # (pagina, titulo)
     with pdfplumber.open(pdf_path) as pdf:
         n_pags = len(pdf.pages)
-        for i, pag in enumerate(pdf.pages):
-            t = pag.extract_text() or ""
+        for i, pagina in enumerate(pdf.pages):
+            t = pagina.extract_text() or ""
             for m in RE_INICIO_CONVENCAO.finditer(t):
-                titulo = t[m.start():m.start() + 300].split("\n")
                 # título pode ocupar 2-3 linhas
-                titulo = " ".join(l.strip() for l in titulo[:3])
-                inicios.append((i, titulo))
+                linhas_titulo = t[m.start():m.start() + 300].split("\n")
+                inicios.append((i, " ".join(l.strip() for l in linhas_titulo[:3])))
     convencoes = []
     for j, (pag, titulo) in enumerate(inicios):
         fim = inicios[j + 1][0] if j + 1 < len(inicios) else n_pags
