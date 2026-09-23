@@ -330,42 +330,43 @@ def ligar_avisos(linhas_catalogo: list[dict]) -> list[dict]:
     return linhas_catalogo
 
 
-def _chave(linha: dict) -> str:
-    """Identidade de uma linha entre regerações do catálogo.
-
-    O `nome_canonico`, quando existe. Uma linha sem nome (por confirmar) não
-    pode ser procurada só pelo ficheiro de origem: o BTE numera os PDF por
-    páginas (`00010004.pdf`), e o mesmo nome repete-se de boletim para
-    boletim. Usa-se o ano com o `IDDocumento` da DGCP, que é único no ano; sem
-    ele, o ano, o boletim, a origem e o URL.
-    """
-    if linha.get("nome_canonico"):
-        return linha["nome_canonico"]
-    ano = str(linha.get("ano") or "")
-    seq = str(linha.get("seq_anual") or "")
-    if seq:
-        return f"sem_nome:{ano}:{seq}"
-    return (f"sem_nome:{ano}:BTE{linha.get('bte_numero') or ''}:"
-            f"{linha.get('ficheiro_origem') or ''}:{linha.get('url_fonte') or ''}")
-
-
-AVISO_CHAVE_REPETIDA = ("chave repetida no catálogo anterior ou nos índices — "
-                        "colunas da equipa não repostas, verificar à mão")
-
+# Identidade de um documento entre regenerações: só campos que vêm do índice
+# do BTE, nunca campos que a aplicação deriva (nome, siglas, âmbito, avisos),
+# para que uma tabela de siglas nova ou uma migração de nomes não separem uma
+# linha do trabalho que a equipa lá pôs. O ficheiro de origem sozinho não
+# serve: o BTE numera os PDF por páginas (`00010004.pdf`) e o nome repete-se
+# de boletim para boletim.
+COLUNAS_IDENTIDADE = ("ano", "seq_anual", "bte_numero", "tipo_documento",
+                      "ficheiro_origem", "url_fonte", "titulo")
 
 # Estados que a aplicação escreve sozinha. Outro estado foi posto pela equipa.
 ESTADOS_AUTOMATICOS = frozenset({"", "recolhido", "nao_processavel",
                                  "por_confirmar", "metadado"})
 
+AVISO_ORFA = "já não consta dos índices lidos — verificar"
+AVISO_REPETIDO = ("documento repetido no catálogo anterior ou nos índices — "
+                  "colunas da equipa não repostas, verificar à mão")
+# Avisos que a própria fusão escreve. São recalculados em cada corrida, para
+# que um aviso que deixou de se aplicar não fique para sempre na linha.
+AVISOS_DA_FUSAO = frozenset({AVISO_ORFA, AVISO_REPETIDO})
 
-def _avisar(linha: dict, aviso: str) -> None:
-    """Acrescenta o aviso uma vez só: a linha volta a passar por aqui em cada
-    regeneração, e o texto não pode crescer de corrida para corrida."""
-    existentes = [a.strip() for a in (linha.get("avisos") or "").split(";")
-                  if a.strip()]
-    if aviso not in existentes:
-        existentes.insert(0, aviso)
-    linha["avisos"] = "; ".join(existentes)
+
+def _identidade(linha: dict) -> tuple | None:
+    chave = tuple(str(linha.get(c) or "").strip() for c in COLUNAS_IDENTIDADE)
+    return chave if any(chave) else None
+
+
+def _nome(linha: dict) -> str | None:
+    return (linha.get("nome_canonico") or "").strip() or None
+
+
+def _avisar(linha: dict, aviso: str | None) -> None:
+    """Tira os avisos da fusão de corridas anteriores e põe o atual, uma vez."""
+    avisos = [a.strip() for a in (linha.get("avisos") or "").split(";")
+              if a.strip() and a.strip() not in AVISOS_DA_FUSAO]
+    if aviso:
+        avisos.insert(0, aviso)
+    linha["avisos"] = "; ".join(avisos)
 
 
 def _tem_trabalho_da_equipa(linha: dict) -> bool:
@@ -385,61 +386,96 @@ def fundir(novas: list[dict], anterior: Path | None,
            correspondencia: dict[str, str] | None = None) -> list[dict]:
     """Repõe as colunas da equipa a partir de um catálogo anterior.
 
-    A correspondência é feita pelo `nome_canonico`, que por convenção nunca
-    muda. A exceção é a migração única do ADR-0022: com `correspondencia`
-    (nome antigo → nome novo), as linhas do catálogo anterior são procuradas
-    pelo nome novo. Uma linha sem nome canónico (por confirmar) é procurada
-    pela chave de `_chave`; uma chave repetida não repõe nada e deixa as linhas
-    antigas assinaladas. Uma linha do catálogo anterior que já não apareça
-    nos índices é mantida — apagá-la perdia o trabalho de quem a preencheu, e um
-    documento que desaparece de um índice é um facto a investigar, não a
-    esquecer.
+    Garante quatro propriedades, verificadas em `tests/test_esquema_adr0022.py`
+    sobre centenas de cenários gerados ao acaso:
+
+    1. **idempotência** — regenerar com os mesmos índices dá o mesmo ficheiro;
+    2. **nada do trabalho da equipa se perde nem se duplica**;
+    3. **o trabalho da equipa só é reposto no documento a que pertence**;
+    4. **um documento que desaparece dos índices fica no catálogo**, assinalado.
+
+    O algoritmo, por esta ordem:
+
+    1. **Cópias.** Uma linha antiga sem trabalho da equipa, cujo documento
+       (`COLUNAS_IDENTIDADE`) está nos índices atuais, é a cópia que a corrida
+       anterior gerou: a linha nova substitui-a, e ela é posta de parte antes
+       de qualquer decisão. É isto que torna a fusão idempotente — a corrida
+       seguinte vê exatamente as mesmas linhas antigas que a anterior.
+    2. **Identidade.** As restantes linhas antigas casam com as novas pelo
+       documento. Uma para uma: as colunas da equipa passam para a nova. Mais do
+       que uma de algum dos lados: não se escolhe às cegas; nada é reposto, e
+       as antigas ficam, uma vez cada, assinaladas.
+    3. **Nome.** O que sobrar casa pelo `nome_canonico`, com as mesmas regras e
+       sem descartar nada. Apanha um título corrigido pela DGERT e, com
+       `correspondencia`, a migração de nomes do ADR-0022.
+    4. **Órfãs.** O que ainda sobrar do catálogo anterior é documento que
+       desapareceu dos índices e fica, com aviso.
+
+    Um documento repetido nos índices é sempre assinalado, haja ou não
+    catálogo anterior.
     """
+    contagem: dict = {}
+    for l in novas:
+        contagem[_identidade(l)] = contagem.get(_identidade(l), 0) + 1
+    for l in novas:
+        if _identidade(l) is not None and contagem[_identidade(l)] > 1:
+            _avisar(l, AVISO_REPETIDO)
     if not anterior or not Path(anterior).exists():
         return novas
     correspondencia = correspondencia or {}
-    antigas: dict[str, list[dict]] = {}
     with open(anterior, encoding="utf-8-sig", newline="") as f:
-        for l in csv.DictReader(f, delimiter=";"):
-            if l.get("nome_canonico") in correspondencia:
-                l["nome_canonico"] = correspondencia[l["nome_canonico"]]
-            antigas.setdefault(_chave(l), []).append(l)
-    contagem_novas: dict[str, int] = {}
-    for linha in novas:
-        contagem_novas[_chave(linha)] = contagem_novas.get(_chave(linha), 0) + 1
+        antigas = list(csv.DictReader(f, delimiter=";"))
+    for l in antigas:
+        if l.get("nome_canonico") in correspondencia:
+            l["nome_canonico"] = correspondencia[l["nome_canonico"]]
 
-    # Uma chave repetida, de um lado ou do outro, não se resolve às cegas: nada
-    # é reposto nessas linhas e as antigas ficam todas, assinaladas. Escolher
-    # uma delas era arriscar pôr o trabalho da equipa no documento errado.
-    ambiguas = {k for k, v in antigas.items() if len(v) > 1}
-    ambiguas |= {k for k, n in contagem_novas.items() if n > 1 and k in antigas}
-    for linha in novas:
-        chave = _chave(linha)
-        if chave in ambiguas:
-            _avisar(linha, AVISO_CHAVE_REPETIDA)
-            continue
-        velha = (antigas.pop(chave, None) or [None])[0]
-        if velha:
-            for c in COLUNAS_EQUIPA:
-                if velha.get(c):
-                    linha[c] = velha[c]
-            if velha.get("estado") not in ESTADOS_AUTOMATICOS:
-                linha["estado"] = velha["estado"]
-    for chave, grupo in antigas.items():
-        for orfa in grupo:
-            # Numa chave repetida que os índices continuam a trazer, uma linha
-            # antiga sem trabalho da equipa é só a cópia gerada na corrida
-            # anterior: a linha nova substitui-a. Mantê-la fazia o catálogo
-            # crescer uma linha por corrida. As que têm trabalho da equipa
-            # ficam, uma vez cada, para revisão.
-            if (chave in ambiguas and chave in contagem_novas
-                    and not _tem_trabalho_da_equipa(orfa)):
+    # 1. cópias da corrida anterior
+    identidades_novas = {k for k in contagem if k is not None}
+    antigas_livres = {i for i, l in enumerate(antigas)
+                      if _tem_trabalho_da_equipa(l)
+                      or _identidade(l) not in identidades_novas}
+    novas_livres = set(range(len(novas)))
+    repetidas: list[int] = []                 # antigas mantidas por ambiguidade
+
+    # 2. e 3. casar por identidade, depois por nome
+    for chave_de in (_identidade, _nome):
+        grupos_novas: dict = {}
+        for i in sorted(novas_livres):
+            if (k := chave_de(novas[i])) is not None:
+                grupos_novas.setdefault(k, []).append(i)
+        grupos_antigas: dict = {}
+        for i in sorted(antigas_livres):
+            if (k := chave_de(antigas[i])) is not None:
+                grupos_antigas.setdefault(k, []).append(i)
+        for k, ias in grupos_antigas.items():
+            ins = grupos_novas.get(k)
+            if not ins:
                 continue
-            linha = {c: orfa.get(c, "") for c in COLUNAS}
-            _avisar(linha, AVISO_CHAVE_REPETIDA if chave in ambiguas
-                    else "já não consta dos índices lidos — verificar")
-            novas.append(linha)
-    return novas
+            if len(ins) == 1 and len(ias) == 1:
+                nova, velha = novas[ins[0]], antigas[ias[0]]
+                for c in COLUNAS_EQUIPA:
+                    if velha.get(c):
+                        nova[c] = velha[c]
+                if (velha.get("estado") or "") not in ESTADOS_AUTOMATICOS:
+                    nova["estado"] = velha["estado"]
+            else:
+                for i in ins:
+                    _avisar(novas[i], AVISO_REPETIDO)
+                repetidas.extend(ias)
+            novas_livres.difference_update(ins)
+            antigas_livres.difference_update(ias)
+
+    # 4. o que sobra do catálogo anterior
+    saida = list(novas)
+    for i in sorted(repetidas):
+        linha = {c: antigas[i].get(c, "") for c in COLUNAS}
+        _avisar(linha, AVISO_REPETIDO)
+        saida.append(linha)
+    for i in sorted(antigas_livres):
+        linha = {c: antigas[i].get(c, "") for c in COLUNAS}
+        _avisar(linha, AVISO_ORFA)
+        saida.append(linha)
+    return saida
 
 
 def escrever(linhas_catalogo: list[dict], saida: Path) -> None:

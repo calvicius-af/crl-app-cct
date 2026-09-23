@@ -231,8 +231,10 @@ dentro do que o ADR-0022 deixa em aberto:
    `RE_DOC_ID_AVISO`.
 4. **Migração do passo 4.** `cct.nomeacao --migrar --correspondencia CSV` passa os nomes
    do ADR-0016 para o esquema novo, apaga o ficheiro antigo depois de conferir o
-   `sha256` e escreve a tabela de correspondência; `cct.catalogo --correspondencia CSV`
-   usa-a para levar as colunas da equipa para o nome novo. Sem `--migrar`, um nome já
+   `sha256` e escreve a tabela de correspondência. O catálogo passa as colunas da
+   equipa pela identidade do documento no índice, sem depender do nome (ver
+   `catalogo.fundir`); `cct.catalogo --correspondencia CSV` usa a tabela como recurso,
+   para o caso de o índice ter mudado entretanto. Sem `--migrar`, um nome já
    escrito que mudaria continua a ser `conflito`.
 5. **PE renomeadas à mão.** O `cct.pipeline_tema` passa a recusar também os nomes fora de
    qualquer esquema que tragam `PE`, `PCT`, `PRT` ou `AA` como campo próprio.

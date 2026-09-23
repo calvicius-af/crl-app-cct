@@ -403,9 +403,9 @@ def test_chave_ambigua_nao_repoe_nem_perde_o_trabalho_da_equipa(tmp_path):
     novas = catalogo.fundir([_sem_nome(ano=2026, bte_numero=31, ficheiro_origem="")],
                             anterior)
     assert novas[0]["perita"] == ""
-    assert "chave repetida" in novas[0]["avisos"]
+    assert "documento repetido" in novas[0]["avisos"]
     assert sorted(l["perita"] for l in novas[1:]) == ["Dra. A", "Dra. B"]
-    assert all("chave repetida" in l["avisos"] for l in novas[1:])
+    assert all("documento repetido" in l["avisos"] for l in novas[1:])
 
 
 def _regerar(novas_fn, anterior, vezes):
@@ -419,7 +419,7 @@ def _regerar(novas_fn, anterior, vezes):
 
 
 def test_colisao_nao_faz_crescer_o_catalogo_entre_regeneracoes(tmp_path):
-    """Revisão do PR #87: com duas linhas antigas de chave repetida, cada
+    """Revisão do PR #87: com duas linhas antigas do mesmo documento, cada
     corrida acrescentava mais uma. O catálogo tem de estabilizar."""
     anterior = tmp_path / "catalogo.csv"
     catalogo.escrever([
@@ -432,7 +432,7 @@ def test_colisao_nao_faz_crescer_o_catalogo_entre_regeneracoes(tmp_path):
     assert tamanhos == [3, 3, 3]
     assert sorted(l["perita"] for l in linhas) == ["", "Dra. A", "Dra. B"], \
         "as linhas da equipa ficam, uma vez cada"
-    assert all(l["avisos"].count("chave repetida") == 1 for l in linhas), \
+    assert all(l["avisos"].count("documento repetido") == 1 for l in linhas), \
         "o aviso não se acumula de corrida para corrida"
 
 
@@ -443,3 +443,101 @@ def test_orfa_com_aviso_nao_acumula_avisos(tmp_path):
     linhas, tamanhos = _regerar(lambda: [], anterior, 3)
     assert tamanhos == [1, 1, 1]
     assert linhas[0]["avisos"].count("já não consta") == 1
+
+
+def test_documento_que_desaparece_nao_e_confundido_com_o_que_fica(tmp_path):
+    """Revisão do PR #87 (f14aa50): duas linhas antigas sem nome partilham ano,
+    BTE, origem e URL, mas são documentos distintos (títulos A e B). O índice
+    novo só traz B. A tem de ficar no catálogo; B não pode duplicar."""
+    anterior = tmp_path / "catalogo.csv"
+    comum = dict(ano="2026", bte_numero="31", ficheiro_origem="00010004.pdf")
+    catalogo.escrever([_sem_nome(titulo="Portaria A", **comum),
+                       _sem_nome(titulo="Portaria B", **comum)], anterior)
+    linhas, tamanhos = _regerar(
+        lambda: [_sem_nome(ano=2026, bte_numero=31, ficheiro_origem="00010004.pdf",
+                           titulo="Portaria B")], anterior, 3)
+    assert tamanhos == [2, 2, 2]
+    assert sorted(l["titulo"] for l in linhas) == ["Portaria A", "Portaria B"]
+    a = next(l for l in linhas if l["titulo"] == "Portaria A")
+    assert "já não consta" in a["avisos"]
+
+
+# ------------------------------------------ propriedades da fusão do catálogo
+
+IDENTIDADE = ("ano", "seq_anual", "bte_numero", "tipo_documento",
+              "ficheiro_origem", "url_fonte", "titulo")
+
+
+def _documentos_de_ensaio():
+    """Documentos pensados para colidir: mesma origem em boletins diferentes,
+    mesma origem e boletim com títulos diferentes, sem `seq_anual`, com e sem
+    nome canónico."""
+    docs = []
+    for bte in ("31", "33"):
+        for titulo in ("Portaria A", "Portaria B"):
+            for seq in ("", f"4{bte}"):
+                for nome in ("", f"2026_BTE_{bte}_PE_{seq or '000'}_{titulo[-1]}"):
+                    docs.append({"ano": "2026", "bte_numero": bte, "seq_anual": seq,
+                                 "tipo_documento": "PE", "familia": "extensao",
+                                 "ficheiro_origem": "00010004.pdf", "url_fonte": "",
+                                 "titulo": titulo, "nome_canonico": nome})
+    return docs
+
+
+def _linha_de(doc):
+    linha = {c: "" for c in catalogo.COLUNAS}
+    linha.update(doc)
+    return linha
+
+
+@pytest.mark.parametrize("semente", range(300))
+def test_propriedades_da_fusao(tmp_path, semente):
+    import random
+
+    rnd = random.Random(semente)
+    docs = _documentos_de_ensaio()
+    # 1.ª corrida: um índice com duplicados possíveis
+    primeiro = [rnd.choice(docs) for _ in range(rnd.randint(1, 6))]
+    anterior = tmp_path / "catalogo.csv"
+    catalogo.escrever(catalogo.fundir([_linha_de(d) for d in primeiro], None), anterior)
+
+    # a equipa trabalha em algumas linhas, com marcas únicas
+    with open(anterior, encoding="utf-8") as f:
+        c1 = list(csv.DictReader(f, delimiter=";"))
+    marcas = {}
+    for i, linha in enumerate(c1):
+        if rnd.random() < 0.6:
+            linha["observacoes"] = f"M{i}"
+            marcas[f"M{i}"] = tuple(linha[c] for c in IDENTIDADE)
+        if rnd.random() < 0.2:
+            linha["estado"] = "validado"
+    catalogo.escrever(c1, anterior)
+
+    # 2.ª corrida e seguintes: outro índice, repetido três vezes
+    segundo = [rnd.choice(docs) for _ in range(rnd.randint(0, 6))]
+    ficheiros = []
+    for _ in range(3):
+        catalogo.escrever(catalogo.fundir([_linha_de(d) for d in segundo], anterior),
+                          anterior)
+        ficheiros.append(anterior.read_text(encoding="utf-8"))
+    with open(anterior, encoding="utf-8") as f:
+        final = list(csv.DictReader(f, delimiter=";"))
+
+    # a) idempotência: regenerar não muda nada
+    assert ficheiros[1] == ficheiros[0] and ficheiros[2] == ficheiros[0]
+    # b) nenhuma marca da equipa se perde nem se duplica
+    obs = [l["observacoes"] for l in final if l["observacoes"]]
+    assert sorted(obs) == sorted(marcas), (semente, obs, sorted(marcas))
+    # c) e fica sempre no documento a que foi posta
+    for l in final:
+        if l["observacoes"]:
+            assert tuple(l[c] for c in IDENTIDADE) == marcas[l["observacoes"]]
+    # d) todos os documentos do índice atual estão no catálogo
+    ids_finais = [tuple(l[c] for c in IDENTIDADE) for l in final]
+    for d in segundo:
+        assert ids_finais.count(tuple(d[c] for c in IDENTIDADE)) >= \
+            [tuple(x[c] for c in IDENTIDADE) for x in segundo].count(
+                tuple(d[c] for c in IDENTIDADE))
+    # e) nenhum documento da 1.ª corrida desaparece do catálogo
+    for l in c1:
+        assert tuple(l[c] for c in IDENTIDADE) in ids_finais

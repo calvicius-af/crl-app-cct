@@ -339,7 +339,14 @@ São 33 colunas produzidas automaticamente: `nome_canonico`, `ficheiro_destino`,
 
 E cinco colunas preenchidas pela equipa ao longo do ciclo: `temas_atribuidos`, `tecnico`, `data_validacao`, `perita` e `observacoes`.
 
-Regerar o catálogo não apaga trabalho humano. As cinco colunas da equipa são recuperadas do catálogo anterior pelo `nome_canonico`, que por convenção não muda. As duas exceções são previstas: uma linha ainda sem nome canónico (por confirmar) é procurada pelo ano e pelo `IDDocumento` (ou, sem ele, pelo ano, boletim, ficheiro de origem e URL, porque o nome de origem `00010004.pdf` repete-se entre boletins), uma chave repetida não repõe nada e deixa as linhas antigas assinaladas para revisão, e na migração única do ADR-0022 a tabela de correspondência passa as colunas do nome antigo para o novo (`--correspondencia`, ver 10). Uma linha que deixe de aparecer nos índices é mantida com o aviso «já não consta dos índices lidos, verificar», porque um documento que desaparece de um índice é facto a investigar.
+Regerar o catálogo não apaga trabalho humano. As cinco colunas da equipa, e um estado posto pela equipa, passam de uma corrida para a seguinte por quatro regras, aplicadas por esta ordem:
+
+1. **Identidade do documento.** Cada linha casa com a linha anterior do mesmo documento, reconhecido pelos campos que vêm do índice: ano, `IDDocumento`, boletim, tipo, ficheiro de origem, URL e título. Não se usa só o ficheiro de origem, porque `00010004.pdf` repete-se de boletim para boletim, nem o nome, porque o nome depende de vocabulários que mudam. É por isto que um catálogo com nomes do ADR-0016 passa para os nomes novos sem perder nada.
+2. **Nome.** O que não casar pela identidade casa pelo `nome_canonico`, que apanha um título corrigido pela DGERT; na migração do ADR-0022, com a tabela de correspondência (`--correspondencia`, ver 10).
+3. **Repetidos.** Quando há mais do que uma linha do mesmo documento, de um lado ou do outro, nada é reposto às cegas: as linhas ficam todas, uma vez cada, com o aviso «documento repetido». Uma linha antiga sem trabalho da equipa, de um documento que continua nos índices, é só a cópia da corrida anterior e é substituída; é isso que impede o catálogo de crescer de corrida para corrida.
+4. **Órfãs.** Uma linha que deixe de aparecer nos índices é mantida com o aviso «já não consta dos índices lidos, verificar», porque um documento que desaparece de um índice é facto a investigar.
+
+Regerar duas vezes com os mesmos índices dá o mesmo ficheiro. Estas propriedades estão verificadas em `tests/test_esquema_adr0022.py` sobre centenas de cenários gerados ao acaso.
 
 Este catálogo não substitui a lista SharePoint proposta no SOP v1.0: alimenta-a. A diferença é que a fonte de verdade passa a ser um ficheiro versionável e regerável.
 
@@ -497,7 +504,8 @@ python -m cct.nomeacao --destino 1_fontes/irct --migrar \
 #    e acrescenta cada troca à tabela de correspondência
 python -m cct.nomeacao --destino 1_fontes/irct --migrar --aplicar \
     --correspondencia 0_gestao/catalogo/correspondencia_nomes_adr0022.csv
-# 3. regerar o catálogo com a tabela: as colunas da equipa passam para o nome novo
+# 3. regerar o catálogo: as colunas da equipa passam para o nome novo pela
+#    identidade do documento; a tabela cobre o caso de o índice ter mudado
 python -m cct.catalogo --indices 1_fontes/indices_bte \
     --saida 0_gestao/catalogo/catalogo_irct_2026.csv \
     --correspondencia 0_gestao/catalogo/correspondencia_nomes_adr0022.csv
