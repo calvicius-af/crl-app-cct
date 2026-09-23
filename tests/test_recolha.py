@@ -262,7 +262,7 @@ def test_descarrega_uma_vez_e_nao_repete(ambiente):
     assert r2["pedidos_de_rede"] == 0
 
 
-def test_ficheiro_alterado_no_disco_faz_pedido_condicional(ambiente):
+def test_ficheiro_alterado_no_disco_e_descarregado_por_inteiro(ambiente):
     indice, registo, interim = ambiente
     abridor = AbridorFalso()
     recolher([indice], interim, registo, rede=True, abridor=abridor, pausa=0)
@@ -273,8 +273,9 @@ def test_ficheiro_alterado_no_disco_faz_pedido_condicional(ambiente):
     abridor2 = AbridorFalso()
     resumo = recolher([indice], interim, Registo.carregar(registo.caminho),
                       rede=True, abridor=abridor2, pausa=0)
-    assert resumo["por_estado"]["inalterado"] == 1        # 304 do servidor
-    assert abridor2.pedidos[0][1]["If-None-Match"] == '"abc"'
+    assert resumo["por_estado"]["descarregado"] == 1
+    assert "If-None-Match" not in abridor2.pedidos[0][1]
+    assert alvo.read_bytes() == PDF_FALSO
 
 
 def test_ficheiro_apagado_e_descarregado_de_novo_por_inteiro(ambiente):
