@@ -1,6 +1,6 @@
 # ADR-0018: cada família documental na sua pasta, e só as convenções no pipeline
 
-- **Estado:** Aceite
+- **Estado:** Aceite. A frase «o âmbito continua no nome de todos os ficheiros» foi alterada pelo [ADR-0022](0022-esquema-de-nomes-comum-as-tres-familias.md): nas portarias e adesões o âmbito fica só no catálogo
 - **Data:** 2026-09-16
 - **Decidido por:** coordenação do RNC
 

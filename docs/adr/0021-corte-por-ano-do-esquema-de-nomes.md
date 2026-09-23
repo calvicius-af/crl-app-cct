@@ -1,6 +1,6 @@
 # ADR-0021: o esquema RNC é obrigatório a partir do corpus de 2026
 
-- **Estado:** Aceite
+- **Estado:** Aceite. O ponto «Revisitar quando» foi respondido pelo [ADR-0022](0022-esquema-de-nomes-comum-as-tres-familias.md): conta o ano do BTE
 - **Data:** 2026-09-18
 - **Decidido por:** CRL (António Fula), a partir da ISSUE-0022
 
