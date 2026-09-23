@@ -73,8 +73,10 @@ convenção e um acordo de adesão a ela, e por isso partilham o código `27251`
 
 Três regras resumem o esquema:
 
-1. **Começa sempre por ano e boletim.** A ordem alfabética dos nomes coincide com a
-   ordem de publicação.
+1. **Começa sempre por ano e boletim.** A ordem alfabética agrupa os ficheiros por
+   ano e número do BTE. Dentro de cada boletim, o quarto campo agrupa-os por âmbito
+   ou família antes do número sequencial; para obter a ordem integral de publicação,
+   usa-se o catálogo e a posição no índice.
 2. **O quarto campo diz o que o ficheiro é.** `PRI`, `SPE` ou `APU` indicam uma
    convenção e o seu âmbito. `PE`, `PCT`, `PRT` ou `AA` indicam uma família que não é
    convenção e que nunca entra no pipeline.
@@ -103,8 +105,10 @@ Regras de cada campo:
    dessa convenção. Numa convenção é o seu próprio código. Numa PE é o código da
    convenção que estende. Num AA é o código da convenção a que se adere, mesmo que seja
    de um ano anterior, porque o código é estável entre revisões (§4.4 do README do
-   RNC). Se uma PE estender várias convenções, o nome leva a primeira, fica um aviso e
-   o catálogo guarda as restantes.
+   RNC). Se uma PE estender várias convenções, o nome leva a primeira na ordem do
+   índice confirmado, fica um aviso e o catálogo conserva a relação com **todas** as
+   convenções abrangidas. A pesquisa por `*_{CODIRCT}_*` encontra essa PE apenas
+   para o primeiro código. Para reunir as PE dos outros códigos consulta-se o catálogo.
 7. **`SIGLAS`**: a primeira sigla patronal e a primeira sigla sindical, por esta ordem,
    separadas por hífen. `+N` indica quantas partes ficaram de fora. A regra aplica-se
    às três famílias e substitui a regra das três primeiras siglas pela ordem do índice
@@ -161,9 +165,11 @@ se volta a uma contagem interna.
 
 ## Consequências
 
-**Torna fácil:** ordenar os ficheiros pela ordem de publicação; saber pelo quarto
+**Torna fácil:** agrupar os ficheiros por ano e número do BTE; saber pelo quarto
 campo se um ficheiro é convenção; ver numa só listagem uma convenção, as suas extensões
-e as suas adesões; citar uma portaria pelo número legal a partir do nome do ficheiro.
+e as suas adesões quando são a relação principal; citar uma portaria pelo número legal
+a partir do nome do ficheiro. O catálogo permite ordenar dentro do BTE e consultar
+relações adicionais de uma PE que abrange várias convenções.
 
 **Torna difícil:** nomear uma PE ou um AA sem o código da convenção de base. É
 deliberado: sem esse código, o ficheiro fica por escrever.
