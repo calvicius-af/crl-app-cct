@@ -587,7 +587,7 @@ def main(argv=None):
         indices = sorted(caminho_indices.glob("*.xlsx"))
     else:
         indices = [caminho_indices]
-    indices = [i for i in indices if not i.name.startswith("~$")]
+    indices = [i for i in indices if i.is_file() and not i.name.startswith("~$")]
     if not indices:
         raise SystemExit(f"Sem ficheiros-índice em {args.indices} "
                          "(ver docs/dados/README.md)")

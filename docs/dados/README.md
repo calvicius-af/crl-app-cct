@@ -135,10 +135,17 @@ outorgantes e a ligação direta para o PDF de cada documento (por exemplo
 Depositar esses ficheiros em `data/raw/indices/` — tal como vêm, sem editar — é tudo o que
 a recolha automática precisa:
 
-```bash
-python -m cct.aquisicao --indices data/raw/indices                       # simula
-python -m cct.aquisicao --indices data/raw/indices --confirmar-rede --aplicar
+No PowerShell do Windows, a partir da raiz do projeto:
+
+```powershell
+.\.venv\Scripts\python.exe -m cct.aquisicao --indices data\raw\indices
+.\.venv\Scripts\python.exe -m cct.aquisicao --indices data\raw\indices --confirmar-rede --aplicar
 ```
+
+No macOS, usar `.venv/bin/python` e `/` nos caminhos. A primeira corrida
+simula sem descarregar. A segunda só funciona se houver índices `.xlsx` na
+pasta indicada. Ver o [guia de operação](../operacao/guia-operacao.md#21-encher-a-pasta-automaticamente-recolha-do-bte)
+para os estados da recolha e da nomeação.
 
 O que acontece, em duas fases ([SPEC-0001](../../specs/0001-recolha-e-nomeacao-do-bte.md)):
 
@@ -161,8 +168,12 @@ O que acontece, em duas fases ([SPEC-0001](../../specs/0001-recolha-e-nomeacao-d
 
 A rede está **desligada por omissão** e só liga com `--confirmar-rede`
 ([ADR-0015](../adr/0015-recolha-em-rede-desligada-por-omissao.md)). Numa rede fechada,
-basta a equipa colocar os PDFs à mão em `data/interim/recolha/<ano>/<nº>/` e correr só a
-nomeação.
+não basta copiar PDFs para `data/interim/recolha/<ano>/<nº>/`: a nomeação
+seleciona entradas do registo com estado de descarga e `sha256`. Usar apenas
+uma importação manual que registe a correspondência exata entre cada PDF e
+a linha do índice, com hash verificado. Enquanto essa via não estiver
+implementada, não atribuir nomes canónicos manualmente por aproximação;
+registar a pendência e validar a fonte com a equipa.
 
 ### O registo (`data/registo/registo_bte.jsonl`)
 
@@ -195,6 +206,8 @@ Para fixar os casos que a equipa quer decididos de uma vez por todas — o fiche
 vive na **raiz do projeto** (é esse o caminho que o exemplo abaixo assume; noutro
 sítio, indicar o caminho relativo a partir da raiz):
 
-```bash
-python -m cct.nomeacao --siglas siglas.csv --aplicar     # ficheiro 'nome;sigla' por linha
+```powershell
+.\.venv\Scripts\python.exe -m cct.nomeacao --siglas siglas.csv --aplicar
 ```
+
+No macOS, usar `.venv/bin/python`. A tabela tem linhas `nome;sigla`.

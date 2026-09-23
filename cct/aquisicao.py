@@ -22,7 +22,7 @@ from .recolha import (DESTINO_OMISSAO, FAMILIAS_POR_OMISSAO, INDICES_OMISSAO,
 
 def _indices(caminho: Path) -> list[Path]:
     ficheiros = sorted(caminho.glob("*.xlsx")) if caminho.is_dir() else [caminho]
-    return [f for f in ficheiros if not f.name.startswith("~$")]
+    return [f for f in ficheiros if f.is_file() and not f.name.startswith("~$")]
 
 
 def main(argv=None):

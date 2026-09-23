@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from cct import aquisicao, recolha
 
 from .test_recolha import AbridorFalso, escrever_indice
@@ -14,6 +16,16 @@ def _argumentos(pasta: Path) -> list[str]:
             "--registo", str(pasta / "registo.jsonl"),
             "--relatorio", str(pasta / "relatorios"),
             "--pausa", "0"]
+
+
+def test_indice_indicado_mas_inexistente_para_antes_da_rede(tmp_path, monkeypatch):
+    def recusar(url, cabecalhos=None):
+        raise AssertionError("não pode ligar à rede sem índice")
+
+    monkeypatch.setattr(recolha, "abridor_urllib", recusar)
+    with pytest.raises(SystemExit, match="Sem ficheiros-índice"):
+        aquisicao.main(["--indices", str(tmp_path / "inexistente.xlsx"),
+                        "--confirmar-rede", "--aplicar"])
 
 
 def test_simulacao_nao_liga_a_rede_nem_escreve(tmp_path, monkeypatch, capsys):

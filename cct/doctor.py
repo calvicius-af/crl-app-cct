@@ -2,12 +2,41 @@
 
 Uso: python -m cct.doctor
 """
+import os
 import sys
 from pathlib import Path
+
+# Mapeamento módulo -> pacote, partilhado com o instalador offline para não
+# haver duas listas a divergir uma da outra (ISSUE-0010).
+MODULOS = [("pdfplumber", "pdfplumber"), ("openpyxl", "openpyxl"),
+           ("yaml", "pyyaml"), ("jsonschema", "jsonschema")]
+
+
+def _python_do_venv() -> Path:
+    raiz = Path(os.path.abspath(__file__)).parent.parent
+    if os.name == "nt":
+        return raiz / ".venv" / "Scripts" / "python.exe"
+    return raiz / ".venv" / "bin" / "python"
+
+
+def _venv_em_uso(venv: Path) -> bool:
+    r"""Compara diretórios reais, incluindo UNC e unidades mapeadas no Windows.
+
+    `sys.prefix` pode usar `\\localhost\C$` e a raiz do projeto `L:` para a
+    mesma pasta. Comparar representações textuais dá um falso aviso.
+    """
+    if sys.prefix == sys.base_prefix or not venv.is_dir():
+        return False
+    try:
+        return Path(sys.prefix).samefile(venv)
+    except OSError:
+        return os.path.normcase(os.path.abspath(sys.prefix)) == \
+            os.path.normcase(os.path.abspath(venv))
 
 
 def verificar() -> int:
     problemas = 0
+    dados_pendentes = 0
 
     def ok(msg):
         print(f"  ✓ {msg}")
@@ -17,26 +46,48 @@ def verificar() -> int:
         problemas += 1
         print(f"  ✗ {msg}\n    → {solucao}")
 
+    def pendente(msg, solucao):
+        nonlocal dados_pendentes
+        dados_pendentes += 1
+        print(f"  · {msg}\n    → {solucao}")
+
     print("== Python")
     if sys.version_info >= (3, 11):
         ok(f"Python {sys.version.split()[0]}")
     else:
         falha(f"Python {sys.version.split()[0]} é antigo",
               "instalar Python 3.11 ou superior (python.org)")
+    # ISSUE-0010: dizer sempre com que interpretador se está a correr, e
+    # detectar o .venv do projeto que não está a ser usado — sem isto, o
+    # doctor corrido com o Python do sistema reporta como em falta
+    # bibliotecas que estão instaladas no .venv.
+    print(f"  · interpretador: {sys.executable}")
+    raiz = Path(os.path.abspath(__file__)).parent.parent
+    venv = raiz / ".venv"
+    venv_em_uso = _venv_em_uso(venv)
+    if venv.is_dir() and not venv_em_uso:
+        print(f"  · o projeto tem um .venv ({venv}) que não está a ser usado")
+        print(f"    → correr com o Python do projeto: "
+              f"{_python_do_venv()} -m cct.doctor")
 
     print("== Bibliotecas")
-    for mod, pacote in [("pdfplumber", "pdfplumber"), ("openpyxl", "openpyxl"),
-                        ("yaml", "pyyaml"), ("jsonschema", "jsonschema")]:
+    for mod, pacote in MODULOS:
         try:
             __import__(mod)
             ok(pacote)
         except ImportError:
-            falha(f"falta a biblioteca {pacote}",
-                  "instalar as dependências: duplo clique em "
-                  "scripts/instalar_offline.bat (Windows) ou "
-                  "scripts/instalar_offline.command (macOS) — instalação sem internet, "
-                  "ver docs/institucional/instalacao-offline.md; "
-                  f"com acesso à internet basta: python -m pip install {pacote}")
+            if venv.is_dir() and not venv_em_uso:
+                falha(f"falta a biblioteca {pacote} (ou está no .venv que "
+                      "não está a ser usado)",
+                      f"correr com o Python do projeto: "
+                      f"{_python_do_venv()} -m cct.doctor")
+            else:
+                falha(f"falta a biblioteca {pacote}",
+                      "instalar as dependências: duplo clique em "
+                      "scripts/instalar_offline.bat (Windows) ou "
+                      "scripts/instalar_offline.command (macOS) — instalação sem internet, "
+                      "ver docs/institucional/instalacao-offline.md; "
+                      f"com acesso à internet basta: python -m pip install {pacote}")
     try:
         import tkinter  # noqa: F401
         ok("tkinter (app gráfica)")
@@ -48,8 +99,8 @@ def verificar() -> int:
     print("== Pastas e ficheiros")
     raiz = Path(__file__).resolve().parent.parent  # raiz do repositório
     dados = raiz / "data" / "raw"
-    if (raiz / "codebooks").glob("*.yaml"):
-        n = len(list((raiz / "codebooks").glob("*.yaml")))
+    n = len(list((raiz / "codebooks").glob("*.yaml")))
+    if n:
         ok(f"codebooks/ com {n} tema(s)")
     else:
         falha("não há codebooks", "ver docs/operacao/prompts-codebooks.md")
@@ -57,15 +108,16 @@ def verificar() -> int:
     if pastas_bte:
         ok("pastas de PDFs: " + ", ".join(p.name for p in pastas_bte))
     else:
-        falha("não existe data/raw/bte/bte_<ano>/ com PDFs",
-              "criar a pasta e copiar os PDFs "
-              "(ver docs/operacao/guia-operacao.md §2 e docs/dados/README.md)")
+        pendente("ainda não há PDFs em data/raw/bte/bte_<ano>/",
+                 "para a recolha automática, colocar índices .xlsx em "
+                 "data/raw/indices/ e seguir docs/operacao/guia-operacao.md §2.1; "
+                 "a ausência de PDFs antes da recolha é normal")
     variaveis = sorted((dados / "maxqda").glob("VariaveisDocumento*.xlsx"))
     if variaveis:
         ok(f"variáveis do MaxQDA: {variaveis[-1].name}")
     else:
-        falha("sem data/raw/maxqda/VariaveisDocumento*.xlsx (opcional mas recomendado)",
-              "exportar do MaxQDA (GUIA §3.2)")
+        print("  · sem data/raw/maxqda/VariaveisDocumento*.xlsx "
+              "(opcional; não impede a recolha — GUIA §3.2)")
     if sorted((dados / "maxqda").glob("*.qdc")):
         ok("codebook master (.qdc) presente")
     else:
@@ -80,8 +132,10 @@ def verificar() -> int:
         ok(f"data/raw/indices/ com {len(indices)} índice(s) do BTE "
            f"(recolha automática disponível)")
     else:
-        print("  · sem data/raw/indices/*.xlsx — a recolha automática do BTE "
-              "não tem o que ler (docs/dados/README.md §Índices)")
+        pendente("sem data/raw/indices/*.xlsx — a recolha automática do BTE "
+                 "não tem o que ler",
+                 "copiar os índices fornecidos pela equipa antes de correr "
+                 "cct.aquisicao (docs/operacao/guia-operacao.md §2.1)")
     registo = raiz / "data" / "registo" / "registo_bte.jsonl"
     if registo.exists():
         n = sum(1 for l in registo.read_text(encoding="utf-8").splitlines() if l.strip())
@@ -118,7 +172,10 @@ def verificar() -> int:
 
     print()
     if problemas:
-        print(f"{problemas} problema(s) a resolver — ver as setas acima.")
+        print(f"{problemas} problema(s) da instalação — ver as setas acima.")
+    elif dados_pendentes:
+        print("Instalação pronta. Faltam dados de entrada para algumas operações "
+              "— ver as setas acima.")
     else:
         print("Tudo pronto. Podes correr o pipeline "
               "(docs/operacao/guia-operacao.md §4).")

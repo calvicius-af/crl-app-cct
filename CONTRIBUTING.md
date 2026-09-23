@@ -12,6 +12,15 @@ python -m venv .venv
 .venv/bin/python -m cct.doctor     # verifica dados e dependências
 ```
 
+Em Windows (o sistema das estações do CRL) o interpretador do ambiente é
+`.venv\Scripts\python.exe`:
+
+```bat
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pytest -q
+.venv\Scripts\python -m cct.doctor
+```
+
 Os testes correm **sem os dados**: os que precisam de PDFs ou de exports do MaxQDA
 declaram-se `skipped` em vez de falhar. É por isso que a integração contínua passa num
 repositório clonado de fresco.
@@ -52,7 +61,7 @@ assim?"* e a resposta não estiver no código, é um ADR.
 ## Antes de fazer commit
 
 ```bash
-.venv/bin/python -m pytest -q
+.venv/bin/python -m pytest -q        # Windows: .venv\Scripts\python -m pytest -q
 
 # nada de dados, credenciais ou segredos a escapar
 python scripts/verificar_seguranca.py --verboso
