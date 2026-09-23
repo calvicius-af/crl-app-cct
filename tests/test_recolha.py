@@ -119,6 +119,36 @@ def recusa_rede(url, cabecalhos=None):
     raise AssertionError(f"pedido de rede não autorizado: {url}")
 
 
+def test_registo_de_outro_destino_nao_finge_que_o_pdf_existe(tmp_path):
+    """Um caminho antigo válido não substitui o PDF do destino escolhido (#44)."""
+    indice = escrever_indice(tmp_path)
+    registo = Registo(tmp_path / "registo.jsonl")
+    origem = tmp_path / "estacao_a"
+    recolher([indice], origem, registo, rede=True,
+             abridor=AbridorFalso(), pausa=0)
+    destino = tmp_path / "estacao_b"
+    assert not list(destino.rglob("*.pdf"))
+    resumo = recolher([indice], destino, registo, rede=False,
+                      abridor=recusa_rede, pausa=0)
+    assert resumo["por_estado"].get("ja_existente", 0) == 0
+    assert resumo["por_estado"]["por_descarregar"] == 6
+
+
+def test_recolha_em_novo_destino_guarda_o_caminho_atual(tmp_path):
+    indice = escrever_indice(tmp_path)
+    registo = Registo(tmp_path / "registo.jsonl")
+    origem = tmp_path / "estacao_a"
+    recolher([indice], origem, registo, rede=True,
+             abridor=AbridorFalso(), pausa=0)
+    destino = tmp_path / "estacao_b"
+    resumo = recolher([indice], destino, registo, rede=True,
+                      abridor=AbridorFalso(), pausa=0)
+    assert resumo["por_estado"]["descarregado"] == 6
+    primeiro = next(e for e in registo.entradas.values()
+                    if e.get("descarga", {}).get("estado") == "descarregado")
+    assert Path(primeiro["descarga"]["caminho"]).is_relative_to(destino)
+
+
 @pytest.fixture()
 def ambiente(tmp_path):
     indice = escrever_indice(tmp_path)
