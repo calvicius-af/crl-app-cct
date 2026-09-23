@@ -1,6 +1,6 @@
 # SPEC-0004: um só esquema de nomes para convenções, portarias de extensão e acordos de adesão
 
-- **Estado:** Aprovada; passos 1 a 3 implementados, passos 0 e 4 por fazer
+- **Estado:** Aprovada; passos 1 a 3 implementados, passo 0 por fazer, passo 4 reduzido a nova recolha
 - **Data:** 2026-09-23
 - **Autoria:** CRL (António Fula)
 - **Decisões relacionadas:** [ADR-0022](../docs/adr/0022-esquema-de-nomes-comum-as-tres-familias.md),
@@ -238,6 +238,12 @@ dentro do que o ADR-0022 deixa em aberto:
    qualquer esquema que tragam `PE`, `PCT`, `PRT` ou `AA` como campo próprio.
 6. **Omissão do esquema.** `ESQUEMA_OMISSAO` passa a `rnc` também nas funções, alinhado
    com as linhas de comando (ADR-0021); o esquema de 2025 chama-se `ESQUEMA_2025`.
+
+**Passo 4, confirmado pela equipa a 23/09/2026:** não há trabalho no MAXQDA sobre o
+corpus de 2026. Os PDF de 2026 descarregados até aqui eram de teste e foram apagados
+depois dos testes. Não há, por isso, ficheiros a migrar nem colunas da equipa a
+preservar: o corpus de 2026 recolhe-se de novo já com o esquema do ADR-0022. O
+`--migrar` fica disponível para cópias antigas do corpus noutras estações.
 
 ## Plano de verificação
 
