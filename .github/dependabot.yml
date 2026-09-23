@@ -3,7 +3,9 @@
 # Duas ecologias: as dependências Python e as próprias GitHub Actions. As
 # actions estão fixadas por SHA no workflow; é o Dependabot que propõe o SHA
 # seguinte, mantendo o comentário de versão actualizado. Nenhuma actualização
-# entra sozinha: tudo passa por pull request e pelos cinco jobs de testes.
+# entra sozinha: tudo passa por pull request e pelos jobs de testes.
+# Etiquetas automáticas ficam desactivadas até serem criadas no repositório;
+# entradas inexistentes geram avisos em cada PR do Dependabot.
 version: 2
 
 updates:
@@ -16,9 +18,6 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "deps"
-    labels:
-      - dependencies
-      - security
 
   # Constraints com versões exactas: runtime, desenvolvimento e Docling.
   - package-ecosystem: pip
@@ -29,9 +28,6 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "deps"
-    labels:
-      - dependencies
-      - security
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -41,7 +37,3 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "ci"
-    labels:
-      - dependencies
-      - ci
-      - security
