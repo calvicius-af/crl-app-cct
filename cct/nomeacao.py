@@ -93,6 +93,10 @@ MAX_NOME = 63          # limite de nome de documento do MaxQDA (RF-21)
 MAX_SIGLA = 20
 MIN_CHAVE_PARCIAL = 12   # ver a nota em sigla(), sobre correspondência parcial
 
+
+class NomeRNCInvalido(ValueError):
+    """Os metadados não permitem um nome RNC íntegro no limite de tamanho."""
+
 # Palavras que não entram numa sigla derivada por recurso.
 LIGACOES = {"de", "do", "da", "dos", "das", "e", "em", "a", "o", "as", "os",
             "no", "na", "nos", "nas", "para", "com", "ao", "aos", "à", "às"}
@@ -307,10 +311,13 @@ def _nome_rnc(entrada: dict, ordinal: int, tabela: dict[str, str] | None,
     nome = prefixo + "-".join(siglas) + cauda
     if len(nome) > MAX_NOME:            # encurta as siglas, nunca o prefixo
         folga = MAX_NOME - len(prefixo) - len(cauda) - (len(siglas) - 1)
-        por_sigla = max(3, folga // len(siglas))
+        if folga < 3 * len(siglas):
+            raise NomeRNCInvalido("campos estruturais do nome RNC excedem o limite "
+                                  f"de {MAX_NOME} caracteres; confirmar tipo e código IRCT")
+        por_sigla = folga // len(siglas)
         nome = prefixo + "-".join(s[:por_sigla] for s in siglas) + cauda
         avisos.append(f"nome encurtado para caber em {MAX_NOME} caracteres")
-    return nome[:MAX_NOME], avisos
+    return nome, avisos
 
 
 def nome_documento(entrada: dict, ordinal: int,
@@ -506,9 +513,16 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
                                            f"({origem})")
                 contar("sem_origem")
                 continue
-            nome, avisos = nome_documento(e, nomeacao["ordinal"], tabela,
-                                          esquema=esquema,
-                                          vocabulario_ambito=vocabulario_ambito)
+            try:
+                nome, avisos = nome_documento(e, nomeacao["ordinal"], tabela,
+                                              esquema=esquema,
+                                              vocabulario_ambito=vocabulario_ambito)
+            except NomeRNCInvalido as exc:
+                nomeacao["estado"] = "por_confirmar"
+                nomeacao["avisos"] = [str(exc)]
+                resumo["problemas"].append(f"{e['chave']}: {exc} — PDF não escrito")
+                contar("por_confirmar")
+                continue
             nomeacao = e["nomeacao"]      # _nome_rnc pode ter registado o âmbito
             avisos_heuristica = list(avisos)   # antes do aviso de par repetido, abaixo —
                                                # esse é informativo, não indica nome errado
