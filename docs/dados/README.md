@@ -158,7 +158,7 @@ O que acontece, em duas fases ([SPEC-0001](../../specs/0001-recolha-e-nomeacao-d
    do PDF no destino atual; o registo conserva a proveniência da corrida.
 2. **Nomeação** (`cct/nomeacao.py`) — copia cada PDF para
    `data/raw/bte/bte_<ano>/convencoes/{PRI,SPE,APU}/` já com o nome do esquema RNC
-   (`2026_PRI_379_CCT-ALT_26651_BTE_31_AEVP-FESAHT.pdf`), obrigatório a partir do
+   (`2026_BTE_31_PRI_379_CCT-ALT_26651_AEVP-FESAHT.pdf`, ADR-0022), obrigatório a partir do
    corpus de 2026 ([ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md)). Um
    corpo anterior a 2026, no esquema de 2025 (`26_PR_003_BTE_31_AEVP_FESAHT.pdf`), só se
    reprocessa com `--esquema pipeline`. As portarias de extensão vão para

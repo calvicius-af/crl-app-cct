@@ -36,7 +36,7 @@ Projeto_CRL_AppCCT/                ← corre os comandos SEMPRE a partir daqui
 │       │   └── bte_2026/          ← PDFs das convenções, UM POR CONVENÇÃO
 │       │       └── convencoes/
 │       │           ├── PRI/
-│       │           │   ├── 2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf
+│       │           │   ├── 2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP+3.pdf
 │       │           │   └── …
 │       │           └── SPE/
 │       │               └── …
@@ -112,29 +112,30 @@ dos metadados confirmados do índice. Escalar ao responsável pelos dados os
 casos sem identificador ou correspondência segura.
 
 ### Regras de nomes (importante!)
-- **Estado da alteração de 2026**: o [ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md)
-  aprovou um esquema com `{ANO}_BTE_{NN}_` à cabeça para convenções,
-  portarias de extensão e acordos de adesão. A
-  [SPEC-0004](../../specs/0004-esquema-de-nomes-comum-as-tres-familias.md)
-  continua por implementar. O código deste ramo escreve o esquema RNC do
-  ADR-0016 descrito abaixo. O ramo de instalação em Windows resolve problemas
-  do ambiente, não faz a migração nem ativa o esquema do ADR-0022.
-- **PDFs das convenções, a partir do corpus de 2026**: esquema RNC, obrigatório
-  ([ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md)) —
-  `{ANO}_{AMBITO}_{SEQ}_{TIPO}_{CODIRCT}_BTE_{NN}_{SIGLAS}.pdf`, ex.:
-  `2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf`. Sete campos, descritos em
+- **PDFs a partir do corpus de 2026**: esquema RNC, obrigatório
+  ([ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md)), na forma do
+  [ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md): começa
+  sempre por ano e boletim, e o quarto campo diz o que o ficheiro é.
+  Convenções: `{ANO}_BTE_{NN}_{AMBITO}_{SEQ}_{TIPO}_{CODIRCT}_{SIGLAS}.pdf`, ex.:
+  `2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP+3.pdf`. Descrito em
   [docs/rnc/README.md §4.1](../rnc/README.md#41-a-regra). O nome deve ser IGUAL ao
   usado no MaxQDA (sem o sufixo `_TXT`). Sem espaços no início/fim.
-- **Portarias e acordos de adesão**: o esquema atual ainda não garante o
-  número e ano da portaria nem o código confirmado da convenção de base no
-  nome. Não validar estes nomes pela aparência nem integrá-los no corpus de
-  análise temática. Consultar o catálogo e a SPEC-0004 antes de qualquer
-  migração manual; as portarias e adesões não entram no pipeline temático.
+- **Portarias e acordos de adesão**: `2026_BTE_01_PE_012_0452-2025_27251_ACRAL-CESP.pdf`
+  (número e ano da portaria no DR, código da convenção de base) e
+  `2026_BTE_12_AA_412_27251_ABC-CESP.pdf`. Sem o código da convenção de base,
+  ou sem o número e ano da portaria, a aplicação não atribui nome e o documento
+  fica por confirmar. Até ao passo 0 da SPEC-0004, o código lido da cadeia de
+  alterações também fica por confirmar. Não renomear à mão: as portarias e
+  adesões não entram no pipeline temático, e o `cct.pipeline_tema` recusa-as.
+- **PDFs de 2026 ainda com o esquema do ADR-0016**
+  (`2026_PRI_377_CCT_27251_BTE_31_…`): passam uma vez para o esquema novo com
+  `python -m cct.nomeacao --migrar --correspondencia …`, antes de começar o
+  trabalho no MaxQDA — ver [docs/rnc/README.md §10](../rnc/README.md#10-migração-do-ciclo-anterior).
 - **PDFs de corpos anteriores a 2026**: mantêm o esquema de 2025,
   `AA_PR_NNN_BTE_NN_Partes_Sindicato.pdf` (AA = ano com 2 dígitos) — não se renomeiam.
 - **Subpastas de versões**: o nome da subpasta tem de estar CONTIDO no nome
   do PDF da convenção (ex.: subpasta `AEVP_FESAHT` ↔ PDF
-  `2026_PRI_379_CCT-ALT_26651_BTE_31_AEVP-FESAHT.pdf`). É assim que o pipeline as
+  `2026_BTE_31_PRI_379_CCT-ALT_26651_AEVP-FESAHT.pdf`). É assim que o pipeline as
   encontra.
 - **Versões anteriores** dentro da subpasta: o nome deve começar pelo ano —
   `2021_...pdf`, `24122_...pdf` (24 = 2024), `ACIP_FESAHT_2009.pdf`.

@@ -13,11 +13,13 @@ Nada que a equipa ou a aplicação produza. O catálogo fica em `0_gestao/catalo
 Os PDF individuais seguem a convenção do [ponto 4.1 do README](../README.md#41-a-regra) e estão em subpastas por família e, nas convenções, por âmbito:
 
 ```text
-1_fontes/irct/convencoes/PRI/2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2.pdf
-1_fontes/irct/convencoes/SPE/2026_SPE_387_AE-ALT-RECT_47109_BTE_31_CARRISTUR-ASPTC.pdf
+1_fontes/irct/convencoes/PRI/2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP+3.pdf
+1_fontes/irct/convencoes/SPE/2026_BTE_31_SPE_387_AE-ALT-RECT_47109_CARRISTUR-ASPTC.pdf
 1_fontes/irct/convencoes/APU/    recolhido e catalogado, não processado (âmbito)
-1_fontes/irct/portarias_extensao/    não processadas (família), sem subdivisão por âmbito
-1_fontes/irct/acordos_adesao/        idem
+1_fontes/irct/portarias_extensao/2026_BTE_01_PE_012_0452-2025_27251_ACRAL-CESP.pdf
+                                     não processadas (família), sem subdivisão por âmbito
+1_fontes/irct/acordos_adesao/2026_BTE_12_AA_412_27251_ABC-CESP.pdf
+                                     idem
 ```
 
 O âmbito subdivide apenas `convencoes/`, porque o que o âmbito decide é se o documento entra no pipeline e nenhuma portaria ou acordo de adesão entra. Os avisos de projeto de portaria não têm ficheiro nesta pasta: ficam registados na coluna `avisos_projeto` do catálogo, associados à portaria correspondente. Ver [ponto 4.6 do README](../README.md#46-famílias-documentais).

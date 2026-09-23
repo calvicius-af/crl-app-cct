@@ -28,6 +28,21 @@ from .proveniencia import agora_utc, construir_manifesto, escrever_manifesto
 # aplicação recolhe-o mas ainda não o processa (docs/rnc/README.md §4.3)
 _AMBITOS_PROCESSAVEIS = ("PRI", "SPE")
 
+# Um nome que nenhum esquema reconhece mas que traz o tipo de uma portaria ou de
+# uma adesão como campo próprio. É o caso das PE renomeadas à mão antes do
+# ADR-0022 (`2026_001_BTE_01_PE_0452_ADCP_SETAAB`): `familia_do_nome` não as lê,
+# e sem isto passavam pela recusa como se fossem convenções.
+_TOKENS_NAO_CONVENCAO = {"PE": "extensao?", "PCT": "extensao?",
+                         "PRT": "extensao?", "AA": "adesao?"}
+
+
+def _familia_suspeita(nome: str) -> str | None:
+    """Família provável de um nome fora dos esquemas conhecidos, ou `None`."""
+    for token in nome.split("_"):
+        if token in _TOKENS_NAO_CONVENCAO:
+            return _TOKENS_NAO_CONVENCAO[token]
+    return None
+
 
 def _pdfs_da_pasta(pasta: Path) -> list[Path]:
     """PDFs de convenções na pasta do ano, em `convencoes` ou no âmbito.
@@ -144,9 +159,13 @@ def main():
     # codificação temática pressupõe. Se um deles entrar aqui, não dá erro: dá
     # números errados, que só se descobrem muito mais tarde — ou nunca. Por
     # isso recusa-se à entrada, em vez de se avisar e continuar.
-    intrusos = [(f, fam) for f in pdfs
-                if (fam := familia_do_nome(f.stem))
-                and fam not in FAMILIAS_PROCESSAVEIS]
+    intrusos = []
+    for f in pdfs:
+        fam = familia_do_nome(f.stem)
+        if fam is None:
+            fam = _familia_suspeita(f.stem)
+        if fam and fam not in FAMILIAS_PROCESSAVEIS:
+            intrusos.append((f, fam))
     if intrusos:
         linhas = "\n".join(f"    {f.name}  ({fam})" for f, fam in intrusos[:10])
         raise SystemExit(
@@ -155,7 +174,9 @@ def main():
             "  Estes documentos referem-se a uma convenção mas não são uma, e\n"
             "  codificá-los como se fossem contamina as contagens por cláusula.\n"
             "  Apontar --pdfs para a pasta das convenções "
-            "(1_fontes/irct/convencoes/PRI).")
+            "(1_fontes/irct/convencoes/PRI).\n"
+            "  Uma família com «?» vem de um nome fora dos esquemas conhecidos:\n"
+            "  voltar a nomeá-lo com python -m cct.nomeacao (ADR-0022).")
 
     entradas = [*pdfs, Path(args.codebook)]
     for opcional in (args.variaveis, args.master, args.metricas):

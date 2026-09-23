@@ -21,7 +21,7 @@ qdpx/    RNC_2026_lote_03.qdpx
          RNC_2026_lote_03_manifest.json
 ```
 
-Quando as subpastas `texto/` e `precodificado/` passarem a ser usadas, o nome base é herdado do PDF, mudando apenas a extensão: `2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2.txt`, `.doc.json` e `.anotacoes.json`.
+Quando as subpastas `texto/` e `precodificado/` passarem a ser usadas, o nome base é herdado do PDF, mudando apenas a extensão: `2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP+3.txt`, `.doc.json` e `.anotacoes.json`.
 
 ## Quem escreve e quem lê
 

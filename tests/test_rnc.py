@@ -17,7 +17,9 @@ from cct.catalogo import (acto_negociacao, paginas, separar_alteracoes,
                           separar_sectores)
 from cct.localizador import interpretar_doc_id, interpretar_nome_rnc
 from cct.siglas import atribuir, candidatos, linhagem, palavras_distintivas
-from cct.nomeacao import (carregar_siglas, nome_documento, sequencial_bte,
+from cct.nomeacao import (AVISO_BASE_PELA_CADEIA, NomeRNCInvalido,
+                          carregar_siglas, nome_documento, referencia_portaria,
+                          resolver_convencoes_base, sequencial_bte,
                           siglas_outorgantes, tipo_normalizado)
 from cct.nomeacao import familia_do_nome
 from cct.recolha import FAMILIAS_POR_OMISSAO, familia, ler_indice
@@ -145,9 +147,10 @@ def test_cadeia_de_alteracoes_junta_as_duas_colunas(tmp_path):
 
 # ------------------------------------------------------------- esquema de nome
 
-def test_nome_rnc_tem_os_seis_campos_e_o_numero_do_bte(itens):
+def test_nome_rnc_comeca_por_ano_e_boletim(itens):
+    """ADR-0022: cabeça {ANO}_BTE_{NN}_{AMBITO}_{SEQ}, cauda {CODIRCT}_{SIGLAS}."""
     nome, avisos = nome_documento(itens[0], 1, esquema="rnc")
-    assert nome == "2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2"
+    assert nome == "2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP+3"
     assert not avisos
 
 
@@ -162,17 +165,29 @@ def test_todo_o_nome_rnc_e_lido_pelo_localizador(itens):
         assert interpretar_doc_id(nome + "_TXT") == (ano, bte, tokens)
 
 
-def test_o_esquema_antigo_continua_a_ser_lido():
+def test_os_esquemas_antigos_continuam_a_ser_lidos():
+    """2025 e ADR-0016: já não se escrevem, mas os ficheiros existem."""
     assert interpretar_doc_id("25_PR_016_BTE_04_EMARP_SINTAP") == (
         25, 4, ["emarp", "sintap"])
     assert interpretar_nome_rnc("25_PR_016_BTE_04_EMARP_SINTAP") is None
+    assert interpretar_doc_id("2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2") == (
+        26, 31, ["acral", "cesp", "strup"])
 
 
-def test_metadados_que_o_nome_rnc_leva():
+def test_metadados_que_o_nome_do_adr0016_leva():
     meta = interpretar_nome_rnc("2026_SPE_387_AE-ALT-RECT_47109_BTE_31_CARRISTUR-ASPTC")
-    assert meta == {"ano": 2026, "ambito": "SPE", "seq": 387,
+    assert meta == {"esquema": "adr0016", "ano": 2026, "ambito": "SPE", "seq": 387,
                     "tipo": "AE-ALT-RECT", "cod_irct": "47109", "num_bte": 31,
-                    "siglas": ["CARRISTUR", "ASPTC"], "outros_outorgantes": 0}
+                    "siglas": ["CARRISTUR", "ASPTC"], "outros_outorgantes": 0,
+                    "familia": None, "portaria": None, "ano_dr": None}
+
+
+def test_metadados_que_o_nome_do_adr0022_leva():
+    meta = interpretar_nome_rnc("2026_BTE_01_PE_012_0452-2025_27251_ACRAL-CESP+1")
+    assert meta == {"esquema": "adr0022", "ano": 2026, "ambito": None, "seq": 12,
+                    "tipo": "PE", "cod_irct": "27251", "num_bte": 1,
+                    "siglas": ["ACRAL", "CESP"], "outros_outorgantes": 1,
+                    "familia": "extensao", "portaria": "0452", "ano_dr": 2025}
 
 
 def test_retificacao_sem_outorgantes_resolve_se_pelo_titulo(itens):
@@ -202,10 +217,12 @@ def test_esquema_desconhecido_e_recusado(itens):
         nome_documento(itens[0], 1, esquema="sharepoint")
 
 
-def test_siglas_pela_ordem_do_indice_e_o_resto_contado(itens):
-    siglas, restantes, _ = siglas_outorgantes(itens[0])
-    assert siglas == ["ACRAL", "CESP", "STRUP"]
-    assert restantes == 2
+def test_siglas_um_de_cada_lado_e_o_resto_contado(itens):
+    """ADR-0022: primeira patronal, primeira sindical, +N para as restantes."""
+    siglas, restantes, avisos = siglas_outorgantes(itens[0])
+    assert siglas == ["ACRAL", "CESP"]
+    assert restantes == 3
+    assert not avisos
 
 
 def test_tipo_normalizado():
@@ -483,17 +500,21 @@ def test_so_se_traduz_o_codigo_das_familias_verificadas():
 # --------------------------- famílias: extensões, adesões e avisos (ADR-0018)
 
 LINHAS_NAO_CONVENCAO = [
+    # Portaria publicada no DR em 2025 e publicitada no BTE em 2026: conta
+    # para os dados de 2026 (ADR-0022).
     dict(id="401/2026", tipo="PE", cod="27251", pdf="00010004.pdf",
-         titulo="Portaria que estende o contrato coletivo entre a Associação do "
-                "Comércio e Serviços da Região do Algarve - ACRAL e o CESP - "
-                "Sindicato dos Trabalhadores do Comércio.",
+         titulo="Portaria n.º 452/2025 - Portaria que estende o contrato coletivo "
+                "entre a Associação do Comércio e Serviços da Região do Algarve - "
+                "ACRAL e o CESP - Sindicato dos Trabalhadores do Comércio.",
          outorgantes="", altera="CCT.20260822.377/2026",
          sectores="COMÉRCIO A RETALHO", em_vigor=""),
-    dict(id="402/2026", tipo="AA", cod="26760", pdf="00050006.pdf",
-         titulo="Acordo de adesão entre a Santa Casa da Misericórdia de Beja e a "
-                "FNSTFPS ao contrato coletivo da CNIS.",
-         outorgantes="Santa Casa da Misericórdia de Beja; FNSTFPS",
-         altera="CCT.20260822.378/2026",
+    dict(id="402/2026", tipo="AA", cod="27251", pdf="00050006.pdf",
+         titulo="Acordo de adesão entre a Algarve Retalho, L.da e o CESP - "
+                "Sindicato dos Trabalhadores do Comércio ao contrato coletivo "
+                "entre a ACRAL e o CESP.",
+         outorgantes="Algarve Retalho, L.da - ALGRET; CESP - Sindicato dos "
+                     "Trabalhadores do Comércio, Escritórios e Serviços de Portugal",
+         altera="CCT.20260822.377/2026",
          sectores="SOLIDARIEDADE SOCIAL", em_vigor=""),
     dict(id="403/2026", tipo="AVISO", cod="26651", pdf="00070007.pdf",
          titulo="Aviso de projeto de portaria de extensão do contrato coletivo "
@@ -594,14 +615,22 @@ def test_a_relacao_com_a_convencao_base_e_nomeada(itens_mistos):
 
 def test_a_portaria_herda_as_partes_do_titulo(itens_mistos):
     """Uma portaria não tem outorgantes: quem a emite é o Governo."""
+    resolver_convencoes_base(itens_mistos)
     pe = next(i for i in itens_mistos if i["tipo"] == "PE")
     assert pe["outorgantes"] == ""
     nome, avisos = nome_documento(pe, 1, esquema="rnc")
-    assert "_PE_" in nome and "ACRAL" in nome
+    assert nome == "2026_BTE_31_PE_401_0452-2025_27251_ACRAL-CESP"
     assert any("título" in a for a in avisos)
+    assert AVISO_BASE_PELA_CADEIA in avisos, \
+        "até ao passo 0 da SPEC-0004, a base lida da cadeia fica por confirmar"
 
 
-def test_a_familia_le_se_do_nome_nos_dois_esquemas():
+def test_a_familia_le_se_do_nome_nos_tres_esquemas():
+    assert familia_do_nome("2026_BTE_01_PE_012_0452-2025_27251_ACRAL-CESP") == "extensao"
+    assert familia_do_nome("2026_BTE_12_AA_412_27251_ABC-CESP") == "adesao"
+    assert familia_do_nome("2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP+3") == "convencao"
+    assert familia_do_nome("2026_BTE_31_SPE_387_AE-ALT-RECT_47109_CARRISTUR-ASPTC") \
+        == "convencao"
     assert familia_do_nome("2026_PRI_401_PE_27251_BTE_33_ACRAL-CESP") == "extensao"
     assert familia_do_nome("2026_PRI_377_CCT_27251_BTE_31_ACRAL") == "convencao"
     assert familia_do_nome("26_PE_001_BTE_31_ACRAL_CESP") == "extensao"
@@ -615,8 +644,12 @@ def test_o_pipeline_recusa_o_que_nao_e_convencao(tmp_path, monkeypatch):
 
     pasta = tmp_path / "pdfs"
     pasta.mkdir()
-    for nome in ("2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf",
-                 "2026_PRI_401_PE_27251_BTE_33_ACRAL-CESP.pdf"):
+    for nome in ("2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP.pdf",
+                 "2026_BTE_33_PE_401_0452-2025_27251_ACRAL-CESP.pdf",
+                 "2026_BTE_33_AA_402_27251_ALGRET-CESP.pdf",
+                 "2026_PRI_401_PE_27251_BTE_33_ACRAL-CESP.pdf",
+                 # renomeada à mão antes do ADR-0022: nenhum esquema a lê
+                 "2026_001_BTE_01_PE_0452_ADCP_SETAAB.pdf"):
         (pasta / nome).write_bytes(b"%PDF-1.4\n")
     codebook = tmp_path / "cb.yaml"
     codebook.write_text("tema: ensaio\ncodigos: []\n", encoding="utf-8")
@@ -628,8 +661,9 @@ def test_o_pipeline_recusa_o_que_nao_e_convencao(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as erro:
         pipeline_tema.main()
     mensagem = str(erro.value)
-    assert "não são convenções" in mensagem
-    assert "_PE_" in mensagem
+    assert "4 ficheiro(s)" in mensagem, mensagem
+    assert "2026_001_BTE_01_PE_0452_ADCP_SETAAB.pdf  (extensao?)" in mensagem
+    assert "_PE_" in mensagem and "_AA_" in mensagem
     assert "convencoes" in mensagem, "a mensagem tem de dizer para onde apontar"
 
 

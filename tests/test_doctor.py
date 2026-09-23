@@ -39,6 +39,11 @@ def _correr_doctor(monkeypatch, tmp_path, capsys, venv_existe=True,
         monkeypatch.setattr(
             doctor, "MODULOS",
             [("modulo_inexistente_xyz", "pacote-fake")])
+    # O tkinter é do Python e não do projeto: há interpretadores (contentores,
+    # algumas builds do Linux) sem ele. Sem este módulo falso, o resultado dos
+    # testes dependia da máquina e não do que o doctor faz.
+    import types
+    monkeypatch.setitem(sys.modules, "tkinter", types.ModuleType("tkinter"))
     # sys.prefix/base_prefix: simular que NÃO estamos num venv do projeto
     monkeypatch.setattr(doctor.sys, "prefix", "/usr")
     monkeypatch.setattr(doctor.sys, "base_prefix", "/usr")
