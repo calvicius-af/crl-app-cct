@@ -413,8 +413,11 @@ def descarregar_item(item: dict, destino_raiz: Path, registo: Registo, *,
         cabecalhos["If-None-Match"] = descarga["etag"]
     if descarga.get("last_modified"):
         cabecalhos["If-Modified-Since"] = descarga["last_modified"]
-    if not caminho.exists():
-        cabecalhos = {}          # o ficheiro desapareceu: pedir a cópia inteira
+    if not caminho.exists() or (descarga.get("sha256") and
+                               sha256_ficheiro(caminho) != descarga["sha256"]):
+        # Falta a cópia neste destino, ou está diferente. Um 304 baseado no
+        # ETag anterior não provaria que esta cópia local está correta.
+        cabecalhos = {}
 
     erro = None
     for tentativa in range(1, TENTATIVAS + 1):
@@ -508,10 +511,12 @@ def recolher(indices: list[Path], destino: Path, registo: Registo, *,
                     continue
 
                 anterior = (registo.get(item["chave"]) or {}).get("descarga") or {}
-                caminho_ant = Path(anterior.get("caminho", ""))
-                if anterior.get("sha256") and caminho_ant.exists() and \
-                        sha256_ficheiro(caminho_ant) == anterior["sha256"]:
+                caminho_atual = (destino / str(item["ano"]) /
+                                 str(item["num_bte"]) / item["ficheiro"])
+                if (anterior.get("sha256") and caminho_atual.is_file() and
+                        sha256_ficheiro(caminho_atual) == anterior["sha256"]):
                     registo.actualizar(item, descarga={**anterior,
+                                                       "caminho": str(caminho_atual),
                                                        "estado": "ja_existente"})
                     contar("ja_existente")
                     continue
