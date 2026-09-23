@@ -76,13 +76,13 @@ Novas sub-issues:
 | #25 isolar e limitar o Docling | aberta | não tratado nesta ronda |
 | #26 desempenho dos extratores | aberta | precisa de um corpus autorizado de PDF para medir |
 | #27 gates estáticos | em curso | feito: Ruff, mypy no pacote `cct`, `git diff --check`; falta: tipos para os objetos do Docling, heurísticas de colunas nomeadas, testes de propriedades dos offsets, cobertura mínima |
-| #28 numeração por extenso | resolvida no código | gate com uma convenção real, que o repositório não tem (ISSUE-0001) |
-| #29 títulos multilinha | aberta | precisa dos casos reais (ACIP/FESAHT e outros) como fixtures |
+| #28 numeração por extenso | resolvida no código | normalização confirmada num PDF real (LPFP/SJPF, BTE 29/2025); falta um par de versões reais para o emparelhamento (ISSUE-0001) |
+| #29 títulos multilinha | aberta | confirmado na revisão do PR #88: o título inicial da TINITA continua dividido; precisa dos casos reais como fixtures |
 | #30 cadeia de fornecimento | fechada no GitHub | — |
 | #31 validação no MaxQDA | aberta | validação humana no MaxQDA |
 | #56 acesso à partilha do pacote | aberta | configuração pelo Instituto de Informática, fora do repositório |
 | #58 gate de instalação Windows | resolvida no código | ISSUE-0009 a 0013 verificadas; falta repetir o gate numa estação do CRL (ISSUE-0009) |
-| #64 CARRISTUR sem cláusulas | resolvida no código | confirmar na próxima corrida sobre os PDF reais (ISSUE-0014) |
+| #64 CARRISTUR sem cláusulas | resolvida no código | confirmado na corrida real com nomes RNC; falta repetir com os nomes de 2025, agora cobertos pelo título (ISSUE-0014) |
 
 «Resolvida no código» quer dizer que o defeito está corrigido e coberto por testes, mas
 que o issue tem um critério que só se confirma com pessoas, dados reais ou configuração

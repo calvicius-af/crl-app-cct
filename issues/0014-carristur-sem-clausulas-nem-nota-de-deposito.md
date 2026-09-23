@@ -94,7 +94,16 @@ O defeito estava em dois sítios:
 Testes em `tests/test_sanidade.py`, incluindo uma corrida do pipeline sobre um nome
 `…_AE-ALT-RECT_…` sem registo, que falha com o código anterior.
 
-**Falta:** confirmar na próxima corrida sobre os PDF reais do BTE 31/2026 que os quatro
-documentos aparecem com a nota de retificação. O sintoma de `Artigo 1.º: corpo sem frase
+**Revisão do PR #88 (2026-09-23).** Corrida real do BTE 31/2026: 14/14 PDF, 292 cláusulas,
+101 anotações; os quatro CARRISTUR com nomes RNC deram zero cláusulas e a nota de
+retificação, sem o aviso de truncagem. Mas o mesmo PDF com o nome da corrida original
+(`26_PR_011_BTE_31_CARRISTUR_ASPTC`, esquema de 2025, hash igual) voltava a receber
+«documento truncado?», porque esse esquema não traz o tipo e não havia registo. A
+retificação passa também a reconhecer-se pelo título do documento («… - Retificação»,
+procurado só no bloco do título, antes do primeiro cabeçalho), o que não depende do nome
+nem do registo. Teste com esse nome em `tests/test_sanidade.py`, que falha sem a correção.
+
+**Falta:** repetir a corrida com os PDF reais nomeados no esquema de 2025, para confirmar
+a deteção pelo título no texto extraído. O sintoma de `Artigo 1.º: corpo sem frase
 terminada em ponto` (26_PR_008 e 26_PR_009) não é tratado aqui e continua registado nas
 notas acima.

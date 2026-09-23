@@ -153,3 +153,70 @@ def test_o_pipeline_reconhece_a_retificacao_pelo_nome_sem_registo(
     relatorio = (out / "relatorio.txt").read_text(encoding="utf-8")
     assert AVISO_RETIFICACAO_SEM_ARTICULADO in relatorio
     assert "truncado" not in relatorio
+
+
+# ---------- retificação pelo título (revisão do PR #88) ----------
+
+TITULO_CARRISTUR = (
+    "PRIVADO\nREGULAMENTAÇÃO DO TRABALHO\nCONVENÇÕES COLETIVAS\n"
+    "Acordo de empresa entre a CARRISTUR - Inovação em Transportes Urbanos e "
+    "Regionais, Sociedade Unipessoal L.da e a Associação Sindical dos "
+    "Trabalhadores da Carris e Participadas (ASPTC) - Retificação\n"
+    "Por ter sido publicado com inexatidão no Boletim do Trabalho e Emprego, "
+    "n.º 27, de 22 de julho de 2026, procede-se à sua retificação.\n")
+
+
+def test_o_pipeline_reconhece_a_retificacao_pelo_titulo_no_esquema_de_2025(
+        tmp_path, monkeypatch):
+    """O nome da corrida original não traz o tipo. O PDF é o mesmo: o título
+    é que diz que é uma retificação."""
+    import copy
+
+    from cct import pipeline_tema
+    from cct.sanidade import AVISO_RETIFICACAO_SEM_ARTICULADO
+
+    pasta = tmp_path / "pdfs"
+    pasta.mkdir()
+    nome = "26_PR_011_BTE_31_CARRISTUR_ASPTC"
+    (pasta / f"{nome}.pdf").write_bytes(b"%PDF-1.4\n")
+    codebook = tmp_path / "cb.yaml"
+    codebook.write_text("tema: ensaio\ncodigos: []\n", encoding="utf-8")
+    out = tmp_path / "out"
+    doc, texto = estruturar(TITULO_CARRISTUR, nome)
+
+    monkeypatch.setattr(pipeline_tema, "extrair_pdf",
+                        lambda pdf, **kw: (copy.deepcopy(doc), texto))
+    monkeypatch.setattr("cct.auditoria.contar_tabelas_pdfplumber", lambda pdf: 0)
+    monkeypatch.setattr("sys.argv", ["cct.pipeline_tema", "--pdfs", str(pasta),
+                                     "--codebook", str(codebook), "--out", str(out)])
+    pipeline_tema.main()
+
+    relatorio = (out / "relatorio.txt").read_text(encoding="utf-8")
+    assert AVISO_RETIFICACAO_SEM_ARTICULADO in relatorio
+    assert "truncado" not in relatorio
+
+
+def test_titulo_de_retificacao_so_olha_para_o_titulo():
+    from cct.sanidade import titulo_de_retificacao
+
+    assert titulo_de_retificacao(TITULO_CARRISTUR)
+    assert titulo_de_retificacao(TITULO_CARRISTUR.replace("Retificação", "Rectificação"))
+    # «retificação» no corpo, depois do primeiro cabeçalho, não conta
+    corpo = ("Contrato coletivo entre a A e o B - Revisão global\n"
+             "Cláusula 1.ª - Âmbito\n"
+             "O anexo II - Retificação de categorias aplica-se a todos.\n")
+    assert not titulo_de_retificacao(corpo)
+    # nem a palavra solta no título, sem o travessão do subtipo
+    assert not titulo_de_retificacao("Acordo de retificação de horários\n")
+
+
+def test_os_exemplos_publicados_nao_sao_retificacoes():
+    from pathlib import Path
+
+    from cct.sanidade import titulo_de_retificacao
+
+    raiz = Path(__file__).resolve().parent.parent / "examples"
+    textos = [p for p in raiz.glob("*/saida/*.txt") if p.name != "relatorio.txt"]
+    assert textos
+    for p in textos:
+        assert not titulo_de_retificacao(p.read_text(encoding="utf-8")), p.name

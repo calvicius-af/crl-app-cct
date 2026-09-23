@@ -72,6 +72,8 @@ cláusula escrita como `12.ª` e como `décima segunda`, com o texto reescrito, 
 emparelhada pelo número). Os dois testes de emparelhamento falham com o código
 anterior.
 
-**Falta:** o repositório não tem nenhuma convenção real com numeração por extenso.
-O último critério do #28, identificar uma como gate, fica à espera de um PDF
-autorizado.
+**Gate real, parcial (revisão do PR #88, 2026-09-23):** LPFP e SJPF, BTE 29/2025
+(`25_PR_194_BTE_29_LPFP_SJPfutebol`). A extração produz «Cláusula primeira» e «Cláusula
+segunda», normalizadas para `cl1` e `cl2`. Não há versão anterior local desta convenção,
+pelo que o emparelhamento diacrónico com dados reais continua por testar. Falta: uma
+versão anterior da LPFP/SJPF, ou outro par real, para fechar o critério do #28.
