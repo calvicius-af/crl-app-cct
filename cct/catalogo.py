@@ -331,8 +331,30 @@ def ligar_avisos(linhas_catalogo: list[dict]) -> list[dict]:
 
 
 def _chave(linha: dict) -> str:
-    """O `nome_canonico`, ou o ficheiro de origem se ainda não houver nome."""
-    return linha.get("nome_canonico") or f"origem:{linha.get('ficheiro_origem', '')}"
+    """Identidade de uma linha entre regerações do catálogo.
+
+    O `nome_canonico`, quando existe. Uma linha sem nome (por confirmar) não
+    pode ser procurada só pelo ficheiro de origem: o BTE numera os PDF por
+    páginas (`00010004.pdf`), e o mesmo nome repete-se de boletim para
+    boletim. Usa-se o ano com o `IDDocumento` da DGCP, que é único no ano; sem
+    ele, o ano, o boletim, a origem e o URL.
+    """
+    if linha.get("nome_canonico"):
+        return linha["nome_canonico"]
+    ano = str(linha.get("ano") or "")
+    seq = str(linha.get("seq_anual") or "")
+    if seq:
+        return f"sem_nome:{ano}:{seq}"
+    return (f"sem_nome:{ano}:BTE{linha.get('bte_numero') or ''}:"
+            f"{linha.get('ficheiro_origem') or ''}:{linha.get('url_fonte') or ''}")
+
+
+AVISO_CHAVE_REPETIDA = ("chave repetida no catálogo anterior ou nos índices — "
+                        "colunas da equipa não repostas; verificar à mão")
+
+
+def _avisar(linha: dict, aviso: str) -> None:
+    linha["avisos"] = "; ".join(a for a in (aviso, linha.get("avisos", "")) if a)
 
 
 def carregar_correspondencia(caminho: Path) -> dict[str, str]:
@@ -351,7 +373,8 @@ def fundir(novas: list[dict], anterior: Path | None,
     muda. A exceção é a migração única do ADR-0022: com `correspondencia`
     (nome antigo → nome novo), as linhas do catálogo anterior são procuradas
     pelo nome novo. Uma linha sem nome canónico (por confirmar) é procurada
-    pelo ficheiro de origem. Uma linha do catálogo anterior que já não apareça
+    pela chave de `_chave`; uma chave repetida não repõe nada e deixa as linhas
+    antigas assinaladas. Uma linha do catálogo anterior que já não apareça
     nos índices é mantida — apagá-la perdia o trabalho de quem a preencheu, e um
     documento que desaparece de um índice é um facto a investigar, não a
     esquecer.
@@ -359,14 +382,27 @@ def fundir(novas: list[dict], anterior: Path | None,
     if not anterior or not Path(anterior).exists():
         return novas
     correspondencia = correspondencia or {}
+    antigas: dict[str, list[dict]] = {}
     with open(anterior, encoding="utf-8-sig", newline="") as f:
-        antigas = {}
         for l in csv.DictReader(f, delimiter=";"):
             if l.get("nome_canonico") in correspondencia:
                 l["nome_canonico"] = correspondencia[l["nome_canonico"]]
-            antigas[_chave(l)] = l
+            antigas.setdefault(_chave(l), []).append(l)
+    contagem_novas: dict[str, int] = {}
     for linha in novas:
-        velha = antigas.pop(_chave(linha), None)
+        contagem_novas[_chave(linha)] = contagem_novas.get(_chave(linha), 0) + 1
+
+    # Uma chave repetida, de um lado ou do outro, não se resolve às cegas: nada
+    # é reposto nessas linhas e as antigas ficam todas, assinaladas. Escolher
+    # uma delas era arriscar pôr o trabalho da equipa no documento errado.
+    ambiguas = {k for k, v in antigas.items() if len(v) > 1}
+    ambiguas |= {k for k, n in contagem_novas.items() if n > 1 and k in antigas}
+    for linha in novas:
+        chave = _chave(linha)
+        if chave in ambiguas:
+            _avisar(linha, AVISO_CHAVE_REPETIDA)
+            continue
+        velha = (antigas.pop(chave, None) or [None])[0]
         if velha:
             for c in COLUNAS_EQUIPA:
                 if velha.get(c):
@@ -374,11 +410,12 @@ def fundir(novas: list[dict], anterior: Path | None,
             if velha.get("estado") and velha["estado"] not in (
                     "recolhido", "nao_processavel", "por_confirmar"):
                 linha["estado"] = velha["estado"]
-    for orfa in antigas.values():
-        linha = {c: orfa.get(c, "") for c in COLUNAS}
-        linha["avisos"] = ("já não consta dos índices lidos — verificar; "
-                           + linha.get("avisos", "")).strip("; ")
-        novas.append(linha)
+    for chave, grupo in antigas.items():
+        for orfa in grupo:
+            linha = {c: orfa.get(c, "") for c in COLUNAS}
+            _avisar(linha, AVISO_CHAVE_REPETIDA if chave in ambiguas
+                    else "já não consta dos índices lidos — verificar")
+            novas.append(linha)
     return novas
 
 

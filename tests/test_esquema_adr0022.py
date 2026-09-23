@@ -354,3 +354,55 @@ def test_migrar_exige_a_tabela_de_correspondencia(tmp_path):
     with pytest.raises(SystemExit):
         main(["--registo", str(registo.caminho), "--destino", str(tmp_path / "bte"),
               "--migrar"])
+
+
+# ------------------------------- chave das linhas sem nome (revisão do PR #87)
+
+def _sem_nome(**campos):
+    linha = {c: "" for c in catalogo.COLUNAS}
+    linha.update({"familia": "extensao", "tipo_documento": "PE",
+                  "estado": "por_confirmar", "ficheiro_origem": "00010004.pdf",
+                  **campos})
+    return linha
+
+
+def test_linhas_sem_nome_com_a_mesma_origem_em_boletins_diferentes(tmp_path):
+    """`00010004.pdf` repete-se entre boletins: a chave não pode ser só a origem."""
+    anterior = tmp_path / "catalogo.csv"
+    catalogo.escrever([
+        _sem_nome(ano="2026", bte_numero="31", seq_anual="401", perita="Dra. A"),
+        _sem_nome(ano="2026", bte_numero="33", seq_anual="415", perita="Dra. B"),
+    ], anterior)
+    novas = catalogo.fundir([
+        _sem_nome(ano=2026, bte_numero=33, seq_anual=415),
+        _sem_nome(ano=2026, bte_numero=31, seq_anual=401),
+    ], anterior)
+    assert [(l["bte_numero"], l["perita"]) for l in novas] == [
+        (33, "Dra. B"), (31, "Dra. A")]
+
+
+def test_sem_identificador_a_chave_usa_ano_boletim_e_origem(tmp_path):
+    anterior = tmp_path / "catalogo.csv"
+    catalogo.escrever([
+        _sem_nome(ano="2026", bte_numero="31", perita="Dra. A"),
+        _sem_nome(ano="2026", bte_numero="33", perita="Dra. B"),
+    ], anterior)
+    novas = catalogo.fundir([_sem_nome(ano=2026, bte_numero=31),
+                             _sem_nome(ano=2026, bte_numero=33)], anterior)
+    assert [l["perita"] for l in novas] == ["Dra. A", "Dra. B"]
+
+
+def test_chave_ambigua_nao_repoe_nem_perde_o_trabalho_da_equipa(tmp_path):
+    """Duas linhas antigas com a mesma chave: nenhuma é escolhida às cegas, e as
+    duas ficam no catálogo, assinaladas, para uma pessoa decidir."""
+    anterior = tmp_path / "catalogo.csv"
+    catalogo.escrever([
+        _sem_nome(ano="2026", bte_numero="31", ficheiro_origem="", perita="Dra. A"),
+        _sem_nome(ano="2026", bte_numero="31", ficheiro_origem="", perita="Dra. B"),
+    ], anterior)
+    novas = catalogo.fundir([_sem_nome(ano=2026, bte_numero=31, ficheiro_origem="")],
+                            anterior)
+    assert novas[0]["perita"] == ""
+    assert "chave repetida" in novas[0]["avisos"]
+    assert sorted(l["perita"] for l in novas[1:]) == ["Dra. A", "Dra. B"]
+    assert all("chave repetida" in l["avisos"] for l in novas[1:])
