@@ -323,6 +323,28 @@ essa informação. Não preencher por inferência nem substituir o índice
 original sem preservar a proveniência. Para cada valor acrescentado, guardar
 o ID do documento, a fonte, a data de consulta e a decisão de revisão.
 
+### 5.4 Avisos de extração de texto e tabelas no QDPX
+
+Uma corrida pode indicar `Convenções processadas: 9/9` e ainda ter tabelas
+salariais mal estruturadas. No caso BTE 31/2026 revisto em 23-09-2026,
+algumas tabelas existem no TXT, mas foram reduzidas a uma linha longa
+(380, 384, 385 e 386). O aviso `nenhum bloco de tabela` não significa
+necessariamente ausência dos valores: a auditoria só reconhece blocos com
+pelo menos duas linhas consecutivas de células separadas por ` | `.
+O aviso `tabela fora do corpo do nó` pode referir-se apenas ao facto de
+o cabeçalho do anexo ser um nó separado do respetivo corpo. Um artigo que
+termina com dois pontos para introduzir cláusulas também pode ser sinalizado
+indevidamente como `sem corpo válido`. **Nenhuma destas explicações valida
+os valores extraídos:** conferir a tabela e o artigo no PDF de origem.
+
+Até à correção, guardar o PDF, o TXT, o QDPX, o relatório e o
+`manifest.json`; registar documento, página, anexo, categoria/valor e
+divergência observada. Não usar tabelas assinaladas para indicadores de
+remuneração sem revisão. Não voltar a correr só com `--extrator docling`
+e presumir que resolveu: comparar as duas saídas com a mesma página do PDF.
+O procedimento de diagnóstico, correção e validação está em
+[Intervenção na extração BTE 31/2026](../validacao/intervencao-extracao-bte31-2026-09-23.md).
+
 ---
 
 ## 6. Ciclo de melhoria dos temas
