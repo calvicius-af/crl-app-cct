@@ -128,6 +128,29 @@ def test_nome_invalido_fica_por_confirmar_sem_bloquear_lote(
     assert resumo["por_estado"]["nomeado"] >= 1
 
 
+def test_corrigir_sigla_de_nome_ja_escrito_nao_cria_segundo_pdf(
+        registo_com_recolha, tmp_path):
+    registo, _ = registo_com_recolha
+    destino = tmp_path / "bte"
+    nomear(registo, destino, aplicar=True, esquema="rnc",
+           aceitar_heuristicas=True)
+    entrada = next(e for e in registo.entradas.values()
+                   if "Empresa Metropolitana" in e.get("outorgantes", ""))
+    nome_original = entrada["nomeacao"]["doc_id"]
+    caminho_original = entrada["nomeacao"]["caminho"]
+    pdfs_antes = sorted(destino.rglob("*.pdf"))
+    tabela = {"empresa metropolitana de estacionamento da maia, em": "EMEMaia"}
+
+    resumo = nomear(registo, destino, aplicar=True, esquema="rnc",
+                    tabela=tabela, aceitar_heuristicas=True)
+
+    assert entrada["nomeacao"]["estado"] == "conflito"
+    assert entrada["nomeacao"]["doc_id"] == nome_original
+    assert entrada["nomeacao"]["caminho"] == caminho_original
+    assert sorted(destino.rglob("*.pdf")) == pdfs_antes
+    assert any("migração controlada necessária" in p for p in resumo["problemas"])
+
+
 # ------------------------------------------------------------- lados da mesa
 
 def test_cnis_e_patronal_e_fnstfps_e_sindical():

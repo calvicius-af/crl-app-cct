@@ -93,6 +93,17 @@ destino**; a existência de uma cópia noutro caminho guardado no registo não
 conta como `ja_existente`. A nova descarga pode ser necessária. Não corrigir
 `caminho` no JSONL à mão.
 
+**Caso observado em 23-09-2026, BTE 31/2026:** o índice
+`BTE31_2026_CRL.xlsx` tinha 14 documentos. A simulação encontrou os 14 PDFs
+já recolhidos, sem pedidos de rede; seis nomes já existiam e oito ficaram
+`por_confirmar`. Com `--aceitar-heuristicas --confirmar-rede --aplicar`, os
+mesmos 14 PDFs foram reaproveitados, sem pedidos de rede, e os oito restantes
+foram copiados com nomes gerados. `nomeado` significa **ficheiro escrito**,
+não sigla confirmada: os 11 avisos de nomeação continuaram no relatório.
+`--confirmar-rede` autoriza pedidos caso sejam necessários, mas não força uma
+nova descarga. Não voltar a aplicar siglas diferentes sobre estes nomes sem
+seguir o procedimento de correção da secção 5.2.
+
 Se a rede institucional não permitir a descarga, usar os PDFs obtidos por via
 institucional e registar a origem e a correspondência com o índice antes de
 qualquer cópia ou renomeação. Não colocar um PDF diretamente na pasta final
@@ -220,7 +231,10 @@ Sai um Excel com cada cláusula classificada: `=` / `alteracao` / `nova` /
 | `ModuleNotFoundError: No module named 'jsonschema'` depois de instalar as dependências | `python` chama outro interpretador | repetir com `.\.venv\Scripts\python.exe`; confirmar o caminho mostrado pelo `doctor` antes de reinstalar |
 | `doctor` indica falta de PDFs antes da primeira recolha | pasta final ainda vazia | verificar primeiro os índices e correr a aquisição; a ausência das variáveis MaxQDA não bloqueia a recolha |
 | `Sem ficheiros-índice` | pasta vazia ou ficheiro `.xlsx` errado | confirmar `Get-ChildItem .\data\raw\indices\*.xlsx`; copiar o índice fornecido pela equipa |
-| PDFs em `data/interim/recolha/`, mas não em `data/raw/bte/` | nomeação por confirmar, execução sem `--aplicar` ou conflito no destino | ler `results/aquisicao/relatorio_*.txt` e o estado no registo; corrigir siglas confirmadas com `--siglas` e repetir a nomeação, sem apagar os originais |
+| PDFs em `data/interim/recolha/`, mas não em `data/raw/bte/` | nomeação por confirmar, execução sem `--aplicar` ou conflito no destino | ler `results/aquisicao/relatorio_*.txt` e o estado no registo; corrigir siglas confirmadas com `--siglas` e repetir a nomeação apenas dos documentos ainda não escritos |
+| `ja_existente: 14`, `pedidos de rede: 0`, mas oito nomes `por_confirmar` | PDFs recolhidos, ainda sem nome aprovado | rever os avisos por documento e a fonte de cada sigla antes de `--aplicar`; a rede não resolve avisos de nomeação |
+| `nomeado: 8` com `--aceitar-heuristicas`, mas ainda há avisos | os PDFs foram escritos com nomes provisórios | inventariar os oito ficheiros e rever as siglas e os outorgantes; não interpretar `nomeado` como validação humana |
+| `conflito: nome já atribuído … novo nome proposto …` | uma sigla ou metadado alterou o nome de um PDF já escrito | guardar o relatório e seguir a migração controlada da secção 5.2; o comando preserva o nome e o PDF anteriores |
 | `campos estruturais do nome RNC excedem o limite` | tipo ou código do índice tornam impossível um nome íntegro de 63 caracteres | confirmar os metadados na fonte; o PDF fica `por_confirmar`, sem truncar campos nem aceitar a heurística |
 
 **Regra dos erros:** o `relatorio.txt` lista sempre os documentos com
@@ -238,6 +252,51 @@ documentos, anexar ao registo de trabalho o identificador do índice e a fonte
 da confirmação. Rever a nota com a equipa antes de a transformar numa regra
 geral ou num teste automático. Não copiar o registo JSONL nem dados do corpus
 para o repositório.
+
+### 5.2 Rever nomes e corrigir os que já foram escritos
+
+1. Guardar uma cópia de segurança do índice, de
+   `data/registo/registo_bte.jsonl`, dos PDFs em `data/interim/recolha/` e
+   `data/raw/bte/`, do catálogo e das variáveis/documentos do MaxQDA, se já
+   existirem. Conservar `results/aquisicao/manifest.json` e o relatório da
+   corrida. Não apagar o registo nem alterar o ordinal.
+2. Fazer uma tabela de revisão com **chave do registo, código IRCT, nome atual,
+   hash do PDF, nome proposto, fonte da sigla, decisão e presença no MaxQDA**.
+   Conferir título, outorgantes e código com o índice e com a fonte institucional;
+   resolver as abreviaturas com a equipa responsável. O mesmo par
+   `AEVP-FESAHT` nos ordinais 379 e 380 tem códigos distintos (26651 e 26652):
+   o aviso de par repetido é informativo, não prova duplicação. Nos casos
+   387–390 (`CARRISTUR`, retificações), os outorgantes vieram do título:
+   confirmar a correspondência com o ato que é retificado. No 381 há uma
+   terceira sigla cortada pelo limite de 63 caracteres; examinar os
+   outorgantes completos. Rever ainda as siglas derivadas de Empresa
+   Metropolitana, AWP, AP Solutions e Sindicato Nacional dos Motoristas.
+   O exemplo `SNM` em documentos antigos não confirma a sigla deste último
+   no índice atual: o vocabulário contém também `SNMOT` para outra designação.
+3. Se um documento **ainda não foi escrito**, preencher um `siglas.csv` local
+   apenas com siglas confirmadas, executar primeiro sem `--aplicar` e verificar
+   o nome proposto. Se o nome **já foi escrito**, uma alteração de sigla produz
+   `conflito` e preserva o `doc_id`, o caminho e o PDF anteriores. Não renomear
+   à mão nem correr repetidamente `--aceitar-heuristicas` para ultrapassar o
+   conflito. Aprovar uma migração que atualize em conjunto PDF, registo,
+   catálogo, referências de versões, variáveis/documentos do MaxQDA e
+   manifestos que dependam do nome. Se o MaxQDA já tiver importado o PDF,
+   coordenar a alteração com a equipa antes de a executar. A migração para o
+   futuro esquema comum das três famílias segue a [SPEC-0004](../../specs/0004-esquema-de-nomes-comum-as-tres-familias.md);
+   essa especificação ainda não está implementada.
+4. Verificar que cada chave mantém um só PDF final com hash igual ao PDF
+   recolhido, que não há colisões de nomes sem distinção de maiúsculas no
+   Windows, que os 14 documentos e respetivos códigos estão representados
+   uma vez no catálogo e que as ligações no MaxQDA continuam válidas. Registar
+   no guia a decisão e a fonte de cada caso que produziu uma regra reutilizável.
+
+O `doctor` do ramo de instalação de 17-09-2026 podia indicar, por engano,
+que o `.venv` não estava em uso e contabilizar a ausência opcional das
+variáveis MaxQDA como problema. Executar o `doctor` com
+`.\.venv\Scripts\python.exe` e usar o ramo principal atualizado para obter o
+diagnóstico corrigido; nenhum desses dois avisos explica por si só os oito
+nomes por confirmar. Um *checkout* antigo não se atualiza automaticamente
+quando o ramo principal muda.
 
 ---
 

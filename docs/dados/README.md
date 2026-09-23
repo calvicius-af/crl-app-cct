@@ -208,6 +208,12 @@ Para fixar os casos que a equipa quer decididos de uma vez por todas — o fiche
 vive na **raiz do projeto** (é esse o caminho que o exemplo abaixo assume; noutro
 sítio, indicar o caminho relativo a partir da raiz):
 
+Confirmar cada sigla na fonte antes de a escrever. O modelo CSV demonstra
+apenas o formato; não valida entidades do BTE. Se um PDF com a sigla anterior
+já foi escrito, a nova sigla gera `conflito` e não cria outra cópia: seguir
+o [procedimento de migração](../operacao/guia-operacao.md#52-rever-nomes-e-corrigir-os-que-ja-foram-escritos)
+com registo, catálogo e MaxQDA, em vez de renomear o PDF isoladamente.
+
 ```powershell
 .\.venv\Scripts\python.exe -m cct.nomeacao --siglas siglas.csv --aplicar
 ```
