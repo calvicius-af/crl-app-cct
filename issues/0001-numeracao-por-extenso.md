@@ -1,6 +1,6 @@
 # ISSUE-0001: normalizar cláusulas com numeração por extenso
 
-- **Estado:** Em curso — reconhecimento implementado no PR #23; falta normalização numérica para diacronia
+- **Estado:** Em curso — normalização implementada a 2026-09-23 (`cct/numeracao.py`); falta o gate com uma convenção real
 - **Data:** 2026-07-07
 - **GitHub:** #28 (sub-issue de #24)
 - **Onde dói:** `cct/diacronia.py` e representação canónica do número
@@ -45,3 +45,33 @@ estrutural deixou, portanto, de estar bloqueada.
 Continua por resolver a normalização do ordinal para um número canónico. O
 emparelhamento em `cct/diacronia.py` ainda reconhece apenas algarismos, pelo que
 esta parte permanece aberta no GitHub como #28, dentro do programa #24.
+
+## Normalização (2026-09-23)
+
+`cct/numeracao.py` dá a cada cláusula ou artigo uma chave canónica, sem tocar no
+rótulo, que fica como está no documento:
+
+| Rótulo | Chave |
+|---|---|
+| `Cláusula 12.ª - Horário` | `cl12` |
+| `Cláusula décima segunda - Horário` | `cl12` |
+| `Cláusula 16.ª-A - Férias` | `cl16A` |
+| `Artigo único - Âmbito` | `arunico` |
+| `Cláusula prévia - Âmbito da revisão` | `clprevia` |
+
+`cct/diacronia.py` passa a emparelhar por esta chave. Converte ordinais simples e
+compostos até 199, só em ordem decrescente, e recusa o todo se uma palavra não for
+ordinal (`Cláusula geral e transitória` continua sem número).
+
+Corrigido de caminho um defeito da chave antiga, que só lia os algarismos: a
+`16.ª-A`, inserida por uma revisão, tinha a mesma chave que a `16.ª` e podia ser
+emparelhada com ela. A letra passa a fazer parte da chave.
+
+Testes em `tests/test_numeracao.py`, incluindo o critério de aceitação (a mesma
+cláusula escrita como `12.ª` e como `décima segunda`, com o texto reescrito, é
+emparelhada pelo número). Os dois testes de emparelhamento falham com o código
+anterior.
+
+**Falta:** o repositório não tem nenhuma convenção real com numeração por extenso.
+O último critério do #28, identificar uma como gate, fica à espera de um PDF
+autorizado.
