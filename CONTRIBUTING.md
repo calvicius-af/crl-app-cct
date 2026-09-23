@@ -136,8 +136,10 @@ Para subir uma versão:
 
 1. altera o `==` no ficheiro de *constraints* correspondente (e o `>=` em
    `requirements.txt` apenas se o mínimo deixar de ser suportado);
-2. corre a suite nas **duas** versões do Python da matriz, 3.11 e 3.12 — uma
-   versão nova que já não suporte 3.11 parte o CI em metade dos jobs;
+2. corre a suite em todas as versões do Python da matriz do CI
+   ([`.github/workflows/testes.yml`](.github/workflows/testes.yml)), a começar
+   pela mais antiga, que é o mínimo declarado em `pyproject.toml` — uma versão
+   nova que já não a suporte parte o CI em parte dos jobs;
 3. confirma que a instalação leve continua a funcionar sem Docling: a suite tem
    de passar sem `docling-core` instalado (os testes respectivos declaram-se
    `skipped`);

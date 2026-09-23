@@ -1,4 +1,4 @@
-# Exemplos completos: do PDF do BTE ao projeto MaxQDA
+# Exemplos: do PDF do BTE ao projeto MaxQDA
 
 Esta pasta responde a uma pergunta simples — **o que entra e o que sai desta aplicação?** —
 com dois casos reais. É a única parte de dados/resultados que está versionada no
@@ -17,6 +17,21 @@ comprimento de cada substituição é igual ao do nome original, pelo que os off
 erro de extração, comparação ou exportação. O procedimento verificável está em
 `scripts/anonimizar_exemplos.py --check` e é decidido pelo
 [ADR-0013](../docs/adr/0013-anonimizacao-dos-exemplos-publicados.md).
+
+## O que se consegue reproduzir, e com quê
+
+Os exemplos demonstram o comportamento da aplicação; não são uma reprodução bit a bit que
+qualquer clone consiga refazer. Há três níveis, e convém não os confundir (issue #4):
+
+| Nível | O que é preciso | Garantia |
+|---|---|---|
+| **Executar** | os PDF oficiais do BTE, obtidos na origem (ver cada exemplo) | a corrida completa funciona e produz os mesmos tipos de artefacto |
+| **Verificar os artefactos publicados** | só o repositório | `python scripts/anonimizar_exemplos.py --check`, que corre no CI, confirma que os textos publicados correspondem à extração depois de retirados os nomes dos signatários |
+| **Reproduzir exatamente as saídas publicadas** | os PDF oficiais e os exports internos do MaxQDA (`--variaveis` e `--master`), que não são publicados | as mesmas contagens e os mesmos ficheiros, a menos da anonimização |
+
+Sem os exports internos, as diferenças esperadas estão descritas em cada exemplo, em
+«Como regenerar»: os códigos saem sem as descrições oficiais e o subtipo da convenção fica
+«desconhecido», o que pode mudar a contagem de anotações.
 
 Cada exemplo tem a mesma organização:
 
