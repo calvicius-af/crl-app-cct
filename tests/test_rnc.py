@@ -659,6 +659,10 @@ def test_pdfs_da_pasta_encontra_direto_e_nas_subpastas_de_ambito(tmp_path):
         "2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf",
         "2026_SPE_382_AE_47252_BTE_31_EMEM-SINTAP.pdf",
     ], "APU não é processável (README §4.3) — não entra na descoberta automática"
+    assert _pdfs_da_pasta(ano / "convencoes") == achados, (
+        "a pasta convencoes também deve encontrar PRI e SPE sem duplicar o caminho")
+    assert _pdfs_da_pasta(ano / "convencoes" / "PRI") == achados[:1]
+    assert _pdfs_da_pasta(ano / "convencoes" / "SPE") == achados[1:]
 
 
 def test_pdfs_da_pasta_sem_nada_devolve_lista_vazia(tmp_path):
