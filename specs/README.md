@@ -37,6 +37,7 @@ ver [ADR-0011](../docs/adr/0011-fluxo-spec-driven.md). O espaço está preparado
 | [0001](0001-recolha-e-nomeacao-do-bte.md) | Recolha automática do BTE e nomeação dos ficheiros | Implementada |
 | [0002](0002-instalacao-offline.md) | Instalação em estações sem acesso à internet | Implementada |
 | [0003](0003-compatibilizacao-com-a-gestao-documental-do-rnc.md) | Compatibilização com a gestão documental do RNC | Implementada |
+| [0004](0004-esquema-de-nomes-comum-as-tres-familias.md) | Um só esquema de nomes para convenções, portarias de extensão e acordos de adesão | Aprovada |
 
 ## Ideias por especificar
 

@@ -47,12 +47,13 @@ seguir*.
 | [0013](0013-anonimizacao-dos-exemplos-publicados.md) | Anonimização dos exemplos publicados e exclusão dos PDFs originais | Aceite |
 | [0014](0014-ciclo-de-vida-dos-artefactos-locais.md) | Ciclo de vida de caches, corridas e artefactos humanos fora do Git | Aceite |
 | [0015](0015-recolha-em-rede-desligada-por-omissao.md) | Recolha do BTE isolada num módulo, com a rede desligada por omissão | Aceite |
-| [0016](0016-esquema-de-nomes-do-rnc.md) | O esquema de nomes do RNC, com o número do BTE acrescentado | Aceite |
+| [0016](0016-esquema-de-nomes-do-rnc.md) | O esquema de nomes do RNC, com o número do BTE acrescentado | Substituído por ADR-0022 |
 | [0017](0017-regra-de-desambiguacao-de-siglas.md) | Siglas duplicadas resolvem-se por regra, não caso a caso | Aceite |
 | [0018](0018-familias-documentais-em-pastas-separadas.md) | Cada família documental na sua pasta; só as convenções no pipeline | Aceite |
 | [0019](0019-lista-do-ine-como-sinal-de-ambito.md) | A lista do INE é um sinal de âmbito, nunca uma decisão | Aceite |
 | [0020](0020-integridade-dos-artefactos-de-instalacao.md) | A integridade dos artefactos vive no pacote offline, não no CI | Aceite |
 | [0021](0021-corte-por-ano-do-esquema-de-nomes.md) | O esquema RNC é obrigatório a partir do corpus de 2026 | Aceite |
+| [0022](0022-esquema-de-nomes-comum-as-tres-familias.md) | Um só esquema de nomes para convenções, portarias de extensão e acordos de adesão | Aceite |
 
 Os dez primeiros foram escritos **retroativamente**, em agosto de 2026, a partir do
 histórico do desenvolvimento (fases 0 a 5, entre janeiro e julho de 2026). Registam

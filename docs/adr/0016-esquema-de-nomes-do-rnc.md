@@ -1,6 +1,6 @@
 # ADR-0016: o esquema de nomes do RNC leva o número do BTE
 
-- **Estado:** Aceite
+- **Estado:** Substituído por [ADR-0022](0022-esquema-de-nomes-comum-as-tres-familias.md)
 - **Data:** 2026-09-16
 - **Decidido por:** CRL (António Fula), a partir da convenção da v2.1 do README
   de estrutura do RNC

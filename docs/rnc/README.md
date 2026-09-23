@@ -129,6 +129,8 @@ Cada execução da aplicação é datada e descartável. O que fica no arquivo d
 
 ### 4.1 A regra
 
+**Alteração aprovada, por implementar.** A 23/09/2026 foi aceite um esquema comum às convenções, portarias de extensão e acordos de adesão, com o número do BTE a seguir ao ano e o código da convenção de base no nome (`2026_BTE_31_PRI_377_CCT-ALT_27251_ACRAL-CESP+3`). Fundamentação em [ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md); alterações a fazer, incluindo a migração do corpus de 2026, em [SPEC-0004](../../specs/0004-esquema-de-nomes-comum-as-tres-familias.md). Até a SPEC-0004 estar implementada, a aplicação continua a gerar o esquema descrito abaixo, e este documento será revisto nessa altura.
+
 ```text
 {ANO}_{AMBITO}_{SEQ}_{TIPO}_{CODIRCT}_BTE_{NN}_{SIGLAS}
 ```
@@ -541,6 +543,8 @@ Reproduzível com `python -m pytest tests/test_rnc.py`.
 ---
 
 ## Registo de alterações
+
+**Nota de 23/09/2026.** Aceite o [ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md), que substitui o ADR-0016: um só esquema de nomes para as três famílias, com o número do BTE a seguir ao ano, o código da convenção de base e duas siglas. Assinalado em 4.1. A revisão deste documento para a versão 4.2 faz parte da [SPEC-0004](../../specs/0004-esquema-de-nomes-comum-as-tres-familias.md).
 
 **v4.1, 18/09/2026.** Clarificado o corte entre os dois esquemas de nome: até 2025
 mantém-se o nome atribuído; a partir do corpus de 2026, inclusive, o esquema RNC é
