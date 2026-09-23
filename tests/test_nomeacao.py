@@ -106,6 +106,28 @@ def test_siglas_vazias_continuam_a_funcionar(registo_com_recolha, tmp_path):
                  "--destino", str(tmp_path / "bte")]) == 0
 
 
+def test_rnc_recusa_prefixo_maior_que_o_limite_sem_o_truncar():
+    entrada = {"ano": 2026, "num_bte": 31, "id_dgert": "377/2026",
+               "tipo": "CCT-" + "A" * 70, "cod_irct": "27251",
+               "outorgantes": "Associação A - ACRAL; CESP - Sindicato B"}
+    with pytest.raises(ValueError, match="campos estruturais"):
+        nome_documento(entrada, 1, esquema="rnc")
+
+
+def test_nome_invalido_fica_por_confirmar_sem_bloquear_lote(
+        registo_com_recolha, tmp_path):
+    registo, _ = registo_com_recolha
+    primeiro = next(e for e in registo.entradas.values()
+                    if e.get("familia") == "convencao")
+    primeiro["tipo"] = "CCT-" + "A" * 70
+    resumo = nomear(registo, tmp_path / "bte", aplicar=True,
+                    esquema="rnc", aceitar_heuristicas=True)
+    assert primeiro["nomeacao"]["estado"] == "por_confirmar"
+    assert any("campos estruturais" in p for p in resumo["problemas"])
+    assert not list((tmp_path / "bte").rglob("*" + "A" * 30 + "*.pdf"))
+    assert resumo["por_estado"]["nomeado"] >= 1
+
+
 # ------------------------------------------------------------- lados da mesa
 
 def test_cnis_e_patronal_e_fnstfps_e_sindical():

@@ -31,7 +31,7 @@ def test_subtokens_camel_case():
 
 def test_caminho_bte():
     p = caminho_bte(Path("/x/bte"), "25_PR_251_BTE_41_AguasRibatejo_STAL_TXT")
-    assert str(p).endswith("bte_2025/bte41_2025.pdf")
+    assert p.parts[-2:] == ("bte_2025", "bte41_2025.pdf")
 
 
 @pytest.mark.skipif(not (PASTA_BTE / "bte_2025" / "bte4_2025.pdf").exists(),

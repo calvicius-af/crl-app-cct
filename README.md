@@ -48,11 +48,21 @@ Requer **Python 3.11 ou superior**. A instalação base tem quatro dependências
 todas com licença permissiva. O extrator Docling é opcional e significativamente mais
 pesado.
 
-```bash
+No PowerShell do Windows:
+
+```powershell
 python -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt   # Windows: .venv\Scripts\python
-.venv/bin/python -m cct.doctor                        # verifica o ambiente, em português
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m cct.doctor
 ```
+
+No macOS, usar `.venv/bin/python` nos dois últimos comandos. Usar o mesmo
+interpretador na instalação e na execução; `python` isolado pode referir-se
+ao Python do sistema.
+
+O `cct.doctor` diz sempre com que interpretador está a correr; se o projeto
+tiver um `.venv` que não esteja a ser usado, é esse o problema a resolver
+antes de qualquer outro.
 
 **Em rede fechada** (o caso das estações do CRL, onde o proxy bloqueia o pip): as
 bibliotecas preparam-se uma vez numa máquina com acesso e instalam-se sem qualquer pedido
@@ -77,10 +87,17 @@ carregar em *Correr pipeline*.
 **Encher a pasta de PDFs a partir dos índices do BTE** (opcional — a única parte que usa
 a rede, e só com autorização explícita):
 
-```bash
-python -m cct.aquisicao --indices data/raw/indices                       # simula
-python -m cct.aquisicao --indices data/raw/indices --confirmar-rede --aplicar
+Depois de copiar os índices `.xlsx` para `data/raw/indices/`, no PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m cct.aquisicao --indices data\raw\indices
+.\.venv\Scripts\python.exe -m cct.aquisicao --indices data\raw\indices --confirmar-rede --aplicar
 ```
+
+No macOS, usar `.venv/bin/python` e `/` nos caminhos. A primeira corrida
+simula, sem descarregar PDFs. `cct.aquisicao` executa `cct.recolha` e depois
+`cct.nomeacao`; o [guia de operação](docs/operacao/guia-operacao.md#21-encher-a-pasta-automaticamente-recolha-do-bte)
+explica os estados e o tratamento de documentos por confirmar.
 
 **Por linha de comandos** — a corrida completa de um tema:
 

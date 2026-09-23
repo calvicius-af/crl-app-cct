@@ -178,7 +178,7 @@ def escrever_manifesto(alvos: list[tuple[str, str]],
     # auditoria possa dizer, sem adivinhar, contra que versões este pacote foi
     # preparado.
     registo_constraints = [
-        {"ficheiro": str(c.relative_to(RAIZ)), "sha256": sha256(c)}
+        {"ficheiro": c.relative_to(RAIZ).as_posix(), "sha256": sha256(c)}
         for c in (constraints or [])
     ]
 

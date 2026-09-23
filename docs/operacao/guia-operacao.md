@@ -57,29 +57,68 @@ Projeto_CRL_AppCCT/                ← corre os comandos SEMPRE a partir daqui
 Se a DGERT enviou os ficheiros-índice do boletim (`BTE31_2026.xlsx` e afins), não é
 preciso descarregar nem renomear nada à mão:
 
-1. Copiar os índices para `data/raw/indices/`.
+1. Copiar pelo menos um índice `.xlsx` para `data/raw/indices/` e confirmar o
+   nome com `Get-ChildItem .\data\raw\indices\*.xlsx` no PowerShell. Um índice
+   não vem no repositório: tem de ser fornecido pela equipa. Não copiar os PDFs
+   manualmente para esta pasta.
 2. Na app gráfica, carregar em **"Recolher do BTE…"** — a aplicação pergunta se pode
    ligar-se à internet. Responder *Não* faz uma simulação, que mostra o que seria
    descarregado sem descarregar nada.
-3. Por linha de comandos, o mesmo:
+3. Por linha de comandos, a partir da raiz do projeto, usar **sempre o Python
+   do ambiente virtual**. No PowerShell do Windows:
 
-```bash
-python -m cct.aquisicao --indices data/raw/indices                       # simulação
-python -m cct.aquisicao --indices data/raw/indices --confirmar-rede --aplicar
+```powershell
+.\.venv\Scripts\python.exe -m cct.doctor
+.\.venv\Scripts\python.exe -m cct.aquisicao --indices data\raw\indices
+.\.venv\Scripts\python.exe -m cct.aquisicao --indices data\raw\indices --confirmar-rede --aplicar
 ```
 
-Os PDFs aparecem em `data/raw/bte/bte_<ano>/convencoes/{PRI,SPE,APU}/` já com o nome
-certo, e o relatório da corrida fica em `results/aquisicao/`. **Ler sempre a lista "a
-confirmar"**: são as siglas que a aplicação teve de inventar e os documentos com vários
-outorgantes do mesmo lado. Correr uma segunda vez não descarrega nem reescreve nada.
+No macOS, substituir o interpretador por `.venv/bin/python` e usar `/` nos
+caminhos. A primeira corrida é uma **simulação sem rede nem escrita de PDFs**;
+a segunda autoriza a descarga e a cópia nomeada. `--aplicar` sozinho não
+autoriza a rede. Se faltar o índice, a operação para antes da descarga.
+
+O comando `cct.aquisicao` encadeia duas fases autónomas: `cct.recolha` lê o
+índice e guarda os PDFs com os nomes de origem em `data/interim/recolha/`;
+`cct.nomeacao` copia os que podem ser nomeados para
+`data/raw/bte/bte_<ano>/`, nas pastas da respetiva família. Chamar apenas
+`cct.nomeacao` antes da recolha não descarrega PDFs. Os relatórios da corrida
+ficam em `results/aquisicao/` e o registo persistente em
+`data/registo/registo_bte.jsonl`; não apagar este registo para repetir uma
+corrida. **Ler sempre os estados `por_confirmar`, `falhado` e `conflito`**:
+um PDF pode ter sido descarregado e, ainda assim, não ter sido copiado com
+um nome canónico. Uma segunda corrida reaproveita os PDFs válidos.
+Se a pasta de destino mudar, a versão atual verifica os PDFs **no novo
+destino**; a existência de uma cópia noutro caminho guardado no registo não
+conta como `ja_existente`. A nova descarga pode ser necessária. Não corrigir
+`caminho` no JSONL à mão.
+
+Se a rede institucional não permitir a descarga, usar os PDFs obtidos por via
+institucional e registar a origem e a correspondência com o índice antes de
+qualquer cópia ou renomeação. Não colocar um PDF diretamente na pasta final
+com um nome presumido: a nomeação automática depende do registo de recolha e
+dos metadados confirmados do índice. Escalar ao responsável pelos dados os
+casos sem identificador ou correspondência segura.
 
 ### Regras de nomes (importante!)
+- **Estado da alteração de 2026**: o [ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md)
+  aprovou um esquema com `{ANO}_BTE_{NN}_` à cabeça para convenções,
+  portarias de extensão e acordos de adesão. A
+  [SPEC-0004](../../specs/0004-esquema-de-nomes-comum-as-tres-familias.md)
+  continua por implementar. O código deste ramo escreve o esquema RNC do
+  ADR-0016 descrito abaixo. O ramo de instalação em Windows resolve problemas
+  do ambiente, não faz a migração nem ativa o esquema do ADR-0022.
 - **PDFs das convenções, a partir do corpus de 2026**: esquema RNC, obrigatório
   ([ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md)) —
   `{ANO}_{AMBITO}_{SEQ}_{TIPO}_{CODIRCT}_BTE_{NN}_{SIGLAS}.pdf`, ex.:
   `2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf`. Sete campos, descritos em
   [docs/rnc/README.md §4.1](../rnc/README.md#41-a-regra). O nome deve ser IGUAL ao
   usado no MaxQDA (sem o sufixo `_TXT`). Sem espaços no início/fim.
+- **Portarias e acordos de adesão**: o esquema atual ainda não garante o
+  número e ano da portaria nem o código confirmado da convenção de base no
+  nome. Não validar estes nomes pela aparência nem integrá-los no corpus de
+  análise temática. Consultar o catálogo e a SPEC-0004 antes de qualquer
+  migração manual; as portarias e adesões não entram no pipeline temático.
 - **PDFs de corpos anteriores a 2026**: mantêm o esquema de 2025,
   `AA_PR_NNN_BTE_NN_Partes_Sindicato.pdf` (AA = ano com 2 dígitos) — não se renomeiam.
 - **Subpastas de versões**: o nome da subpasta tem de estar CONTIDO no nome
@@ -95,12 +134,13 @@ outorgantes do mesmo lado. Correr uma segunda vez não descarrega nem reescreve 
 ## 3. Antes de correr — checklist
 
 ### 3.1 Verificar a instalação (fazer sempre primeiro)
+```powershell
+.\.venv\Scripts\python.exe -m cct.doctor
 ```
-.venv/bin/python -m cct.doctor          (Mac)
-.venv\Scripts\python -m cct.doctor      (Windows)
-```
-Isto verifica o Python, as bibliotecas e as pastas, e diz-te em português
-o que falta e como resolver.
+No Mac, usar `.venv/bin/python -m cct.doctor`. O `doctor` verifica o
+interpretador, as bibliotecas e as pastas. Antes da primeira recolha é
+normal ainda não haver PDFs; a ausência das variáveis do MaxQDA é opcional
+para a recolha. Confirmar separadamente que há índices `.xlsx`.
 
 ### 3.2 Exportar as variáveis do MaxQDA
 No MaxQDA: **Variáveis → Variáveis de documento → Exportar (Excel)**.
@@ -134,6 +174,13 @@ ou: `python -m cct.app`. Preencher os campos e carregar em "Correr".
     --pasta-versoes data/raw/textos_consolidados \
     --out results/runs/2026/2026_4_08
 ```
+Em Windows, o interpretador é `.venv\Scripts\python`:
+```
+.venv\Scripts\python -m cct.pipeline_tema ^
+    --pdfs data\raw\bte\bte_2026 ^
+    --codebook codebooks\4_08_protecao_dados.yaml ^
+    --out results\runs\2026\2026_4_08
+```
 Só `--pdfs`, `--codebook` e `--out` são obrigatórios; o resto melhora o
 resultado mas pode faltar.
 
@@ -142,6 +189,7 @@ extração. Recupera tabelas de anexos (tabelas salariais, perfis de função)
 e layouts difíceis que o extrator clássico perde, ao custo de ser mais
 lento (~1-1,7 s/página) e de exigir instalação à parte:
 `.venv/bin/python -m pip install docling`
+(Windows: `.venv\Scripts\python -m pip install docling`)
 (≈4 GB com PyTorch; em Mac Apple Silicon o Python tem de ser arm64 —
 `python3 -c "import platform; print(platform.machine())"` deve dizer
 `arm64`). A primeira corrida descarrega os modelos de layout.
@@ -168,10 +216,28 @@ Sai um Excel com cada cláusula classificada: `=` / `alteracao` / `nova` /
 | códigos todos em REVER, nada em AUTO | falta `--metricas` (calibração) | usar o metricas.json da última avaliação contra a amostra de referência |
 | erro ao importar QDPX no MaxQDA | versão antiga do MaxQDA | usar MaxQDA 2022 ou superior (REFI-QDA) |
 | a app/comando "não faz nada" | ambiente por instalar | correr `python -m cct.doctor` e seguir as instruções |
+| `.venv/bin/python` não é reconhecido no PowerShell | caminho de macOS usado em Windows | usar `.\.venv\Scripts\python.exe` em todos os comandos; não é necessário ativar o ambiente |
+| `ModuleNotFoundError: No module named 'jsonschema'` depois de instalar as dependências | `python` chama outro interpretador | repetir com `.\.venv\Scripts\python.exe`; confirmar o caminho mostrado pelo `doctor` antes de reinstalar |
+| `doctor` indica falta de PDFs antes da primeira recolha | pasta final ainda vazia | verificar primeiro os índices e correr a aquisição; a ausência das variáveis MaxQDA não bloqueia a recolha |
+| `Sem ficheiros-índice` | pasta vazia ou ficheiro `.xlsx` errado | confirmar `Get-ChildItem .\data\raw\indices\*.xlsx`; copiar o índice fornecido pela equipa |
+| PDFs em `data/interim/recolha/`, mas não em `data/raw/bte/` | nomeação por confirmar, execução sem `--aplicar` ou conflito no destino | ler `results/aquisicao/relatorio_*.txt` e o estado no registo; corrigir siglas confirmadas com `--siglas` e repetir a nomeação, sem apagar os originais |
+| `campos estruturais do nome RNC excedem o limite` | tipo ou código do índice tornam impossível um nome íntegro de 63 caracteres | confirmar os metadados na fonte; o PDF fica `por_confirmar`, sem truncar campos nem aceitar a heurística |
 
 **Regra dos erros:** o `relatorio.txt` lista sempre os documentos com
 problemas — o resto do lote NÃO é afetado. Corrige só esses e volta a correr
 (o pipeline pode repetir-se à vontade; não estraga nada).
+
+### 5.1 Registar soluções manuais no guia
+
+Cada dificuldade resolvida na estação deve produzir uma nota curta para a
+próxima revisão deste guia: comando e ambiente usados (sem nomes de pessoas
+nem caminhos pessoais), sintoma literal, causa confirmada, passo que resolveu,
+ficheiros afetados e verificação final. Distinguir uma hipótese de uma causa
+confirmada. Quando a solução exigir um nome de PDF ou uma relação entre
+documentos, anexar ao registo de trabalho o identificador do índice e a fonte
+da confirmação. Rever a nota com a equipa antes de a transformar numa regra
+geral ou num teste automático. Não copiar o registo JSONL nem dados do corpus
+para o repositório.
 
 ---
 
