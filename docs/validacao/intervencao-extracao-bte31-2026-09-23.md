@@ -2,7 +2,8 @@
 
 - **Estado:** proposta para execução e validação com os PDFs de origem
 - **Data:** 2026-09-23
-- **Evidência:** `relatorio.txt` e `projeto.qdpx` da corrida fornecida pela equipa.
+- **Evidência:** `relatorio.txt`, `projeto.qdpx`, `manifest.json`, comando e
+  arquivo ZIP com os nove PDFs PRI fornecidos pela equipa.
   Os artefactos contêm texto do corpus e não são versionados no repositório.
 
 ## Objetivo e limite da evidência
@@ -11,23 +12,27 @@ Garantir que as tabelas e os artigos dos documentos processados chegam ao
 texto e ao MaxQDA completos, legíveis e ligados à estrutura correta. O
 relatório diz `Convenções processadas: 9/9`: o QDPX contém nove fontes
 `TextSource` (377–381 e 383–386), não os 14 documentos do índice BTE 31.
+O comando apontou para `convencoes/PRI`: os cinco documentos SPE (382 e
+387–390) ficaram fora da procura. A tentativa anterior com `convencoes`
+falhou porque `_pdfs_da_pasta` acrescentava outra subpasta `convencoes`.
 Os outros cinco não fazem parte desta prova. Há 76 seleções de texto no QDPX;
 a sua presença não comprova que apontem para o trecho certo após uma correção.
 
-Não foram fornecidos os nove PDFs, o `manifest.json` nem o comando da corrida.
-Por isso, não é possível confirmar a integridade dos valores perante a fonte,
-qual extrator foi selecionado, nem a versão importada no MaxQDA. O aviso
-`pdfplumber deteta` identifica o **auditor** que conta grelhas no PDF;
-não identifica, por si só, o extrator que produziu o TXT.
+Os nove PDFs recebidos têm tamanho e SHA-256 idênticos aos do manifesto. Este
+confirma `--extrator pdfplumber` por omissão, Python 3.13.5 e Windows 11.
+O commit aparece como `fora_de_repositorio`, pelo que a versão local exata
+do código não fica demonstrada. Também não há prova da importação desta
+corrida no MaxQDA. O aviso `pdfplumber deteta` identifica o **auditor**;
+foi o manifesto, e não essa mensagem, que confirmou o extrator selecionado.
 
 ## Diagnóstico com os artefactos recebidos
 
 | Caso | Evidência no QDPX e no relatório | Interpretação sustentada | A verificar no PDF |
 |---|---|---|---|
 | 377, anexos II e IV; 379, anexo III; 383, anexo I | Há linhas com ` | ` depois dos respetivos cabeçalhos; no 379 a tabela ocupa várias linhas (26–35 da fonte TXT). O relatório afirma que a tabela está fora do corpo do nó. | A auditoria examina somente o nó folha `anexo`, que o `estruturar` fecha depois do cabeçalho; o corpo fica no nó filho `bloco`. O aviso não prova orfandade. | Correspondência das linhas e células com o PDF e relação do bloco com o anexo certo. |
-| 380, anexo III | Uma linha de 1371 caracteres concentra a tabela salarial; o auditor não encontra bloco de duas linhas com ` | `. | Há conteúdo tabular, mas perdeu-se a separação por linhas/células. A mensagem «nenhum bloco» não equivale a «nenhum valor». | Número de linhas e colunas, valores, cabeçalhos e eventuais células em falta. |
-| 384 e 385, anexo IV | Cada TXT tem três linhas isoladas com ` | `, incluindo uma de 3781 caracteres noutro anexo e uma linha salarial de cerca de 265 caracteres. O auditor vê cinco tabelas por PDF e zero blocos. | Deteção presente no PDF e linearização deficiente no TXT; a contagem bruta de grelhas não estabelece quantas sobreviveram. | Tabelas concretas nas páginas de origem, especialmente anexos com grelhas longas. |
-| 386, anexos III e IV | As duas tabelas ficaram em linhas únicas de 933 e 1187 caracteres. O auditor vê três tabelas por PDF e zero blocos. | Há texto, mas a estrutura tabular não é utilizável para revisão. | Divisão em linhas e colunas e correspondência dos valores por categoria. |
+| 380, anexo III | Uma linha de 1371 caracteres concentra a tabela salarial; o PDF tem uma grelha de 11 linhas na página 2 e outra de 2 na página 3. | As duas páginas com tabela fizeram a limpeza de cabeçalhos apagar as sentinelas internas repetidas. Sem elas, `juntar_linhas` colou as linhas. Com as sentinelas preservadas, o TXT local passou a ter 13 linhas tabulares e manteve, por exemplo, `A | Enólogo principal Analista principal | 1 355,48`. | Conferir todas as categorias/valores e a continuidade entre páginas. |
+| 384 e 385, anexo IV | Cada TXT tinha três linhas isoladas com ` | `, incluindo uma de 3781 caracteres noutro anexo e uma linha salarial de cerca de 265 caracteres. O PDF tem cinco tabelas detetadas. | A preservação das sentinelas produziu 64 linhas tabulares em seis blocos por documento; a tabela salarial volta a ter linhas por nível. A heurística de duas colunas ainda divide tabelas largas nas páginas 4 e 5; falta verificar o anexo II. | Associação das células fundidas e das categorias nas páginas 4–6, além do anexo salarial na página 14. |
+| 386, anexos III e IV | As duas tabelas ficaram em linhas únicas de 933 e 1187 caracteres. O PDF contém duas grelhas na página 2 e uma na página 3. | Após proteger as sentinelas, o TXT local passou a ter 58 linhas tabulares em três blocos; a primeira linha de valores do anexo IV corresponde visualmente ao PDF. | Confirmar as células fundidas, as 38 linhas do anexo IV e os valores por categoria. |
 | 384 e 385, artigo 1.º | O texto do artigo termina com `passam a ter a redação seguinte:` e é seguido por cabeçalhos de cláusulas. | O controlo `clausulas_sem_corpo` exige ponto final e emite um provável falso positivo para um artigo introdutório com dois pontos. | Confirmar no PDF que a lista de cláusulas pertence ao artigo e não há texto truncado. |
 
 O QDPX demonstra a presença de texto, mas não substitui o PDF na validação.
@@ -38,8 +43,11 @@ integral das suas tabelas. Não usar o valor `9/9` como taxa de qualidade.
 
 ### 1. Fixar uma base verificável
 
-Guardar fora do repositório os PDFs individuais, hashes, índice, registo,
-`manifest.json`, comando, opção `--extrator`, versão do código, versão do
+Os nove PDFs PRI, hashes, manifesto, comando e opção de extrator já foram
+conferidos. Faltam os cinco PDFs SPE, a versão do código da estação (o
+manifesto não a identifica), o registo e a versão do MaxQDA. Guardar fora
+do repositório os PDFs individuais, hashes, índice, registo, manifesto,
+comando, versão do código, versão do
 MaxQDA, TXT e QDPX. Construir uma grelha por documento, página, anexo e tabela:
 cabeçalho, número de linhas e colunas, células de controlo escolhidas no PDF,
 resultado no TXT, decisão e pessoa/data da revisão. Começar por 379 (controlo
@@ -59,6 +67,16 @@ pelas cláusulas anunciadas; manter o aviso para corpo vazio ou truncado.
 Testes devem reproduzir ambos os casos e proteger o verdadeiro negativo.
 
 ### 3. Comparar extratores e recuperar as grelhas
+
+Causa confirmada para as grelhas colapsadas: em
+`_remover_cabecalhos_rodapes`, as marcas internas `\x02TABELA` e
+`\x03TABELA` entram na contagem de linhas repetidas e são eliminadas
+quando há tabelas em várias páginas. A correção protege todo o bloco,
+incluindo cabeçalhos/células repetidos, da limpeza do mobiliário do BTE;
+a execução local com os PDFs originais passou de
+1 para 13 linhas tabulares no 380, de 3 para 64 no 384/385 e de 2 para
+58 no 386. Isso recupera a separação, mas não valida ainda todas as
+células, sobretudo as grelhas complexas de 384/385.
 
 Correr os mesmos PDFs separadamente com `pdfplumber` e `docling` em ambiente
 offline preparado, com o mesmo código e parâmetros. Confrontar cada saída
@@ -99,8 +117,10 @@ corpus.
    explícitas com página e estado `reprovado`, nunca escondidas num `9/9`.
 2. O relatório deixa de dizer que uma tabela está fora do anexo se estiver
    num bloco filho desse anexo. Continua a detetar tabela realmente órfã.
-3. As tabelas colapsadas de 380, 384, 385 e 386 deixam de ser linhas únicas,
-   ou permanecem assinaladas como falha com evidência de perda de estrutura.
+3. As tabelas colapsadas de 380, 384, 385 e 386 deixam de ser linhas únicas;
+   a correção das sentinelas é verificada com teste de regressão e com os
+   PDFs recebidos. As grelhas cujas células permaneçam incorretas continuam
+   assinaladas como falha, com página e evidência.
 4. Os artigos 1.º de 384/385 passam no controlo apenas após confirmação de
    que introduzem as cláusulas seguintes. Um artigo truncado continua a falhar.
 5. Todas as seleções QDPX mantêm os trechos corretos; a amostra importada

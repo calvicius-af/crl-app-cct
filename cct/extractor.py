@@ -524,19 +524,38 @@ def _extrair_pagina(pag) -> str:
 
 
 def _remover_cabecalhos_rodapes(paginas: list[str]) -> list[str]:
-    """Remove linhas repetidas em ≥30% das páginas e números de página soltos."""
+    """Remove mobiliário repetido sem tocar nos delimitadores/células de tabelas."""
     contagem = Counter()
     for pag in paginas:
-        for linha in set(l.strip() for l in pag.split("\n") if l.strip()):
-            contagem[linha] += 1
+        fora = set()
+        em_tabela = False
+        for linha in pag.split("\n"):
+            limpa = linha.strip()
+            if limpa == MARCA_TABELA_INI:
+                em_tabela = True
+            elif limpa == MARCA_TABELA_FIM:
+                em_tabela = False
+            elif limpa and not em_tabela:
+                fora.add(limpa)
+        contagem.update(fora)
     limiar = max(2, int(len(paginas) * 0.3))
     repetidas = {l for l, c in contagem.items() if c >= limiar}
     limpas = []
     for pag in paginas:
-        linhas = [l for l in pag.split("\n")
-                  if l.strip() not in repetidas
-                  and not re.fullmatch(r"\d+", l.strip())
-                  and not RE_RODAPE_BTE.match(l.strip())]
+        linhas = []
+        em_tabela = False
+        for linha in pag.split("\n"):
+            limpa = linha.strip()
+            if limpa == MARCA_TABELA_INI:
+                em_tabela = True
+                linhas.append(linha)
+            elif limpa == MARCA_TABELA_FIM:
+                linhas.append(linha)
+                em_tabela = False
+            elif em_tabela or (limpa not in repetidas
+                               and not re.fullmatch(r"\d+", limpa)
+                               and not RE_RODAPE_BTE.match(limpa)):
+                linhas.append(linha)
         limpas.append("\n".join(linhas))
     return limpas
 
