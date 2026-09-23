@@ -74,17 +74,42 @@ def deposito_no_fim(texto: str, e_retificacao: bool = False) -> str | None:
     return None
 
 
+AVISO_RETIFICACAO_SEM_ARTICULADO = (
+    "retificação sem articulado próprio: zero cláusulas é o esperado")
+AVISO_SEM_ESTRUTURA = (
+    "nenhuma cláusula ou artigo reconhecido: estrutura não reconhecida pelo "
+    "extrator, ou documento sem articulado — verificar o PDF")
+
+
+def e_retificacao(doc: dict) -> bool:
+    """Pelo subtipo do schema ou pelo tipo IRCT (AE-ALT-RECT etc.), que o
+    pipeline põe no doc como 'tipo_registo'."""
+    return bool(RE_RETIFICACAO.search(doc.get("subtipo", ""))
+                or RE_RETIFICACAO.search(doc.get("tipo_registo", "")))
+
+
+def sem_articulado(doc: dict) -> str | None:
+    """Zero cláusulas nunca fica ambíguo (ISSUE-0014, issue #64).
+
+    Numa retificação é o resultado certo: a retificação corrige outra
+    convenção e não tem articulado próprio. Noutro documento pode ser um
+    defeito do extrator ou um documento sem articulado, e diz-se isso, sem
+    sugerir truncagem.
+    """
+    if any(no.get("tipo") in _TIPOS_COM_CORPO for no in doc.get("nos", [])):
+        return None
+    return AVISO_RETIFICACAO_SEM_ARTICULADO if e_retificacao(doc) else AVISO_SEM_ESTRUTURA
+
+
 def verificar(doc: dict, texto: str) -> list[str]:
     """Todos os controlos; devolve a lista de avisos (vazia = tudo bem)."""
     from .auditoria import tabelas_esperadas
 
     avisos = []
-    # retificação: pelo subtipo do schema ou pelo tipo IRCT do registo
-    # (AE-ALT-RECT etc.), que o pipeline põe no doc como 'tipo_registo'
-    e_retificacao = bool(
-        RE_RETIFICACAO.search(doc.get("subtipo", ""))
-        or RE_RETIFICACAO.search(doc.get("tipo_registo", "")))
-    aviso = deposito_no_fim(texto, e_retificacao=e_retificacao)
+    aviso = sem_articulado(doc)
+    if aviso:
+        avisos.append(aviso)
+    aviso = deposito_no_fim(texto, e_retificacao=e_retificacao(doc))
     if aviso:
         avisos.append(aviso)
     vazias = clausulas_sem_corpo(doc, texto)

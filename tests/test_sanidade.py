@@ -102,3 +102,54 @@ def test_tabela_no_corpo_conta_como_conteudo():
              "1 | 1 234,56\n")
     doc, final = estruturar(texto, "t")
     assert clausulas_sem_corpo(doc, final) == []
+
+
+# ---------- zero cláusulas (ISSUE-0014, issue #64) ----------
+
+def test_retificacao_sem_clausulas_e_o_esperado():
+    """As quatro CARRISTUR do BTE 31/2026 eram retificações (AE-ALT-RECT):
+    zero cláusulas era o resultado certo, e o relatório dizia «truncado?»."""
+    from cct.sanidade import AVISO_RETIFICACAO_SEM_ARTICULADO
+
+    doc, final = estruturar("Retifica o acordo publicado no BTE n.º 27.\n"
+                            "Na cláusula 5.ª, onde se lê 20 deve ler-se 25.\n", "t")
+    doc["tipo_registo"] = "AE-ALT-RECT"
+    avisos = verificar(doc, final)
+    assert avisos == [AVISO_RETIFICACAO_SEM_ARTICULADO]
+    assert not any("truncado" in a for a in avisos)
+
+
+def test_zero_clausulas_fora_de_retificacao_diz_o_que_pode_ser():
+    from cct.sanidade import AVISO_SEM_ESTRUTURA
+
+    doc, final = estruturar("Texto corrido sem cabeçalhos.\n" + DEPOSITO + "\n", "t")
+    assert verificar(doc, final) == [AVISO_SEM_ESTRUTURA]
+
+
+def test_o_pipeline_reconhece_a_retificacao_pelo_nome_sem_registo(
+        tmp_path, monkeypatch):
+    """Sem o registo da recolha na máquina, o tipo lê-se do nome RNC."""
+    import copy
+
+    from cct import pipeline_tema
+    from cct.sanidade import AVISO_RETIFICACAO_SEM_ARTICULADO
+
+    pasta = tmp_path / "pdfs"
+    pasta.mkdir()
+    nome = "2026_BTE_31_SPE_387_AE-ALT-RECT_47109_CARRISTUR-ASPTC"
+    (pasta / f"{nome}.pdf").write_bytes(b"%PDF-1.4\n")
+    codebook = tmp_path / "cb.yaml"
+    codebook.write_text("tema: ensaio\ncodigos: []\n", encoding="utf-8")
+    out = tmp_path / "out"
+    doc, texto = estruturar("Na cláusula 5.ª, onde se lê 20 deve ler-se 25.\n", nome)
+
+    monkeypatch.setattr(pipeline_tema, "extrair_pdf",
+                        lambda pdf, **kw: (copy.deepcopy(doc), texto))
+    monkeypatch.setattr("cct.auditoria.contar_tabelas_pdfplumber", lambda pdf: 0)
+    monkeypatch.setattr("sys.argv", ["cct.pipeline_tema", "--pdfs", str(pasta),
+                                     "--codebook", str(codebook), "--out", str(out)])
+    pipeline_tema.main()
+
+    relatorio = (out / "relatorio.txt").read_text(encoding="utf-8")
+    assert AVISO_RETIFICACAO_SEM_ARTICULADO in relatorio
+    assert "truncado" not in relatorio
