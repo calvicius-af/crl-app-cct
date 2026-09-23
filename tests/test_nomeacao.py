@@ -8,8 +8,9 @@ do MaxQDA) lê o nome do ficheiro.
 import pytest
 
 from cct.localizador import interpretar_doc_id
-from cct.nomeacao import (MAX_NOME, MAX_SIGLA, carregar_siglas, e_sindical, main,
-                          nome_documento, nomear, separar_outorgantes, sigla)
+from cct.nomeacao import (ESQUEMA_2025, MAX_NOME, MAX_SIGLA, carregar_siglas,
+                          e_sindical, main, nome_documento, nomear,
+                          separar_outorgantes, sigla)
 from cct.recolha import Registo, recolher
 
 from .test_recolha import URL, AbridorFalso, escrever_indice
@@ -197,7 +198,7 @@ def test_varios_outorgantes_do_mesmo_lado_geram_aviso():
     entrada = {"ano": 2026, "num_bte": 31, "familia": "convencao",
                "titulo": "", "outorgantes":
                "Associação A - AAA; Associação B - BBB; Sindicato C - CCC"}
-    nome, avisos = nome_documento(entrada, 7)
+    nome, avisos = nome_documento(entrada, 7, esquema=ESQUEMA_2025)
     assert nome == "26_PR_007_BTE_31_AAA_CCC"
     assert any("outorgantes patronals" in a or "outorgantes" in a for a in avisos)
 
@@ -206,7 +207,7 @@ def test_varios_outorgantes_do_mesmo_lado_geram_aviso():
 
 def test_nomes_do_bte31(registo_com_recolha):
     registo, tmp_path = registo_com_recolha
-    resumo = nomear(registo, tmp_path / "bte", aplicar=True)
+    resumo = nomear(registo, tmp_path / "bte", aplicar=True, esquema=ESQUEMA_2025)
     # o nome é sempre calculado e reportado, mesmo para os que ficam por
     # confirmar (ver PR #35, achado nº5) — só a ESCRITA fica condicionada
     assert [n for _, n in resumo["nomes"]] == NOMES_ESPERADOS
@@ -234,7 +235,7 @@ def test_nomes_de_partes_compridas_continuam_a_caber():
                "outorgantes": ("Associação Muito Comprida dos Industriais de "
                                "Qualquer Coisa Assim; Sindicato Igualmente "
                                "Comprido dos Trabalhadores Desse Setor")}
-    nome, _avisos = nome_documento(entrada, 8)
+    nome, _avisos = nome_documento(entrada, 8, esquema=ESQUEMA_2025)
     assert len(nome) <= MAX_NOME
     assert interpretar_doc_id(nome)
     assert all(len(parte) <= MAX_SIGLA for parte in nome.split("_")[5:])
@@ -244,15 +245,15 @@ def test_nomes_de_partes_compridas_continuam_a_caber():
 
 def test_ordinais_sao_estaveis_entre_corridas(registo_com_recolha):
     registo, tmp_path = registo_com_recolha
-    primeiro = dict(nomear(registo, tmp_path / "bte", aplicar=True)["nomes"])
+    primeiro = dict(nomear(registo, tmp_path / "bte", aplicar=True, esquema=ESQUEMA_2025)["nomes"])
     segundo = dict(nomear(Registo.carregar(registo.caminho), tmp_path / "bte",
-                          aplicar=True)["nomes"])
+                          aplicar=True, esquema=ESQUEMA_2025)["nomes"])
     assert primeiro == segundo
 
 
 def test_documento_novo_recebe_o_ordinal_seguinte(registo_com_recolha, tmp_path):
     registo, pasta = registo_com_recolha
-    nomear(registo, pasta / "bte", aplicar=True)
+    nomear(registo, pasta / "bte", aplicar=True, esquema=ESQUEMA_2025)
 
     # chega mais um documento, de um BTE anterior: não reordena o que já existe
     novo = {"chave": "2026/30/00010002", "ano": 2026, "num_bte": 30,
@@ -260,7 +261,7 @@ def test_documento_novo_recebe_o_ordinal_seguinte(registo_com_recolha, tmp_path)
             "outorgantes": "Associação X - XXX; Sindicato Y - YYY",
             "descarga": {"estado": "descarregado", "caminho": "", "sha256": "x"}}
     registo.entradas[novo["chave"]] = novo
-    nomear(registo, pasta / "bte", aplicar=False)
+    nomear(registo, pasta / "bte", aplicar=False, esquema=ESQUEMA_2025)
     assert novo["nomeacao"]["ordinal"] == 7
     assert registo.get("2026/31/00260057")["nomeacao"]["ordinal"] == 1
 
@@ -269,7 +270,7 @@ def test_documento_novo_recebe_o_ordinal_seguinte(registo_com_recolha, tmp_path)
 
 def test_simulacao_nao_escreve_nada(registo_com_recolha):
     registo, tmp_path = registo_com_recolha
-    resumo = nomear(registo, tmp_path / "bte", aplicar=False)
+    resumo = nomear(registo, tmp_path / "bte", aplicar=False, esquema=ESQUEMA_2025)
     # sem --aplicar nada é escrito, quer o motivo seja a simulação (por_nomear)
     # quer seja um aviso por confirmar (por_confirmar tem sempre prioridade)
     assert resumo["por_estado"]["por_nomear"] == 3
@@ -279,8 +280,8 @@ def test_simulacao_nao_escreve_nada(registo_com_recolha):
 
 def test_segunda_corrida_nao_reescreve(registo_com_recolha):
     registo, tmp_path = registo_com_recolha
-    nomear(registo, tmp_path / "bte", aplicar=True)
-    resumo = nomear(Registo.carregar(registo.caminho), tmp_path / "bte", aplicar=True)
+    nomear(registo, tmp_path / "bte", aplicar=True, esquema=ESQUEMA_2025)
+    resumo = nomear(Registo.carregar(registo.caminho), tmp_path / "bte", aplicar=True, esquema=ESQUEMA_2025)
     # os 3 já escritos ficam confirmados por sha256; os 3 por confirmar
     # continuam por confirmar — nunca é feita uma segunda tentativa de escrita
     assert resumo["por_estado"]["ja_existente"] == 3
@@ -291,7 +292,7 @@ def test_segunda_corrida_nao_reescreve(registo_com_recolha):
 def test_aceitar_heuristicas_escreve_mesmo_com_aviso(registo_com_recolha):
     registo, tmp_path = registo_com_recolha
     resumo = nomear(registo, tmp_path / "bte", aplicar=True,
-                    aceitar_heuristicas=True)
+                    aceitar_heuristicas=True, esquema=ESQUEMA_2025)
     assert resumo["por_estado"]["nomeado"] == 6
     assert "por_confirmar" not in resumo["por_estado"]
     # os avisos continuam a ser reportados — só a escrita deixa de ser bloqueada
@@ -304,7 +305,7 @@ def test_destino_ocupado_por_outro_conteudo_e_conflito(registo_com_recolha):
     alvo.parent.mkdir(parents=True)
     alvo.write_bytes(b"%PDF-1.4\noutra coisa qualquer\n")
 
-    resumo = nomear(registo, tmp_path / "bte", aplicar=True)
+    resumo = nomear(registo, tmp_path / "bte", aplicar=True, esquema=ESQUEMA_2025)
     assert resumo["por_estado"]["conflito"] == 1
     assert alvo.read_bytes().startswith(b"%PDF-1.4\noutra")   # não foi tocado
     assert any("já existe" in p for p in resumo["problemas"])
@@ -323,7 +324,7 @@ def test_portarias_ficam_fora_da_pasta_que_o_pipeline_le(registo_com_recolha):
     # aceitar_heuristicas=True: este teste verifica isolamento de pastas
     # (extensões vs. convenções), não a confirmação de siglas — ver o teste
     # dedicado test_aceitar_heuristicas_escreve_mesmo_com_aviso
-    nomear(registo, tmp_path / "bte", aplicar=True, aceitar_heuristicas=True)
+    nomear(registo, tmp_path / "bte", aplicar=True, aceitar_heuristicas=True, esquema=ESQUEMA_2025)
     pasta_pipeline = tmp_path / "bte" / "bte_2026"
     assert (pasta_pipeline / "extensoes" / "26_PE_001_BTE_31_ANX_SNY.pdf").exists()
     assert len(sorted(pasta_pipeline.glob("*.pdf"))) == 6   # o glob do pipeline

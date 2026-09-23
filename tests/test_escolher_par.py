@@ -63,6 +63,9 @@ def test_sem_candidato_2025_falha():
     ("26_PR_003_BTE_31_ACRAL_CESP", 2026),
     ("26_PE_001_BTE_31_ANX_SNY", 2026),        # esquema novo, família não-PR
     ("25_PR_016_BTE_04_EMARP_SINTAP_TXT", 2025),
+    ("2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP", 2026),         # ADR-0016
+    ("2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP+3", 2026),       # ADR-0022
+    ("2026_BTE_01_PE_012_0452-2025_27251_ACRAL-CESP", 2026),    # ano do BTE, não do DR
 ])
 def test_ano_reconhece_o_esquema_da_aquisicao_automatica(nome, esperado):
     """cct.nomeacao produz nomes AA_XX_NNN_BTE_NN_...; _ano() tem de os

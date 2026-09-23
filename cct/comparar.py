@@ -23,6 +23,9 @@ def _ano(nome: str) -> int | None:
     if m:
         return 2000 + int(m.group(1))  # esquema da aquisição automática (cct.nomeacao):
                                        # "26_PR_003_BTE_31_…", "26_PE_001_BTE_31_…"
+    m = re.match(r"^(20\d{2})_BTE_\d+_", nome)
+    if m:
+        return int(m.group(1))         # esquema do ADR-0022: "2026_BTE_31_PRI_377_…"
     m = re.match(r"^(\d{2})\d{3}_", nome)
     if m:
         return 2000 + int(m.group(1))  # "25146_", "24122_", "19000_"

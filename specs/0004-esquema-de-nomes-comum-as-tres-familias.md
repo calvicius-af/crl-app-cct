@@ -1,6 +1,6 @@
 # SPEC-0004: um só esquema de nomes para convenções, portarias de extensão e acordos de adesão
 
-- **Estado:** Aprovada
+- **Estado:** Aprovada; passos 1 a 3 implementados, passos 0 e 4 por fazer
 - **Data:** 2026-09-23
 - **Autoria:** CRL (António Fula)
 - **Decisões relacionadas:** [ADR-0022](../docs/adr/0022-esquema-de-nomes-comum-as-tres-familias.md),
@@ -69,7 +69,7 @@ As regras de cada campo estão no ADR-0022. As que têm efeito direto no código
 | AA que adere a convenção de um ano anterior | nome com o código dessa convenção, que é estável entre revisões |
 | Só partes de um lado (patronal ou sindical) | as duas primeiras desse lado; aviso |
 | Portaria com letra de sufixo (50-A/2025) | `0050A-2025` |
-| Tipo fora do vocabulário do quarto campo (ex.: retificação de portaria) | `por_classificar/` e relatório, como hoje; o vocabulário alarga-se por decisão registada |
+| Tipo fora do vocabulário do quarto campo (ex.: retificação de portaria) | família desconhecida: `por_classificar/` e relatório, como hoje; família conhecida com subtipo novo (ex.: `AA-ALT`): `por_confirmar`, ficheiro não escrito. O vocabulário alarga-se por decisão registada |
 | Nome com mais de 63 caracteres | siglas encurtadas, aviso; cabeça e miolo intactos |
 
 ## Alterações a realizar
@@ -192,23 +192,52 @@ e o merge não a propaga.
 
 ## Critérios de aceitação
 
-- [ ] Todo o nome gerado, nas três famílias, começa por `{ANO}_BTE_{NN}_`, é aceite por
+- [x] Todo o nome gerado, nas três famílias, começa por `{ANO}_BTE_{NN}_`, é aceite por
       `interpretar_doc_id` e tem no máximo 63 caracteres.
-- [ ] O quarto campo é `PRI`, `SPE` ou `APU` nas convenções, e o tipo nas PE e AA.
-- [ ] Uma PE tem o miolo `NNNN-AAAA`, com o ano do DR, e `ANO` igual ao ano do BTE.
-- [ ] O código no nome de uma PE e de um AA é o da convenção de base.
-- [ ] Sem código da convenção de base ou sem referência da portaria, o ficheiro não é
+- [x] O quarto campo é `PRI`, `SPE` ou `APU` nas convenções, e o tipo nas PE e AA.
+- [x] Uma PE tem o miolo `NNNN-AAAA`, com o ano do DR, e `ANO` igual ao ano do BTE.
+- [x] O código no nome de uma PE e de um AA é o da convenção de base.
+- [x] Sem código da convenção de base ou sem referência da portaria, o ficheiro não é
       escrito, mesmo com `--aceitar-heuristicas`.
-- [ ] As siglas são a primeira patronal e a primeira sindical, com `+N`.
-- [ ] Nenhuma contagem interna entra no nome.
-- [ ] `familia_do_nome` reconhece as três famílias no esquema novo, e o `pipeline_tema`
+- [x] As siglas são a primeira patronal e a primeira sindical, com `+N`.
+- [x] Nenhuma contagem interna entra no nome.
+- [x] `familia_do_nome` reconhece as três famílias no esquema novo, e o `pipeline_tema`
       recusa PE e AA pelo nome.
-- [ ] Os nomes do esquema de 2025 e do ADR-0016 continuam a ser lidos.
-- [ ] O catálogo tem as colunas `cod_irct_base` e `portaria_dr`.
+- [x] Os nomes do esquema de 2025 e do ADR-0016 continuam a ser lidos.
+- [x] O catálogo tem as colunas `cod_irct_base` e `portaria_dr`.
 - [ ] O passo 0 está feito e registado no README do RNC.
 - [ ] Os 14 ficheiros do BTE 31/2026 e as PE de 2026 estão no esquema novo, sem perda
       das colunas da equipa no catálogo.
-- [ ] `pytest`, `verificar_seguranca.py` e `verificar_referencias.py` passam.
+- [x] `pytest`, `verificar_seguranca.py` e `verificar_referencias.py` passam.
+
+## Estado da implementação (23/09/2026)
+
+Passos 1 a 3 feitos. Testes em `tests/test_esquema_adr0022.py` (critérios do passo 2),
+`tests/test_rnc.py` e `tests/test_escolher_par.py`. Decisões tomadas na implementação,
+dentro do que o ADR-0022 deixa em aberto:
+
+1. **Fonte alternativa do código de base, com salvaguarda.** Sem coluna do índice
+   conhecida, o código resolve-se pela cadeia de alterações, com correspondência exata
+   de tipo e `IDDocumento` contra o registo ou os índices lidos
+   (`resolver_convencoes_base`). Enquanto o passo 0 não confirmar esta leitura com dados
+   reais, o nome assim obtido sai com o aviso `AVISO_BASE_PELA_CADEIA` e fica por
+   confirmar; só `--aceitar-heuristicas` o escreve. Fechar o passo 0 é retirar esse aviso
+   e, se a DGCP tiver coluna própria, acrescentar o seu nome aos *aliases* de
+   `cod_irct_base` e `portaria_dr` em `cct/recolha.py`.
+2. **Várias convenções numa PE.** O nome leva a primeira pela ordem da cadeia do índice;
+   o catálogo guarda as restantes em `cod_irct_base_adicionais`, separadas por `; `.
+3. **Avisos.** Não têm ficheiro, mas têm nome no catálogo. Recebem a forma de uma
+   adesão com o tipo no quarto campo (`2026_BTE_31_AVISO_403_26651_…`), lida por
+   `RE_DOC_ID_AVISO`.
+4. **Migração do passo 4.** `cct.nomeacao --migrar --correspondencia CSV` passa os nomes
+   do ADR-0016 para o esquema novo, apaga o ficheiro antigo depois de conferir o
+   `sha256` e escreve a tabela de correspondência; `cct.catalogo --correspondencia CSV`
+   usa-a para levar as colunas da equipa para o nome novo. Sem `--migrar`, um nome já
+   escrito que mudaria continua a ser `conflito`.
+5. **PE renomeadas à mão.** O `cct.pipeline_tema` passa a recusar também os nomes fora de
+   qualquer esquema que tragam `PE`, `PCT`, `PRT` ou `AA` como campo próprio.
+6. **Omissão do esquema.** `ESQUEMA_OMISSAO` passa a `rnc` também nas funções, alinhado
+   com as linhas de comando (ADR-0021); o esquema de 2025 chama-se `ESQUEMA_2025`.
 
 ## Plano de verificação
 

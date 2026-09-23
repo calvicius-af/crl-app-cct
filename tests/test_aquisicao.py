@@ -48,18 +48,18 @@ def test_corrida_completa_escreve_so_os_documentos_sem_aviso(tmp_path, monkeypat
     derivada por heurística ficam por confirmar — ver PR #35, achado nº5.
 
     Por omissão, `--esquema` é `rnc` (ADR-0021): os nomes já saem no formato
-    do RNC, não no de 2025."""
+    do RNC (ADR-0022), não no de 2025."""
     monkeypatch.setattr(recolha, "abridor_urllib", AbridorFalso())
     codigo = aquisicao.main(_argumentos(tmp_path) + ["--confirmar-rede", "--aplicar"])
 
     assert codigo == 0
     pdfs = sorted(p.name for p in (tmp_path / "bte" / "bte_2026").rglob("*.pdf"))
-    assert pdfs == ["2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf",
-                    "2026_PRI_378_CCT-ALT_26760_BTE_31_CNIS-FNSTFPS.pdf",
-                    "2026_PRI_379_CCT-ALT_26651_BTE_31_AEVP-FESAHT.pdf"]
+    assert pdfs == ["2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP.pdf",
+                    "2026_BTE_31_PRI_378_CCT-ALT_26760_CNIS-FNSTFPS.pdf",
+                    "2026_BTE_31_PRI_379_CCT-ALT_26651_AEVP-FESAHT.pdf"]
     relatorio = next((tmp_path / "relatorios").glob("relatorio_*.txt")).read_text(
         encoding="utf-8")
-    assert "2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP" in relatorio
+    assert "2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP" in relatorio
     assert "Rede: autorizada" in relatorio
     assert "por_confirmar: 3" in relatorio
 
@@ -72,15 +72,15 @@ def test_corrida_completa_produz_a_pasta_do_pipeline_com_aceitar_heuristicas(
 
     assert codigo == 0
     pdfs = sorted(p.name for p in (tmp_path / "bte" / "bte_2026").rglob("*.pdf"))
-    assert pdfs == ["2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP.pdf",
-                    "2026_PRI_378_CCT-ALT_26760_BTE_31_CNIS-FNSTFPS.pdf",
-                    "2026_PRI_379_CCT-ALT_26651_BTE_31_AEVP-FESAHT.pdf",
-                    "2026_PRI_385_AE-ALT_47140_BTE_31_APSolutionsGMBH-STAS.pdf",
-                    "2026_SPE_382_AE_47252_BTE_31_EmpresaMetropolitana-SINTAP.pdf",
-                    "2026_SPE_387_AE-ALT-RECT_47109_BTE_31_CARRISTUR-Transportes.pdf"]
+    assert pdfs == ["2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP.pdf",
+                    "2026_BTE_31_PRI_378_CCT-ALT_26760_CNIS-FNSTFPS.pdf",
+                    "2026_BTE_31_PRI_379_CCT-ALT_26651_AEVP-FESAHT.pdf",
+                    "2026_BTE_31_PRI_385_AE-ALT_47140_APSolutionsGMBH-STAS.pdf",
+                    "2026_BTE_31_SPE_382_AE_47252_EmpresaMetropolitana-SINTAP.pdf",
+                    "2026_BTE_31_SPE_387_AE-ALT-RECT_47109_CARRISTUR-Transportes.pdf"]
     relatorio = next((tmp_path / "relatorios").glob("relatorio_*.txt")).read_text(
         encoding="utf-8")
-    assert "2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP" in relatorio
+    assert "2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP" in relatorio
     assert "Rede: autorizada" in relatorio
 
 

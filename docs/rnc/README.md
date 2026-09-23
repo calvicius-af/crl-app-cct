@@ -1,6 +1,6 @@
 # RNC: organização e nomenclatura dos ficheiros
 
-Relatório da Negociação Coletiva · Centro de Relações Laborais · Versão 4.1 · 18 de setembro de 2026
+Relatório da Negociação Coletiva · Centro de Relações Laborais · Versão 4.2 · 23 de setembro de 2026
 
 Substitui `README.Estrutura_RNC_2027.docx` (v2.1), `README_Estrutura_RNC_2026.md` (v1) e as secções 2 e 3 do `SOP_Gestao_Documental_RNC_2026.docx` (v1.0). O registo de alterações está no final; a fundamentação de cada decisão está nos ADR referidos ao longo do texto.
 
@@ -13,14 +13,14 @@ Substitui `README.Estrutura_RNC_2027.docx` (v2.1), `README_Estrutura_RNC_2026.md
 Exemplo de um nome real, gerado a partir do BTE 31 de 2026:
 
 ```text
-2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2.pdf
- │    │    │   │    │      │     └── siglas das partes (3 primeiras, +2 = há mais duas)
- │    │    │   │    │      └── número do boletim em que saiu
- │    │    │   │    └── código IRCT, o mesmo em todas as revisões desta convenção
- │    │    │   └── tipo de documento, tal como vem do BTE
- │    │    └── número sequencial do ano (o «377/2026» do índice)
- │    └── âmbito: PRI, SPE ou APU. Diz de imediato se é processável.
- └── ano de publicação
+2026_BTE_31_PRI_377_CCT_27251_ACRAL-CESP+3.pdf
+ │     │     │   │   │    │      └── siglas: a 1.ª patronal e a 1.ª sindical (+3 = há mais três partes)
+ │     │     │   │   │    └── código IRCT da convenção, o mesmo em todas as revisões
+ │     │     │   │   └── tipo de documento, tal como vem do BTE
+ │     │     │   └── número sequencial do ano (o «377/2026» do índice)
+ │     │     └── o que o ficheiro é: PRI, SPE ou APU numa convenção; PE ou AA nas outras famílias
+ │     └── número do boletim em que saiu
+ └── ano do BTE, que é também o ano dos dados
 ```
 
 ---
@@ -129,35 +129,45 @@ Cada execução da aplicação é datada e descartável. O que fica no arquivo d
 
 ### 4.1 A regra
 
-**Alteração aprovada, por implementar.** A 23/09/2026 foi aceite um esquema comum às convenções, portarias de extensão e acordos de adesão, com o número do BTE a seguir ao ano e o código da convenção de base no nome (`2026_BTE_31_PRI_377_CCT-ALT_27251_ACRAL-CESP+3`). Fundamentação em [ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md); alterações a fazer, incluindo a migração do corpus de 2026, em [SPEC-0004](../../specs/0004-esquema-de-nomes-comum-as-tres-familias.md). Até a SPEC-0004 estar implementada, a aplicação continua a gerar o esquema descrito abaixo, e este documento será revisto nessa altura.
+Um só esquema para as três famílias que têm ficheiro, com cabeça e cauda comuns e um miolo próprio de cada família ([ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md)):
 
 ```text
-{ANO}_{AMBITO}_{SEQ}_{TIPO}_{CODIRCT}_BTE_{NN}_{SIGLAS}
+CABEÇA                      MIOLO                      CAUDA
+{ANO}_BTE_{NN}_{X}_{SEQ}    _{o que é exatamente}      _{CODIRCT}_{SIGLA1}-{SIGLA2}[+N]
 ```
+
+| Família | Esquema | Exemplo |
+|---|---|---|
+| Convenção | `{ANO}_BTE_{NN}_{AMBITO}_{SEQ}_{TIPO}_{CODIRCT}_{SIGLAS}` | `2026_BTE_31_PRI_377_CCT-ALT_27251_ACRAL-CESP+3` |
+| Portaria de extensão | `{ANO}_BTE_{NN}_{TIPO}_{SEQ}_{NNNN}-{AAAA}_{CODIRCT}_{SIGLAS}` | `2026_BTE_01_PE_012_0452-2025_27251_ACRAL-CESP` |
+| Acordo de adesão | `{ANO}_BTE_{NN}_AA_{SEQ}_{CODIRCT}_{SIGLAS}` | `2026_BTE_12_AA_412_27251_ABC-CESP` |
+
+Três regras resumem o esquema:
+
+1. **Começa sempre por ano e boletim.** A ordem alfabética agrupa os ficheiros por ano e número do BTE. Dentro de cada boletim, o quarto campo agrupa-os antes do número sequencial; a ordem integral de publicação está no catálogo.
+2. **O quarto campo diz o que o ficheiro é.** `PRI`, `SPE` ou `APU` indicam uma convenção e o seu âmbito. `PE`, `PCT`, `PRT` ou `AA` indicam uma família que não é convenção e que nunca entra no pipeline.
+3. **Termina sempre no código da convenção de base e nas duas siglas principais.** `ls 1_fontes/irct/*/*_27251_* 1_fontes/irct/convencoes/*/*_27251_*` junta a convenção, as suas revisões, as portarias que a estendem e as adesões a ela.
 
 | Elemento | Conteúdo | Origem no índice do BTE | Exemplo |
 |---|---|---|---|
-| `ANO` | ano de publicação, 4 dígitos | `Ano` | `2026` |
-| `AMBITO` | PRI, SPE ou APU (ver 4.3) | inferido, com vocabulário | `PRI` |
-| `SEQ` | n.º sequencial do ano, 3 dígitos | `IDDocumento` (`377/2026` dá `377`) | `377` |
-| `TIPO` | tipo de documento, sem tradução | `TipoSubTipoDoc` | `CCT-ALT` |
-| `CODIRCT` | código da convenção, estável entre revisões (ver 4.4) | `CodigoGEPDGERT` | `27251` |
+| `ANO` | ano do BTE, 4 dígitos; é também o ano dos dados do relatório | `Ano` | `2026` |
 | `NN` | número do boletim, 2 dígitos | `NBTE` | `31` |
-| `SIGLAS` | até 3 siglas das partes, separadas por hífen; havendo mais, `+N` | `Outorgantes` | `ACRAL-CESP-STRUP+2` |
+| `X` | numa convenção, o âmbito: PRI, SPE ou APU (ver 4.3); nas outras famílias, o tipo: PE, PCT, PRT ou AA | inferido, com vocabulário; `TipoSubTipoDoc` | `PRI` |
+| `SEQ` | n.º sequencial do ano, 3 dígitos | `IDDocumento` (`377/2026` dá `377`) | `377` |
+| `TIPO` | só nas convenções: tipo de documento, sem tradução | `TipoSubTipoDoc` | `CCT-ALT` |
+| `NNNN-AAAA` | só nas portarias: número da portaria e ano do Diário da República | título do documento (ver 4.6) | `0452-2025` |
+| `CODIRCT` | código da convenção de base, estável entre revisões (ver 4.4) | `CodigoGEPDGERT` da convenção | `27251` |
+| `SIGLAS` | a 1.ª sigla patronal e a 1.ª sindical, separadas por hífen; havendo mais partes, `+N` | `Outorgantes`, ou o título | `ACRAL-CESP+3` |
 
-Sem acentos, sem espaços, sem cedilhas. **Máximo de 63 caracteres**, que é o limite de nome de documento do MAXQDA: um nome mais longo é truncado na importação e quebra o cruzamento com as variáveis de documento. Quando não cabe, a aplicação encurta as siglas, nunca o prefixo, e assinala que o fez.
+Sem acentos, sem espaços, sem cedilhas. **Máximo de 63 caracteres**, que é o limite de nome de documento do MAXQDA: um nome mais longo é truncado na importação e quebra o cruzamento com as variáveis de documento. Quando não cabe, a aplicação encurta as siglas, nunca a cabeça nem o miolo, e assinala que o fez.
 
-O número sequencial é o atribuído pela DGCP, sem o ano, por decisão de compatibilidade: os códigos do RNC devem coincidir ao máximo com os que já existem, e este é o número pelo qual o próprio boletim cita o documento e pelo qual as cadeias de alteração o referem (`CCT-ALT.20250708.321/2025`). O ordinal interno da aplicação subsiste apenas como recurso: quando o índice não traz `IDDocumento`, a linha fica marcada `por_confirmar` e o ficheiro não é escrito.
+O número sequencial é o atribuído pela DGCP, sem o ano, por decisão de compatibilidade: os códigos do RNC devem coincidir ao máximo com os que já existem, e este é o número pelo qual o próprio boletim cita o documento e pelo qual as cadeias de alteração o referem (`CCT-ALT.20250708.321/2025`). Nenhuma contagem interna, da aplicação ou da equipa, entra no nome. O ordinal interno da aplicação subsiste apenas como recurso: quando o índice não traz `IDDocumento`, a linha fica marcada `por_confirmar` e o ficheiro não é escrito.
 
-O campo `_BTE_{NN}` é um acrescento face à convenção publicada na v2.1, fundamentado em [ADR-0016](../adr/0016-esquema-de-nomes-do-rnc.md). Permite voltar do ficheiro ao boletim sem consultar o catálogo e é o que a aplicação lê para emparelhar versões.
+Numa portaria publicada no DR num ano e no BTE no seguinte, `ANO` é o do BTE e o ano do DR fica no miolo: a Portaria n.º 452/2025, publicitada no BTE n.º 1 de 2026, conta para os dados de 2026 e chama-se `2026_BTE_01_PE_…_0452-2025_…`.
 
-O corte entre os dois esquemas é pelo **ano do corpus**, não pela data em que se corre a
-aplicação: ficheiros de corpos **até 2025** mantêm o nome que já têm
-(`26_PR_003_BTE_31_ACRAL_CESP`); **a partir do corpus de 2026, inclusive, o esquema RNC é
-obrigatório**, sem exceção nem período de transição. A aplicação lê os dois esquemas, mas
-só escreve o antigo quando pedido explicitamente com `--esquema pipeline`; por omissão,
-`python -m cct.nomeacao` usa `--esquema rnc`. Fundamentação em
-[ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md).
+Uma portaria ou uma adesão sem código da convenção de base, ou uma portaria sem número e ano do DR, **não recebe nome**: fica `por_confirmar` no registo e no catálogo, e o ficheiro não é escrito, nem com `--aceitar-heuristicas`. Como um nome atribuído não muda, um código errado não pode chegar a um nome (ver 4.6).
+
+Os esquemas anteriores continuam a ser lidos. O corte é pelo **ano do corpus**, não pela data em que se corre a aplicação: ficheiros de corpos **até 2025** mantêm o nome que já têm (`26_PR_003_BTE_31_ACRAL_CESP`); **a partir do corpus de 2026, inclusive, o esquema RNC é obrigatório**, na forma do ADR-0022. O esquema RNC anterior, do [ADR-0016](../adr/0016-esquema-de-nomes-do-rnc.md) (`2026_PRI_377_CCT_27251_BTE_31_ACRAL-CESP-STRUP+2`), já não é escrito; os ficheiros de 2026 que o tenham passam uma vez para o esquema novo (ver 10). A aplicação só escreve o esquema de 2025 quando pedido explicitamente com `--esquema pipeline`; por omissão, `python -m cct.nomeacao` usa `--esquema rnc`. Fundamentação em [ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md) e [ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md).
 
 ### 4.2 Nomes das outras famílias de ficheiro
 
@@ -223,7 +233,7 @@ Continua a fazer falta uma lista da DGAEP com as entidades cujos trabalhadores e
 
 O `COD: (IRCT)` publicado no BTE é o identificador de acto de negociação da DGERT com um dígito de família antecedido: `27251` corresponde ao acto `7251` (contrato coletivo) e `47252` ao acto `7252` (acordo de empresa). Esse identificador é estável entre revisões da mesma convenção ao longo dos anos, o que foi verificado por cruzamento do índice do BTE 31/2026 com a folha «Negociação coletiva» do registo da DGERT: dos 1.860 actos do registo, 1.110 abrangem mais do que um ano, e o acto 6651 (AEVP com a FESAHT) vai de 2018 a 2026.
 
-É isto que permite reunir toda a história de uma convenção com `ls 1_fontes/irct/convencoes/*/*_27251_*`, e ligar o trabalho do RNC ao registo da DGERT através da coluna `acto_negociacao` do catálogo.
+É isto que permite reunir toda a história de uma convenção, incluindo as portarias que a estendem e as adesões a ela, com `ls 1_fontes/irct/*/*_27251_* 1_fontes/irct/convencoes/*/*_27251_*`, e ligar o trabalho do RNC ao registo da DGERT através da coluna `acto_negociacao` do catálogo.
 
 Estão verificados dois dígitos de família, o `2` e o `4`. Os dígitos dos acordos coletivos de trabalho, portarias de extensão, acordos de adesão e decisões arbitrais não estão determinados, e a DGCP não publica a tabela. A aplicação não os infere: um código de cinco algarismos cuja família não esteja verificada sai com `acto_negociacao` vazio, ficando o código completo na coluna `cod_irct`. Uma coluna vazia é visível; uma junção errada com o registo da DGERT não é.
 
@@ -266,7 +276,16 @@ O BTE publica quatro tipos de documento sob a designação genérica de IRCT.
 
 Uma portaria de extensão tem dois ou três artigos sobre âmbito e produção de efeitos, sem cláusula de retribuição, de tempo de trabalho ou qualquer outra que o livro de códigos procure. Codificá-la como convenção produz contagens erradas sem produzir erro.
 
-Cada família tem a sua pasta. O âmbito subdivide apenas as convenções, porque o que o âmbito decide é se o documento entra no pipeline e nenhuma portaria ou adesão entra. O âmbito continua a constar do nome de todos os ficheiros.
+Cada família tem a sua pasta. O âmbito subdivide apenas as convenções, porque o que o âmbito decide é se o documento entra no pipeline e nenhuma portaria ou adesão entra. Pela mesma razão, desde o [ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md) o âmbito só consta do nome das convenções; nas portarias e adesões fica na coluna `ambito` do catálogo, e o quarto campo do nome leva o tipo.
+
+Uma portaria ou uma adesão refere-se sempre a uma convenção, e é o código dessa convenção que vai no nome. A aplicação obtém-no de duas formas, pela ordem da fiabilidade:
+
+1. **Coluna do índice.** Nenhum dos dialetos conhecidos a traz ainda; o campo interno `cod_irct_base` está preparado para a receber quando for identificada (tarefa 3 do ponto 9).
+2. **Cadeia de alterações.** A cadeia do índice de uma portaria aponta para o documento que ela estende (`CCT.20260822.377/2026`). Se esse documento estiver no registo ou nos índices lidos, com o mesmo tipo e o mesmo `IDDocumento`, o seu código é o da convenção de base. A correspondência é exata ou não há correspondência. Enquanto a tarefa 3 não confirmar esta leitura com dados reais, o nome assim obtido sai com aviso e fica por confirmar.
+
+O `COD: (IRCT)` da própria portaria **não** é usado: não se sabe se é o da convenção ou um código próprio. O número e o ano da portaria leem-se do título («Portaria n.º 452/2025»), ou de uma coluna do índice quando existir (campo interno `portaria_dr`). Uma portaria que estenda várias convenções leva no nome a primeira, pela ordem da cadeia; as outras ficam na coluna `cod_irct_base_adicionais` do catálogo, e a pesquisa por `*_{CODIRCT}_*` encontra-a só pelo primeiro código.
+
+Os avisos, que não têm ficheiro, recebem um nome da mesma forma, com o tipo no quarto campo (`2026_BTE_31_AVISO_403_26651_AEVP-FESAHT`), que serve apenas de chave no catálogo.
 
 Os avisos não têm pasta. Ficam registados na coluna `avisos_projeto` da portaria a que correspondem, ligados pela convenção que ambos referem. A linha de catálogo do aviso mantém-se, com `estado=metadado`.
 
@@ -316,11 +335,11 @@ python -m cct.catalogo \
     --siglas vocabularios/siglas_organizacoes.csv
 ```
 
-São 30 colunas produzidas automaticamente: `nome_canonico`, `ficheiro_destino`, `ficheiro_origem`, `ano`, `seq_anual`, `tipo_documento`, `familia`, `processavel`, `ambito`, `ambito_origem`, `cod_irct`, `acto_negociacao`, `bte_numero`, `bte_data`, `pagina_inicio`, `pagina_fim`, `n_outorgantes`, `outorgantes`, `relacao`, `relacao_alvo`, `avisos_projeto`, `altera_estruturado`, `altera_por_resolver`, `vide_em_vigor`, `materias_detectadas`, `sectores_a_classificar`, `url_fonte`, `titulo`, `estado` e `avisos`.
+São 33 colunas produzidas automaticamente: `nome_canonico`, `ficheiro_destino`, `ficheiro_origem`, `ano`, `seq_anual`, `tipo_documento`, `familia`, `processavel`, `ambito`, `ambito_origem`, `cod_irct`, `acto_negociacao`, `cod_irct_base`, `cod_irct_base_adicionais`, `portaria_dr`, `bte_numero`, `bte_data`, `pagina_inicio`, `pagina_fim`, `n_outorgantes`, `outorgantes`, `relacao`, `relacao_alvo`, `avisos_projeto`, `altera_estruturado`, `altera_por_resolver`, `vide_em_vigor`, `materias_detectadas`, `sectores_a_classificar`, `url_fonte`, `titulo`, `estado` e `avisos`.
 
 E cinco colunas preenchidas pela equipa ao longo do ciclo: `temas_atribuidos`, `tecnico`, `data_validacao`, `perita` e `observacoes`.
 
-Regerar o catálogo não apaga trabalho humano. As cinco colunas da equipa são recuperadas do catálogo anterior pelo `nome_canonico`, que por convenção não muda. Uma linha que deixe de aparecer nos índices é mantida com o aviso «já não consta dos índices lidos, verificar», porque um documento que desaparece de um índice é facto a investigar.
+Regerar o catálogo não apaga trabalho humano. As cinco colunas da equipa são recuperadas do catálogo anterior pelo `nome_canonico`, que por convenção não muda. As duas exceções são previstas: uma linha ainda sem nome canónico (por confirmar) é procurada pelo ficheiro de origem, e na migração única do ADR-0022 a tabela de correspondência passa as colunas do nome antigo para o novo (`--correspondencia`, ver 10). Uma linha que deixe de aparecer nos índices é mantida com o aviso «já não consta dos índices lidos, verificar», porque um documento que desaparece de um índice é facto a investigar.
 
 Este catálogo não substitui a lista SharePoint proposta no SOP v1.0: alimenta-a. A diferença é que a fonte de verdade passa a ser um ficheiro versionável e regerável.
 
@@ -431,7 +450,7 @@ A coluna `Ativa ou Extinta` do registo indica o estado de registo e não de ativ
 |---|---|---|---|
 | 1 | Completar o `temas.csv` a partir do `plano_transicao_livro_codigos_europeu.xlsx`, que tem o mapeamento dos pontos 4.5 a 4.20 para os 12 macro temas. Sem ele, `4_temas/` não se gera. | 1 dia | ficheiro que não está no repositório |
 | 2 | Obter da DGCP a tabela de famílias do `COD: (IRCT)`, ou inferir os dígitos em falta a partir de boletins que tragam um ACT e uma portaria de extensão. | meio dia com a tabela; 1 dia por inferência | DGCP, ou 3 a 4 índices do BTE |
-| 3 | Verificar portarias de extensão e acordos de adesão com dados reais. A leitura da relação com a convenção-base está implementada e testada contra um índice de ensaio, porque o BTE 31/2026 não traz nenhum destes documentos. Confirmar onde a DGERT regista a convenção estendida, e se o `COD: (IRCT)` de uma portaria é o da convenção ou próprio. | meio dia | um boletim que os traga |
+| 3 | Verificar portarias de extensão e acordos de adesão com dados reais (passo 0 da [SPEC-0004](../../specs/0004-esquema-de-nomes-comum-as-tres-familias.md)). A ligação à convenção de base pela cadeia de alterações e a leitura do número da portaria no título estão implementadas e testadas contra um índice de ensaio, porque o BTE 31/2026 não traz nenhum destes documentos. Confirmar em que campo a DGCP regista a convenção de base, se o `COD: (IRCT)` de uma portaria é o da convenção ou próprio, e onde está o número da portaria. Até lá, os nomes de PE e AA saem por confirmar. | meio dia | um boletim que os traga |
 | 4 | Rever as 174 entidades com forma empresarial em S.13 e fixá-las no `empregadores_ambito.csv`. A lista está feita. | 1 dia | equipa |
 | 5 | Decidir se os sectores passam a CAE ou NACE. A separação entre sectores e matérias já está feita. | meio dia e decisão de equipa | equipa |
 | 6 | Rever as 391 siglas desambiguadas e promover as de origem `recurso` que forem adequadas. A regra garante ausência de duplicados, não que a sigla escolhida seja a preferida pela equipa. | 1 dia | equipa |
@@ -466,6 +485,25 @@ recolhido de novo com `--esquema rnc`, não apenas documentado como estando "ain
 esquema antigo". Foi o que aconteceu com o BTE 31/2026 (ver [ADR-0021](../adr/0021-corte-por-ano-do-esquema-de-nomes.md) e ISSUE-0022): os
 14 ficheiros tinham sido nomeados com o esquema de 2025 antes desta clarificação, e
 foram apagados para nova recolha, já com o esquema RNC.
+
+**Passagem única do esquema do ADR-0016 para o do ADR-0022.** Os ficheiros de 2026 já escritos com o esquema RNC anterior (`2026_PRI_377_CCT_27251_BTE_31_…`) passam uma vez para o esquema novo, antes de começar o trabalho no MAXQDA sobre esse corpus. Se esse trabalho já tiver começado, a migração para e volta à equipa. Sem autorização expressa, a nomeação trata um nome já escrito que mudaria como `conflito` e não toca em nada; a autorização é `--migrar`:
+
+```bash
+# 0. cópia de segurança do catálogo e do registo
+# 1. simular: diz o que passaria de nome, sem escrever
+python -m cct.nomeacao --destino 1_fontes/irct --migrar \
+    --correspondencia 0_gestao/catalogo/correspondencia_nomes_adr0022.csv
+# 2. aplicar: escreve o nome novo, apaga o antigo depois de conferir o sha256
+#    e acrescenta cada troca à tabela de correspondência
+python -m cct.nomeacao --destino 1_fontes/irct --migrar --aplicar \
+    --correspondencia 0_gestao/catalogo/correspondencia_nomes_adr0022.csv
+# 3. regerar o catálogo com a tabela: as colunas da equipa passam para o nome novo
+python -m cct.catalogo --indices 1_fontes/indices_bte \
+    --saida 0_gestao/catalogo/catalogo_irct_2026.csv \
+    --correspondencia 0_gestao/catalogo/correspondencia_nomes_adr0022.csv
+```
+
+Um ficheiro antigo com conteúdo diferente do recolhido não é apagado e aparece nos problemas. Se o PDF intermédio da recolha já não existir, a cópia já nomeada serve de origem. As portarias renomeadas à mão antes do ADR-0022 (`2026_001_BTE_01_PE_0452_ADCP_SETAAB`) não estão no registo: voltam a ser nomeadas a partir do índice do BTE onde foram publicadas, e as que não tiverem o ano do DR ou o código da convenção de base ficam por confirmar. Enquanto não forem renomeadas, o `cct.pipeline_tema` recusa-as pelo token `PE` ou `AA` do nome.
 
 ---
 
@@ -537,14 +575,15 @@ Os boletins processam-se por ordem crescente, acumulando o catálogo.
 | Sectores e matérias separados | 14 de 14, sem perda de itens |
 | Siglas duplicadas no vocabulário após a regra | nenhuma, de 391 conflitos |
 | Portarias, adesões e avisos | verificados contra índice de ensaio, não contra dados reais (tarefa 3) |
+| Esquema do ADR-0022 | verificado contra o índice de ensaio reconstruído do BTE 31/2026, nas três famílias; a repetir sobre os 14 PDF reais na migração (ver 10) |
 
-Reproduzível com `python -m pytest tests/test_rnc.py`.
+Os comprimentos e as colisões acima foram medidos com o esquema do ADR-0016. O do ADR-0022 tem os mesmos campos e leva uma sigla a menos, pelo que nenhum nome fica mais comprido. Reproduzível com `python -m pytest tests/test_rnc.py tests/test_esquema_adr0022.py`.
 
 ---
 
 ## Registo de alterações
 
-**Nota de 23/09/2026.** Aceite o [ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md), que substitui o ADR-0016: um só esquema de nomes para as três famílias, com o número do BTE a seguir ao ano, o código da convenção de base e duas siglas. Assinalado em 4.1. A revisão deste documento para a versão 4.2 faz parte da [SPEC-0004](../../specs/0004-esquema-de-nomes-comum-as-tres-familias.md).
+**v4.2, 23/09/2026.** Um só esquema de nomes para convenções, portarias de extensão e acordos de adesão ([ADR-0022](../adr/0022-esquema-de-nomes-comum-as-tres-familias.md), que substitui o ADR-0016), implementado pela [SPEC-0004](../../specs/0004-esquema-de-nomes-comum-as-tres-familias.md): número do BTE a seguir ao ano, quarto campo com o âmbito ou o tipo, código da convenção de base no nome e duas siglas (ver 4.1 e 4.6). Três colunas novas no catálogo: `cod_irct_base`, `cod_irct_base_adicionais` e `portaria_dr` (ver 6). Migração única dos nomes do ADR-0016 com `--migrar` e tabela de correspondência (ver 10). Falta o passo 0 da SPEC-0004 (tarefa 3 do ponto 9): até lá, os nomes de portarias e adesões saem por confirmar. Como `data/` não está versionado, a migração faz-se em cada estação; o merge não a propaga.
 
 **v4.1, 18/09/2026.** Clarificado o corte entre os dois esquemas de nome: até 2025
 mantém-se o nome atribuído; a partir do corpus de 2026, inclusive, o esquema RNC é

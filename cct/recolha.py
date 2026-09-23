@@ -140,6 +140,14 @@ COLUNAS = {
     "url_em_vigor": ["linkdocemvigor", "linkparaodocumentoemvigor"],
     "url": ["linkparaodocumentocriado", "linkparaodocumento", "urlpdf"],
     "ficheiro": ["paginacriado", "nomepdf"],
+    # Para as portarias de extensão e os acordos de adesão (ADR-0022): o código
+    # IRCT da convenção de base e a referência da portaria no Diário da
+    # República. Nenhum dos dois dialetos conhecidos traz estas colunas; os
+    # nomes entram aqui quando o passo 0 da SPEC-0004 os identificar num índice
+    # real. Até lá, o código resolve-se pela cadeia de alterações e a portaria
+    # lê-se do título (cct/nomeacao.py).
+    "cod_irct_base": [],
+    "portaria_dr": [],
 }
 
 # Campos em que várias colunas do índice são partes da mesma informação e não
@@ -314,7 +322,8 @@ class Registo:
         for c in ("ano", "num_bte", "volume", "id_dgert", "tipo", "familia",
                   "cod_irct", "cae", "titulo", "outorgantes", "sectores",
                   "url", "ficheiro", "indice", "posicao", "data_bte",
-                  "data_distribuicao", "altera", "alterado_por"):
+                  "data_distribuicao", "altera", "alterado_por",
+                  "cod_irct_base", "portaria_dr"):
             if item.get(c) not in (None, ""):
                 entrada[c] = item[c]
         entrada.update(campos)

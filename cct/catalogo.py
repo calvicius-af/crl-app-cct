@@ -19,10 +19,11 @@ import re
 from pathlib import Path
 
 from . import ambito as mod_ambito
-from .nomeacao import (ESQUEMA_OMISSAO, FAMILIAS_COM_AMBITO,
+from .nomeacao import (ESQUEMA_2025, FAMILIAS_COM_AMBITO,
                        FAMILIAS_PROCESSAVEIS, FAMILIAS_SO_METADADO,
-                       PASTA_FAMILIA, PASTA_FAMILIA_DESCONHECIDA,
-                       carregar_siglas, nome_documento, separar_outorgantes,
+                       PASTA_FAMILIA, PASTA_FAMILIA_DESCONHECIDA, RE_ALTERA,
+                       NomeRNCInvalido, carregar_siglas, nome_documento,
+                       resolver_convencoes_base, separar_outorgantes,
                        sequencial_bte, tipo_normalizado)
 from .recolha import INDICES_OMISSAO, RAIZ, familia, ler_indice
 
@@ -30,7 +31,8 @@ from .recolha import INDICES_OMISSAO, RAIZ, familia, ler_indice
 COLUNAS_AUTOMATICAS = [
     "nome_canonico", "ficheiro_destino", "ficheiro_origem", "ano", "seq_anual",
     "tipo_documento", "familia", "processavel", "ambito", "ambito_origem",
-    "cod_irct", "acto_negociacao", "bte_numero", "bte_data",
+    "cod_irct", "acto_negociacao", "cod_irct_base", "cod_irct_base_adicionais",
+    "portaria_dr", "bte_numero", "bte_data",
     "pagina_inicio", "pagina_fim",
     "n_outorgantes", "outorgantes", "relacao", "relacao_alvo",
     "avisos_projeto", "altera_estruturado", "altera_por_resolver",
@@ -46,9 +48,9 @@ COLUNAS_EQUIPA = ["temas_atribuidos", "tecnico", "data_validacao", "perita",
 
 COLUNAS = COLUNAS_AUTOMATICAS + COLUNAS_EQUIPA
 
-# `CCT-ALT.20250708.321/2025` → tipo, data, sequencial/ano do documento alterado.
-RE_ALTERA = re.compile(r"^\s*(?P<tipo>[A-Z][A-Z-]*)\.(?P<data>\d{8})\."
-                       r"(?P<seq>\d+)/(?P<ano>\d{4})\s*$")
+# `CCT-ALT.20250708.321/2025` → tipo, data, sequencial/ano do documento
+# alterado. O padrão vive em cct/nomeacao.py, que também o usa para ligar uma
+# portaria à convenção de base.
 
 # `00260057.pdf` → páginas 26 a 57. O nome de origem do BTE codifica o
 # intervalo de páginas em dois blocos de quatro dígitos.
@@ -195,17 +197,44 @@ def acto_negociacao(cod_irct: str) -> str:
     return cod
 
 
+def _colunas_base(item: dict, fam: str, nomeado: dict) -> dict:
+    """`cod_irct_base`, `cod_irct_base_adicionais` e `portaria_dr` (ADR-0022).
+
+    `cod_irct_base` é o código que vai no nome — numa convenção, o seu. Numa
+    portaria que estenda várias convenções, os outros códigos ficam em
+    `cod_irct_base_adicionais`, pela ordem da cadeia do índice, separados por
+    `; `, sem sobrecarregar o campo singular.
+    """
+    if fam == "convencao":
+        base = re.sub(r"\D", "", str(item.get("cod_irct") or ""))
+        return {"cod_irct_base": base, "cod_irct_base_adicionais": "",
+                "portaria_dr": ""}
+    codigos = [c for c in re.split(r"[;\s]+", str(item.get("cod_irct_base") or "")) if c]
+    return {"cod_irct_base": codigos[0] if codigos else "",
+            "cod_irct_base_adicionais": "; ".join(codigos[1:]),
+            "portaria_dr": (nomeado.get("nomeacao") or {}).get("portaria_dr", "")}
+
+
 def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,
            vocabulario_ambito: dict[str, str] | None = None,
            esquema: str = "rnc") -> list[dict]:
     """Uma linha de catálogo por item de índice, já com o nome canónico."""
     saida = []
+    itens = [dict(i) for i in itens]      # a resolução da base escreve nos itens
+    if esquema == "rnc":
+        resolver_convencoes_base(itens)
     for posicao, item in enumerate(sorted(
             itens, key=lambda i: (i.get("ano") or 0, i.get("num_bte") or 0,
                                   sequencial_bte(i) or 0, i.get("posicao") or 0)), 1):
-        nome, avisos = nome_documento(dict(item), posicao, tabela_siglas,
-                                      esquema=esquema,
-                                      vocabulario_ambito=vocabulario_ambito)
+        copia = dict(item)
+        try:
+            nome, avisos = nome_documento(copia, posicao, tabela_siglas,
+                                          esquema=esquema,
+                                          vocabulario_ambito=vocabulario_ambito)
+        except NomeRNCInvalido as exc:
+            # A linha fica no catálogo — o documento existe —, mas sem nome
+            # canónico: nenhum nome se atribui sem os campos estruturais.
+            nome, avisos = "", [f"{exc} — nome por atribuir"]
         patronais, sindicais = separar_outorgantes(item.get("outorgantes", ""),
                                                    item.get("titulo", ""))
         materias, sectores = separar_sectores(item.get("sectores", ""))
@@ -215,7 +244,9 @@ def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,
             item.get("tipo", ""), vocabulario_ambito)
         p_ini, p_fim = paginas(item.get("ficheiro", ""))
         fam = item.get("familia") or familia(item.get("tipo", "")) or ""
-        if fam in FAMILIAS_SO_METADADO:
+        if not nome:
+            destino = ""
+        elif fam in FAMILIAS_SO_METADADO:
             # Um aviso de projeto de portaria não tem ficheiro próprio: o que
             # interessa dele — que houve projeto, e quando — vai para a coluna
             # `avisos_projeto` da portaria que se lhe seguir. A linha de
@@ -245,6 +276,7 @@ def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,
             "ambito_origem": amb_origem,
             "cod_irct": item.get("cod_irct", ""),
             "acto_negociacao": acto_negociacao(item.get("cod_irct", "")),
+            **_colunas_base(item, fam, copia),
             "bte_numero": item.get("num_bte") or "",
             "bte_data": (item.get("data_bte") or "")[:10],
             "pagina_inicio": p_ini if p_ini is not None else "",
@@ -264,6 +296,7 @@ def linhas(itens: list[dict], *, tabela_siglas: dict[str, str] | None = None,
             "url_fonte": item.get("url", ""),
             "titulo": item.get("titulo", ""),
             "estado": ("metadado" if fam in FAMILIAS_SO_METADADO
+                       else "por_confirmar" if not nome
                        else "recolhido" if processavel else "nao_processavel"),
             "avisos": " | ".join(avisos),
             **{c: "" for c in COLUNAS_EQUIPA},
@@ -297,27 +330,49 @@ def ligar_avisos(linhas_catalogo: list[dict]) -> list[dict]:
     return linhas_catalogo
 
 
-def fundir(novas: list[dict], anterior: Path | None) -> list[dict]:
+def _chave(linha: dict) -> str:
+    """O `nome_canonico`, ou o ficheiro de origem se ainda não houver nome."""
+    return linha.get("nome_canonico") or f"origem:{linha.get('ficheiro_origem', '')}"
+
+
+def carregar_correspondencia(caminho: Path) -> dict[str, str]:
+    """`nome_anterior;nome_novo;…` (de `cct.nomeacao --migrar`) → {antigo: novo}."""
+    with open(caminho, encoding="utf-8-sig", newline="") as f:
+        return {l["nome_anterior"]: l["nome_novo"]
+                for l in csv.DictReader(f, delimiter=";")
+                if l.get("nome_anterior") and l.get("nome_novo")}
+
+
+def fundir(novas: list[dict], anterior: Path | None,
+           correspondencia: dict[str, str] | None = None) -> list[dict]:
     """Repõe as colunas da equipa a partir de um catálogo anterior.
 
     A correspondência é feita pelo `nome_canonico`, que por convenção nunca
-    muda. Uma linha do catálogo anterior que já não apareça nos índices é
-    mantida — apagá-la perdia o trabalho de quem a preencheu, e um documento
-    que desaparece de um índice é um facto a investigar, não a esquecer.
+    muda. A exceção é a migração única do ADR-0022: com `correspondencia`
+    (nome antigo → nome novo), as linhas do catálogo anterior são procuradas
+    pelo nome novo. Uma linha sem nome canónico (por confirmar) é procurada
+    pelo ficheiro de origem. Uma linha do catálogo anterior que já não apareça
+    nos índices é mantida — apagá-la perdia o trabalho de quem a preencheu, e um
+    documento que desaparece de um índice é um facto a investigar, não a
+    esquecer.
     """
     if not anterior or not Path(anterior).exists():
         return novas
+    correspondencia = correspondencia or {}
     with open(anterior, encoding="utf-8-sig", newline="") as f:
-        antigas = {l.get("nome_canonico", ""): l
-                   for l in csv.DictReader(f, delimiter=";")}
+        antigas = {}
+        for l in csv.DictReader(f, delimiter=";"):
+            if l.get("nome_canonico") in correspondencia:
+                l["nome_canonico"] = correspondencia[l["nome_canonico"]]
+            antigas[_chave(l)] = l
     for linha in novas:
-        velha = antigas.pop(linha["nome_canonico"], None)
+        velha = antigas.pop(_chave(linha), None)
         if velha:
             for c in COLUNAS_EQUIPA:
                 if velha.get(c):
                     linha[c] = velha[c]
-            if velha.get("estado") and velha["estado"] not in ("recolhido",
-                                                               "nao_processavel"):
+            if velha.get("estado") and velha["estado"] not in (
+                    "recolhido", "nao_processavel", "por_confirmar"):
                 linha["estado"] = velha["estado"]
     for orfa in antigas.values():
         linha = {c: orfa.get(c, "") for c in COLUNAS}
@@ -346,7 +401,11 @@ def main(argv=None):
     p.add_argument("--siglas", action="append", default=[],
                    help="CSV de siglas fixadas; repetível, o primeiro ganha")
     p.add_argument("--ambitos", help="CSV 'nome;ambito' de empregadores")
-    p.add_argument("--esquema", default="rnc", choices=("rnc", ESQUEMA_OMISSAO))
+    p.add_argument("--esquema", default="rnc", choices=("rnc", ESQUEMA_2025))
+    p.add_argument("--correspondencia",
+                   help="CSV nome_anterior;nome_novo escrito por "
+                        "`cct.nomeacao --migrar`: as colunas da equipa do catálogo "
+                        "anterior passam para o nome novo (SPEC-0004, passo 4)")
     args = p.parse_args(argv)
 
     origem = Path(args.indices)
@@ -369,9 +428,11 @@ def main(argv=None):
            else mod_ambito.carregar_vocabulario())
 
     saida = Path(args.saida)
+    correspondencia = (carregar_correspondencia(Path(args.correspondencia))
+                       if args.correspondencia else None)
     catalogo = fundir(ligar_avisos(
         linhas(itens, tabela_siglas=tabela or None, vocabulario_ambito=voc,
-               esquema=args.esquema)), saida)
+               esquema=args.esquema)), saida, correspondencia)
     escrever(catalogo, saida)
 
     print(f"== Catálogo: {len(catalogo)} documentos → {saida}")
@@ -394,8 +455,11 @@ def main(argv=None):
     por_classificar = [l for l in catalogo if l["sectores_a_classificar"]]
     print(f"    com avisos: {len(com_aviso)}")
     print(f"    com sectores por classificar: {len(por_classificar)}")
-    nomes = [l["nome_canonico"] for l in catalogo]
+    nomes = [l["nome_canonico"] for l in catalogo if l["nome_canonico"]]
     colisoes = {n for n in nomes if nomes.count(n) > 1}
+    sem_nome = sum(1 for l in catalogo if not l["nome_canonico"])
+    if sem_nome:
+        print(f"    sem nome canónico (por confirmar): {sem_nome}")
     if colisoes:
         print("    COLISÕES DE NOME: " + ", ".join(sorted(colisoes)))
     return 1 if colisoes else 0
