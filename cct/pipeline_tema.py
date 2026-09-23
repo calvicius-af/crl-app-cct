@@ -30,7 +30,7 @@ _AMBITOS_PROCESSAVEIS = ("PRI", "SPE")
 
 
 def _pdfs_da_pasta(pasta: Path) -> list[Path]:
-    """PDFs de convenções em `pasta`, direto ou nas subpastas RNC por âmbito.
+    """PDFs de convenções na pasta do ano, em `convencoes` ou no âmbito.
 
     O esquema RNC arruma os PDFs em `convencoes/{PRI,SPE,APU}/`, não direto
     na pasta do ano (`bte_2026/`) — mas apontar `--pdfs` para essa pasta,
@@ -41,7 +41,9 @@ def _pdfs_da_pasta(pasta: Path) -> list[Path]:
     diretos = sorted(pasta.glob("*.pdf"))
     if diretos:
         return diretos
-    convencoes = pasta / "convencoes"
+    # `--pdfs .../convencoes` é um ponto de entrada normal: não procurar
+    # `convencoes/convencoes` quando a pasta indicada já é essa.
+    convencoes = pasta if pasta.name.lower() == "convencoes" else pasta / "convencoes"
     if not convencoes.is_dir():
         return []
     achados: list[Path] = []
@@ -94,7 +96,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--pdfs", required=True,
                    help="pasta com PDFs individuais de convenções — a pasta "
-                        "do ano (bte_2026) ou já convencoes/PRI ou SPE")
+                        "do ano (bte_2026), convencoes, PRI ou SPE")
     p.add_argument("--codebook", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--variaveis", help="VariaveisDocumento*.xlsx do MaxQDA (subtipo, CAE, …)")
@@ -134,8 +136,9 @@ def main():
     pdfs = _pdfs_da_pasta(Path(args.pdfs))
     if not pdfs:
         raise SystemExit(
-            f"Sem PDFs em {args.pdfs} (procurado direto e em "
-            f"convencoes/{{{','.join(_AMBITOS_PROCESSAVEIS)}}})")
+            f"Sem PDFs em {args.pdfs} (procurado direto e nas subpastas "
+            f"PRI/SPE de convencoes). Confirma o caminho e a presença "
+            "dos ficheiros .pdf")
 
     # Uma portaria de extensão ou um acordo de adesão não têm o articulado que a
     # codificação temática pressupõe. Se um deles entrar aqui, não dá erro: dá
