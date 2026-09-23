@@ -524,6 +524,19 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
                 contar("por_confirmar")
                 continue
             nomeacao = e["nomeacao"]      # _nome_rnc pode ter registado o âmbito
+            nome_anterior = nomeacao.get("doc_id")
+            if (nome_anterior and nome_anterior != nome and
+                    nomeacao.get("estado") in {"nomeado", "ja_existente", "conflito"}):
+                # Um nome já escrito pode estar no MaxQDA e no catálogo.
+                # Uma nova tabela de siglas não deve criar outra cópia nem
+                # substituir silenciosamente a identidade persistida.
+                nomeacao["estado"] = "conflito"
+                resumo["problemas"].append(
+                    f"{e['chave']}: nome já atribuído {nome_anterior}; "
+                    f"novo nome proposto {nome} — migração controlada necessária, "
+                    "nenhum PDF escrito")
+                contar("conflito")
+                continue
             avisos_heuristica = list(avisos)   # antes do aviso de par repetido, abaixo —
                                                # esse é informativo, não indica nome errado
             partes = "_".join(nome.split("_")[5 if esquema == "pipeline" else 7:])
