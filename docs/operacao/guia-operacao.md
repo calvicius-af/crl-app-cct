@@ -325,10 +325,28 @@ o ID do documento, a fonte, a data de consulta e a decisão de revisão.
 
 ### 5.4 Avisos de extração de texto e tabelas no QDPX
 
+Na corrida BTE 31/2026 de 23-09-2026, `--pdfs` apontou primeiro para
+`bte_2026/convencoes` e o programa respondeu `Sem PDFs`. O código antigo
+acrescentava indevidamente outra pasta `convencoes` a esse caminho. Ao
+apontar para `bte_2026/convencoes/PRI`, processou nove ficheiros e omitiu
+os cinco em `SPE`. Usar a pasta do ano para abranger os dois âmbitos,
+inclusive na versão antiga, ou atualizar o código para aceitar também a
+pasta `convencoes`. Confirmar a contagem esperada no relatório **antes** de
+importar o QDPX; guardar a nova corrida noutra pasta de resultados para
+preservar a evidência anterior. Por exemplo, a partir da raiz no PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m cct.pipeline_tema --pdfs data\raw\bte\bte_2026 --codebook codebooks\4_08_protecao_dados.yaml --out results\corrida_completa
+```
+
 Uma corrida pode indicar `Convenções processadas: 9/9` e ainda ter tabelas
-salariais mal estruturadas. No caso BTE 31/2026 revisto em 23-09-2026,
-algumas tabelas existem no TXT, mas foram reduzidas a uma linha longa
-(380, 384, 385 e 386). O aviso `nenhum bloco de tabela` não significa
+salariais mal estruturadas. Nesta corrida, o manifesto confirma que o
+extrator foi `pdfplumber`. A limpeza de cabeçalhos apagou as marcas
+internas que protegem linhas de tabela quando estas ocorrem em várias
+páginas. Os textos de 380, 384, 385 e 386 foram colados em linhas longas.
+A correção preserva as marcas e recupera blocos de linhas; **a comparação
+de todas as células com os PDFs continua necessária**, sobretudo nas
+grelhas largas de 384/385. O aviso `nenhum bloco de tabela` não significa
 necessariamente ausência dos valores: a auditoria só reconhece blocos com
 pelo menos duas linhas consecutivas de células separadas por ` | `.
 O aviso `tabela fora do corpo do nó` pode referir-se apenas ao facto de
@@ -337,7 +355,7 @@ termina com dois pontos para introduzir cláusulas também pode ser sinalizado
 indevidamente como `sem corpo válido`. **Nenhuma destas explicações valida
 os valores extraídos:** conferir a tabela e o artigo no PDF de origem.
 
-Até à correção, guardar o PDF, o TXT, o QDPX, o relatório e o
+Guardar o PDF, o TXT, o QDPX, o relatório e o
 `manifest.json`; registar documento, página, anexo, categoria/valor e
 divergência observada. Não usar tabelas assinaladas para indicadores de
 remuneração sem revisão. Não voltar a correr só com `--extrator docling`
