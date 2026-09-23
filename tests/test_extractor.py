@@ -10,7 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from cct.extractor import juntar_linhas, estruturar, extrair_pdf
+from cct.extractor import (MARCA_TABELA_FIM, MARCA_TABELA_INI,
+                           _remover_cabecalhos_rodapes, juntar_linhas,
+                           estruturar, extrair_pdf)
 from cct.schemas import validar_doc
 
 PDF_BTE = Path(__file__).parent.parent / "data" / "raw" / "bte" / "bte2_2025.pdf"
@@ -47,6 +49,28 @@ def test_mantem_quebra_antes_de_clausula_e_capitulo():
     saida = juntar_linhas(texto)
     assert "\nCláusula 2.ª" in saida
     assert "\nCAPÍTULO II" in saida
+
+
+def test_marcas_de_tabela_repetidas_nao_sao_cabecalho_bte():
+    """BTE 31: tabelas em 2 de 3 páginas não podem perder delimitadores."""
+    paginas = [
+        "Boletim do Trabalho e Emprego\nTexto inicial.",
+        ("Boletim do Trabalho e Emprego\nANEXO III - Tabela salarial\n"
+         f"{MARCA_TABELA_INI}\nGrupo | Valor\nA | 100\nB | 200\n"
+         f"{MARCA_TABELA_FIM}"),
+        ("Boletim do Trabalho e Emprego\n"
+         f"{MARCA_TABELA_INI}\nGrupo | Valor\nC | 300\nD | 400\n"
+         f"{MARCA_TABELA_FIM}\nAssinaturas."),
+    ]
+    limpas = _remover_cabecalhos_rodapes(paginas)
+    assert all("Boletim do Trabalho e Emprego" not in p for p in limpas)
+    assert sum(p.count(MARCA_TABELA_INI) for p in limpas) == 2
+    assert sum(p.count(MARCA_TABELA_FIM) for p in limpas) == 2
+    assert sum(p.count("Grupo | Valor") for p in limpas) == 2, (
+        "cabeçalhos de tabela repetidos são conteúdo, não mobiliário do BTE")
+    _, texto = estruturar("\n".join(limpas), "teste")
+    assert "Grupo | Valor\nA | 100\nB | 200" in texto
+    assert "C | 300\nD | 400" in texto
 
 
 # ---------- estruturação ----------
