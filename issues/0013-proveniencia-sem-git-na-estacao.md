@@ -1,6 +1,6 @@
 # ISSUE-0013: a proveniência perde o commit quando não há git na estação
 
-- **Estado:** Aberta
+- **Estado:** Resolvida — 2026-09-23
 - **Data:** 2026-09-17
 - **GitHub:** #63 (sub-issue de #58)
 - **Onde dói:** `cct/proveniencia.py` (`estado_git`, L41-51)
@@ -67,3 +67,14 @@ Duas coisas, e a segunda é a que resolve o problema de fundo:
 Prioridade baixa face aos restantes achados do gate: não impede ninguém de trabalhar. Mas
 é uma perda silenciosa, e essas são as que só se descobrem quando já é tarde, com uma
 corrida antiga cuja origem ninguém consegue reconstituir.
+
+## Resolução (2026-09-23)
+
+1. **Motivo registado.** `estado_git` distingue `git_ausente`, `fora_de_repositorio` e
+   `erro` (já feito antes; testes em `tests/test_proveniencia.py`).
+2. **Versão sem git.** O manifesto de cada corrida regista sempre `app_version`, lida do
+   `pyproject.toml` pela biblioteca padrão. O `scripts/preparar_pacote_offline.py`, que
+   corre numa máquina com git, grava no `vendor/wheels/manifesto.json` a versão e o commit
+   de onde o pacote foi preparado; numa estação sem git, o manifesto da corrida regista
+   esse commit em `git.commit_do_pacote_offline`. É informação de proveniência, não de
+   segurança: o manifesto do pacote não é autenticado (ver #56 e ADR-0020).

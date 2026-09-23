@@ -33,7 +33,8 @@ CONSTRAINTS_RUNTIME = RAIZ / "requirements" / "runtime.txt"
 CONSTRAINTS_DEV = RAIZ / "requirements" / "dev.txt"
 
 sys.path.insert(0, str(RAIZ))
-from cct.proveniencia import agora_utc, escrever_manifesto as escrever_json, sha256
+from cct.proveniencia import (agora_utc, escrever_manifesto as escrever_json,
+                              estado_git, sha256, versao_aplicacao)
 
 # Alvos por omissão: as estações do CRL são Windows 64 bits; as versões de
 # Python cobertas são as suportadas pelo projeto (3.11+). Cobrir várias
@@ -201,10 +202,15 @@ def escrever_manifesto(alvos: list[tuple[str, str]],
     temporario.replace(manifesto)
 
     # schema_version 2 acrescenta "constraints". O instalador só lê "wheels",
-    # pelo que um manifesto antigo continua a ser aceite.
+    # pelo que um manifesto antigo continua a ser aceite. "aplicacao" diz de
+    # que versão e commit o pacote foi preparado: as estações não têm git, e é
+    # daqui que o manifesto de cada corrida tira o commit (ISSUE-0013).
+    git = estado_git(RAIZ)
     escrever_json(DESTINO / "manifesto.json", {
         "schema_version": 2,
         "gerado": gerado,
+        "aplicacao": {"versao": versao_aplicacao(RAIZ), "commit": git.get("commit"),
+                      "alteracoes_por_commitar": git.get("dirty")},
         "alvos": [f"{p}/py{v}" for p, v in alvos],
         "constraints": registo_constraints,
         "wheels": registo,

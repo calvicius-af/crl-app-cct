@@ -1,6 +1,6 @@
 # ISSUE-0010: em Windows, não é claro qual o Python do projeto, e o doctor não ajuda
 
-- **Estado:** Aberta
+- **Estado:** Resolvida — 2026-09-23 (verificação)
 - **Data:** 2026-09-17
 - **GitHub:** #60 (sub-issue de #58)
 - **Onde dói:** `cct/doctor.py` (L28-39), `README.md` (L54), `CONTRIBUTING.md`, `docs/operacao/guia-operacao.md` (L118, L134, L141)
@@ -75,3 +75,12 @@ O impacto real é de confiança, não de funcionamento: a aplicação corre bem,
 lançadores `scripts/AppCCT.bat:8-9` usam correctamente `.venv\Scripts\python.exe`. O
 problema aparece a quem sai dos lançadores e segue a documentação à mão, que é
 exactamente o que se faz quando alguma coisa corre mal.
+
+## Verificação (2026-09-23)
+
+1. `cct/doctor.py` imprime sempre o interpretador em uso e deteta um `.venv` do projeto
+   que não está a ser usado, comparando os diretórios reais (também com UNC e unidades
+   mapeadas, `_venv_em_uso`). Nesse caso sugere correr com o Python do projeto, e não
+   reinstalar. Testes em `tests/test_doctor.py`.
+2. O README e o guia de operação trazem os comandos na forma de Windows
+   (`.\.venv\Scripts\python.exe`).

@@ -1,6 +1,6 @@
 # ISSUE-0011: `--siglas` com ficheiro inexistente dá traceback em vez de mensagem
 
-- **Estado:** Aberta
+- **Estado:** Resolvida — 2026-09-23 (verificação)
 - **Data:** 2026-09-17
 - **GitHub:** #62 (sub-issue de #58)
 - **Onde dói:** `cct/nomeacao.py` (`carregar_siglas`, L399-417; `main`, L615-617)
@@ -69,3 +69,10 @@ que a função continue a poder ser usada em testes com caminhos construídos.
 Na mesma correção, dizer no `docs/dados/README.md` onde colocar o ficheiro, já que o
 exemplo da L188 assume a raiz do projeto sem o declarar. É a peça que faltou ao trabalho
 do PR #39, não um erro dele.
+
+## Verificação (2026-09-23)
+
+`cct/nomeacao.py` valida os ficheiros de `--siglas` em `main`, com a mensagem «PAROU AQUI»
+que aponta para `docs/operacao/siglas.exemplo.csv`
+(`tests/test_nomeacao.py::test_siglas_inexistentes_param_com_mensagem`). O
+`docs/dados/README.md` explica que o ficheiro não vem no repositório e onde o colocar.

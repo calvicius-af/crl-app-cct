@@ -106,3 +106,46 @@ def test_manifesto_inicial_fica_marcado_como_corrida_em_curso(tmp_path):
 
     assert manifesto["status"] == "running"
     assert manifesto["finished_at_utc"] is None
+
+
+# ------------------------- versão sem git (ISSUE-0013, ponto 2)
+
+def test_manifesto_regista_sempre_a_versao_da_aplicacao(tmp_path):
+    from cct.proveniencia import versao_aplicacao
+
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "appcct"\nversion = "1.2.3"\n', encoding="utf-8")
+    assert versao_aplicacao(tmp_path) == "1.2.3"
+    assert versao_aplicacao(tmp_path / "nao-existe") is None
+
+
+def test_sem_git_o_commit_vem_do_pacote_offline(monkeypatch, tmp_path):
+    """A estação não sabe o seu commit, mas sabe o do pacote que instalou."""
+    def sem_git(*_a, **_k):
+        raise FileNotFoundError("git")
+    monkeypatch.setattr(subprocess, "check_output", sem_git)
+    wheels = tmp_path / "vendor" / "wheels"
+    wheels.mkdir(parents=True)
+    (wheels / "manifesto.json").write_text(json.dumps(
+        {"schema_version": 2, "aplicacao": {"versao": "0.5.0", "commit": "abc123"},
+         "wheels": []}), encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "appcct"\nversion = "0.5.0"\n', encoding="utf-8")
+
+    manifesto = construir_manifesto(raiz=tmp_path, inicio_utc="2026-09-23T10:00:00+00:00",
+                                    parametros={}, entradas=[], saidas=[], resumo={},
+                                    problemas=[])
+    git = manifesto["environment"]["git"]
+    assert git["commit"] is None and git["motivo"] == "git_ausente"
+    assert git["commit_do_pacote_offline"] == "abc123"
+    assert manifesto["environment"]["app_version"] == "0.5.0"
+
+
+def test_sem_git_nem_pacote_o_motivo_continua_a_ser_o_unico_rasto(monkeypatch, tmp_path):
+    def sem_git(*_a, **_k):
+        raise FileNotFoundError("git")
+    monkeypatch.setattr(subprocess, "check_output", sem_git)
+    manifesto = construir_manifesto(raiz=tmp_path, inicio_utc="2026-09-23T10:00:00+00:00",
+                                    parametros={}, entradas=[], saidas=[], resumo={},
+                                    problemas=[])
+    assert "commit_do_pacote_offline" not in manifesto["environment"]["git"]

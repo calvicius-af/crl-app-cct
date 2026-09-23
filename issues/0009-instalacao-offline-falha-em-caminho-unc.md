@@ -1,6 +1,6 @@
 # ISSUE-0009: a instalação offline falha quando o projeto está num caminho de rede
 
-- **Estado:** Aberta
+- **Estado:** Resolvida no código — falta confirmar no próximo gate numa estação do CRL
 - **Data:** 2026-09-17
 - **GitHub:** #59 (sub-issue de #58)
 - **Onde dói:** `scripts/instalar_offline.py` (`instalar()`, L180-196), `scripts/instalar_offline.bat`
@@ -104,3 +104,18 @@ O `.venv` criado pela tentativa falhada foi reaproveitado pela corrida seguinte
 (`✓ já existe (a reaproveitar)`) e a instalação completou-se sem problema. Não há defeito
 aqui, mas vale a pena confirmar que um `.venv` deixado a meio por uma falha anterior nunca
 pode conduzir a uma instalação parcial silenciosa.
+
+## Verificação (2026-09-23)
+
+Resolvido no código, com testes em `tests/test_pacote_offline.py` (secções «ISSUE-0009»):
+
+1. `scripts/instalar_offline.py` usa `os.path.abspath` em vez de `resolve()`, que em
+   Windows convertia a unidade mapeada (`L:`) no caminho UNC que o pip não abre.
+2. Um projeto em caminho UNC é assinalado antes de instalar, com o que fazer.
+3. A mensagem de falha do pip distingue permissões, caminho inacessível ou UNC, e
+   versão ou plataforma, em vez de apontar sempre para a versão.
+4. Um `.venv` reaproveitado tem de ter o pip, o que evita a instalação parcial silenciosa
+   referida nas notas.
+
+Falta a confirmação numa estação real: um runner Windows do CI não tem unidades de rede
+mapeadas (ver ISSUE-0012).
