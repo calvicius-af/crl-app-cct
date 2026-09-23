@@ -21,8 +21,8 @@ se referem. A equipa renomeou à mão as PE de 2026 com um padrão próprio
 
 ## Objetivo
 
-Que as três famílias documentais sejam nomeadas com um só esquema, ordenável por ano e
-boletim, com a convenção de base no nome, e que a aplicação o escreva, o leia e o use
+Que as três famílias documentais sejam nomeadas com um só esquema, agrupável por ano e
+boletim, com uma convenção de base no nome, e que a aplicação o escreva, o leia e o use
 para proteger o pipeline.
 
 ## Não-objetivos
@@ -65,7 +65,7 @@ As regras de cada campo estão no ADR-0022. As que têm efeito direto no código
 | Sem `IDDocumento` | `por_confirmar`, ficheiro não escrito (comportamento atual, mantém-se) |
 | PE sem número ou ano da portaria | `por_confirmar`, ficheiro não escrito |
 | PE ou AA sem código IRCT da convenção de base confirmado | `por_confirmar`, ficheiro não escrito |
-| PE que estende várias convenções | nome com a primeira; aviso; as restantes em `relacao_alvo` e `cod_irct_base` do catálogo |
+| PE que estende várias convenções | nome com a primeira na ordem confirmada do índice; aviso; catálogo com relação a todas as convenções, incluindo os códigos que não cabem no nome |
 | AA que adere a convenção de um ano anterior | nome com o código dessa convenção, que é estável entre revisões |
 | Só partes de um lado (patronal ou sindical) | as duas primeiras desse lado; aviso |
 | Portaria com letra de sufixo (50-A/2025) | `0050A-2025` |
@@ -107,7 +107,7 @@ verificação e pode avançar já.
 | `cct/localizador.py` | Três expressões regulares novas, com grupos nomeados: `RE_DOC_ID_CONVENCAO` (quarto campo restrito a `PRI|SPE|APU`), `RE_DOC_ID_EXTENSAO` (quarto campo `PE|PCT|PRT`, miolo `\d{4}[A-Z]?-\d{4}`) e `RE_DOC_ID_ADESAO` (quarto campo `AA`, sem miolo). Manter `RE_DOC_ID` (2025) e `RE_DOC_ID_RNC` (ADR-0016) para leitura, restringindo em `RE_DOC_ID_RNC` o âmbito a `PRI|SPE|APU`. `interpretar_doc_id` passa a aceitar os cinco padrões e continua a devolver `(ano de 2 dígitos, n.º do BTE, tokens das partes)`. `interpretar_nome_rnc` devolve também `familia`, `portaria` e `ano_dr` quando existirem. Atualizar a docstring do módulo |
 | `cct/nomeacao.py`, `familia_do_nome` | Reconhecer a família pelos três padrões novos (pelo quarto campo ou pelo tipo), para que o `pipeline_tema` recuse PE e AA pelo nome |
 | `cct/comparar.py` | `_ano` já cai no padrão `^(20\d{2})` para os nomes novos. Acrescentar um caso explícito e um comentário para o esquema do ADR-0022, para que a dedução do ano não dependa de um recurso genérico |
-| `cct/catalogo.py` | Nova coluna `cod_irct_base` (o código que vai no nome; igual a `cod_irct` nas convenções) e nova coluna `portaria_dr` (ex.: `452/2025`; vazia fora da família `extensao`). Colocá-las junto de `cod_irct` e `relacao_alvo`. A recuperação das colunas da equipa pelo `nome_canonico` tem de continuar a funcionar depois da migração: ver passo 4 |
+| `cct/catalogo.py` | Nova coluna `cod_irct_base` (o código que vai no nome; igual a `cod_irct` nas convenções) e nova coluna `portaria_dr` (ex.: `452/2025`; vazia fora da família `extensao`). Colocá-las junto de `cod_irct` e `relacao_alvo`. Para PE com várias convenções, representar explicitamente todas as relações e códigos, sem sobrecarregar os campos singulares; definir o formato persistente e a ordem estável antes da migração. A recuperação das colunas da equipa pelo `nome_canonico` tem de continuar a funcionar depois da migração: ver passo 4 |
 | `cct/pipeline_tema.py` | Atualizar a mensagem de recusa e o exemplo de pasta, se citarem nomes do esquema antigo. A lógica não muda |
 
 ### Passo 2. Testes
@@ -117,8 +117,9 @@ quando o teste for desses módulos):
 
 1. Ida e volta para as três famílias: o nome gerado é aceite por `interpretar_doc_id` e
    por `interpretar_nome_rnc`, e tem no máximo 63 caracteres.
-2. A cabeça é sempre `{ANO}_BTE_{NN}_`, e ordenar os nomes alfabeticamente dá a ordem
-   (ano, n.º do BTE, número sequencial).
+2. A cabeça é sempre `{ANO}_BTE_{NN}_`, e ordenar os nomes alfabeticamente agrupa por
+   (ano, n.º do BTE). Dentro de cada BTE, a ordenação integral por posição requer o
+   catálogo; os nomes agrupam primeiro por quarto campo e só depois pelo sequencial.
 3. `familia_do_nome` devolve `extensao` e `adesao` para os nomes novos, e `convencao`
    para as convenções.
 4. `pipeline_tema` recusa uma pasta com uma PE ou um AA nomeados no esquema novo.
@@ -128,6 +129,8 @@ quando o teste for desses módulos):
    `por_confirmar` e o ficheiro não é escrito, mesmo com `--aceitar-heuristicas`.
 8. O código no nome de uma PE e de um AA é o da convenção de base, e
    `*_{CODIRCT}_*` apanha a convenção, a PE e o AA do índice de ensaio.
+   Numa PE que abrange várias convenções, a pesquisa pelo nome encontra apenas a
+   primeira; o catálogo devolve também as restantes relações.
 9. Siglas: primeira patronal e primeira sindical, `+N` correto; aviso quando só há um
    lado; um AE (empresa e sindicato) fica `EMPRESA-SINDICATO`.
 10. O quarto campo de uma convenção nunca é um tipo, e o de uma PE ou AA nunca é um
@@ -213,8 +216,9 @@ e o merge não a propaga.
    ensaio reconstruídos em `openpyxl`, como na SPEC-0003.
 2. **Verificação manual:** correr a nomeação em simulação sobre o `BTE31_2026.xlsx` e
    sobre o índice real com PE e AA do passo 0; conferir os nomes contra o índice
-   publicado; confirmar que `ls` ordena pela ordem de publicação e que `*_{CODIRCT}_*`
-   junta a família documental.
+   publicado; confirmar que `ls` agrupa por ano e BTE, e que `*_{CODIRCT}_*`
+   junta as relações principais. Conferir no catálogo a ordem integral do BTE e as
+   relações adicionais de portarias que abrangem várias convenções.
 3. **Dados de ensaio:** `BTE31_2026.xlsx` e o índice do passo 0.
 
 ## Riscos
