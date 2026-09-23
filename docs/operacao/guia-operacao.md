@@ -88,6 +88,10 @@ ficam em `results/aquisicao/` e o registo persistente em
 corrida. **Ler sempre os estados `por_confirmar`, `falhado` e `conflito`**:
 um PDF pode ter sido descarregado e, ainda assim, não ter sido copiado com
 um nome canónico. Uma segunda corrida reaproveita os PDFs válidos.
+Se a pasta de destino mudar, a versão atual verifica os PDFs **no novo
+destino**; a existência de uma cópia noutro caminho guardado no registo não
+conta como `ja_existente`. A nova descarga pode ser necessária. Não corrigir
+`caminho` no JSONL à mão.
 
 Se a rede institucional não permitir a descarga, usar os PDFs obtidos por via
 institucional e registar a origem e a correspondência com o índice antes de
@@ -217,6 +221,7 @@ Sai um Excel com cada cláusula classificada: `=` / `alteracao` / `nova` /
 | `doctor` indica falta de PDFs antes da primeira recolha | pasta final ainda vazia | verificar primeiro os índices e correr a aquisição; a ausência das variáveis MaxQDA não bloqueia a recolha |
 | `Sem ficheiros-índice` | pasta vazia ou ficheiro `.xlsx` errado | confirmar `Get-ChildItem .\data\raw\indices\*.xlsx`; copiar o índice fornecido pela equipa |
 | PDFs em `data/interim/recolha/`, mas não em `data/raw/bte/` | nomeação por confirmar, execução sem `--aplicar` ou conflito no destino | ler `results/aquisicao/relatorio_*.txt` e o estado no registo; corrigir siglas confirmadas com `--siglas` e repetir a nomeação, sem apagar os originais |
+| `campos estruturais do nome RNC excedem o limite` | tipo ou código do índice tornam impossível um nome íntegro de 63 caracteres | confirmar os metadados na fonte; o PDF fica `por_confirmar`, sem truncar campos nem aceitar a heurística |
 
 **Regra dos erros:** o `relatorio.txt` lista sempre os documentos com
 problemas — o resto do lote NÃO é afetado. Corrige só esses e volta a correr
