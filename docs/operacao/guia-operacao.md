@@ -270,9 +270,13 @@ para o repositório.
    confirmar a correspondência com o ato que é retificado. No 381 há uma
    terceira sigla cortada pelo limite de 63 caracteres; examinar os
    outorgantes completos. Rever ainda as siglas derivadas de Empresa
-   Metropolitana, AWP, AP Solutions e Sindicato Nacional dos Motoristas.
-   O exemplo `SNM` em documentos antigos não confirma a sigla deste último
-   no índice atual: o vocabulário contém também `SNMOT` para outra designação.
+   Metropolitana, AWP e AP Solutions. O título do 390 explicita
+   `Sindicato Nacional dos Motoristas e Outros Trabalhadores - SNMOT`:
+   `Motoristas` resultou de um corte incorreto da expressão «e Outros».
+   O código corrigido propõe `SNMOT`; se já existir o PDF com `Motoristas`,
+   a proteção assinala `conflito` e mantém ambos o nome e o PDF antigos até
+   à migração controlada. O exemplo `SNM` de documentos antigos não deve ser
+   aplicado ao 390.
 3. Se um documento **ainda não foi escrito**, preencher um `siglas.csv` local
    apenas com siglas confirmadas, executar primeiro sem `--aplicar` e verificar
    o nome proposto. Se o nome **já foi escrito**, uma alteração de sigla produz
@@ -297,6 +301,27 @@ variáveis MaxQDA como problema. Executar o `doctor` com
 diagnóstico corrigido; nenhum desses dois avisos explica por si só os oito
 nomes por confirmar. Um *checkout* antigo não se atualiza automaticamente
 quando o ramo principal muda.
+
+### 5.3 O que o índice BTE 31/2026 permite confirmar
+
+Revisão do `BTE31_2026_CRL.xlsx` fornecido em 23-09-2026, sem alterar o
+ficheiro de origem: há 14 linhas, IDs 377/2026 a 390/2026, com 14 códigos
+IRCT, nomes de PDF e URL distintos. Os quatro `AE-ALT-RECT` (387 a 390)
+têm `Outorgantes` vazio; o título identifica as entidades e a coluna
+`DocAlteradosPorEste` aponta, respetivamente, para os documentos 323, 324,
+325 e 326/2026. Estas relações devem ser conferidas nos atos publicados
+antes de se considerar o nome definitivo. O 381 lista três outorgantes;
+o nome de 63 caracteres contém a terceira sigla abreviada. Os documentos
+379 e 380 partilham outorgantes mas têm códigos IRCT e referências anteriores
+distintos.
+
+O índice ainda tem `PagVersaoEscrita`, `CAE`, `LinkDocEmVigor`,
+`DocAlteradosPorEste2` e `DocAlteramEste` vazios nas 14 linhas; a coluna
+`Outorgantes` falta nas quatro retificações. Estes vazios são uma lista de
+verificação para o enriquecimento futuro, não prova de que o BTE não contém
+essa informação. Não preencher por inferência nem substituir o índice
+original sem preservar a proveniência. Para cada valor acrescentado, guardar
+o ID do documento, a fonte, a data de consulta e a decisão de revisão.
 
 ---
 

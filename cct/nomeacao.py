@@ -202,7 +202,9 @@ def _partes_do_titulo(titulo: str) -> list[str]:
         return []
     partes = []
     for lado in (m.group("a"), m.group("b")):
-        lado = re.split(r"\s+e\s+outr[ao]s?\b", lado, flags=re.IGNORECASE)[0]
+        # «e Outros Trabalhadores» pode integrar o nome oficial da entidade.
+        # Só remover «e outros» quando termina o lado, não a meio do nome.
+        lado = re.sub(r"\s+e\s+outr[ao]s?\s*$", "", lado, flags=re.IGNORECASE)
         partes.append(lado.strip(" .,;"))
     return [p for p in partes if p]
 

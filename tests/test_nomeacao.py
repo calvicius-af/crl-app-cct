@@ -151,6 +151,23 @@ def test_corrigir_sigla_de_nome_ja_escrito_nao_cria_segundo_pdf(
     assert any("migração controlada necessária" in p for p in resumo["problemas"])
 
 
+def test_retificacao_snmot_preserva_nome_da_entidade_no_titulo():
+    """O «e Outros Trabalhadores» do BTE 31 é parte da entidade, não um sufixo."""
+    entrada = {
+        "ano": 2026, "num_bte": 31, "id_dgert": "390/2026",
+        "tipo": "AE-ALT-RECT", "cod_irct": "47111", "familia": "convencao",
+        "outorgantes": "",
+        "titulo": ("Acordo de empresa entre a CARRISTUR - Inovação em Transportes "
+                   "Urbanos e Regionais, Sociedade Unipessoal L.da e o Sindicato "
+                   "Nacional dos Motoristas e Outros Trabalhadores - SNMOT - "
+                   "Retificação."),
+    }
+    nome, avisos = nome_documento(entrada, 1, esquema="rnc")
+
+    assert nome.endswith("_CARRISTUR-SNMOT")
+    assert "outorgantes lidos do título — confirmar" in avisos
+
+
 # ------------------------------------------------------------- lados da mesa
 
 def test_cnis_e_patronal_e_fnstfps_e_sindical():
