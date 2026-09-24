@@ -30,8 +30,17 @@ RE_NUMERO_PAGINA = re.compile(r"^\d{1,4}$")
 # lhe o texto seguinte: «Boletim do Trabalho e Emprego 31 22 agosto 2026 Deve
 # ler-se: …». No início de uma linha, esse prefixo é sempre mobiliário.
 RE_PREFIXO_CABECALHO = re.compile(
-    rf"^Boletim do Trabalho e Emprego\s+\d+(?:\s+\d{{1,2}}\s+(?:{MESES})\s+\d{{4}})?"
+    rf"^Boletim do Trabalho e Emprego\s+\d+(?:\s+\d{{1,2}}\s+(?:{MESES})\s+\d(?:\s?\d){{3}})?"
     r"(?=\s|$)\s*", re.IGNORECASE)
+
+# O cabeçalho completo, com a data, a meio de uma linha: o PDFium cola-o ao fim
+# da linha anterior nas páginas com formulários e tabelas largas («Reunião de
+# avaliação Homologação da avaliação Boletim do Trabalho e Emprego 28 29 agosto
+# 2025», corrida de 2025), e às vezes parte o ano («202 5»). Com a data, não se
+# confunde com uma citação no corpo, que diz «n.º 21, de 8 de junho de 2025».
+RE_CABECALHO_COM_DATA = re.compile(
+    rf"\s*Boletim do Trabalho e Emprego\s+\d+\s+\d{{1,2}}\s+(?:{MESES})\s+\d(?:\s?\d){{3}}(?!\d)",
+    re.IGNORECASE)
 
 # o mesmo mobiliário colado a outro texto, depois de juntar linhas:
 # «Boletim do Trabalho e Emprego 31 ANEX Categorias e gru», «1 | 139 Boletim …»
@@ -49,6 +58,14 @@ def e_mobiliario(linha: str) -> bool:
 def sem_prefixo_de_cabecalho(linha: str) -> str:
     """A linha sem o cabeçalho do BTE que a abra (pode ficar vazia)."""
     return RE_PREFIXO_CABECALHO.sub("", linha.strip(), count=1)
+
+
+def sem_cabecalho_com_data(linha: str) -> tuple[str, list[str]]:
+    """A linha sem o cabeçalho datado do BTE, onde quer que esteja, e o que saiu."""
+    saem = [m.group(0).strip() for m in RE_CABECALHO_COM_DATA.finditer(linha)]
+    if not saem:
+        return linha, []
+    return RE_CABECALHO_COM_DATA.sub(" ", linha).strip(), saem
 
 
 def tem_mobiliario(linha: str) -> bool:

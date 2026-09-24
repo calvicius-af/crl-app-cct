@@ -227,6 +227,22 @@ def test_hifen_do_pdfium_com_rodape_colado_nao_parte_palavras():
     assert not m.perda_por_pagina
 
 
+def test_cabecalho_datado_a_meio_da_linha_sai_da_referencia():
+    """Corrida de 2025: o PDFium cola o cabeçalho ao fim da linha anterior
+    («… Homologação da avaliação Boletim do Trabalho e Emprego 28 29 agosto
+    2025») e às vezes parte o ano («202 5»). Contava como texto em falta."""
+    pagina = ("Reunião de avaliação Homologação da avaliação Boletim do Trabalho e "
+              "Emprego 28 29 agosto 2025\n"
+              "Boletim do Trabalho e Emprego 5 8 fevereiro 202 5 ANEXO III\n"
+              "publicado no Boletim do Trabalho e Emprego, n.º 21, de 8 de junho de 2025.")
+    limpa, saem = sem_mobiliario(pagina)
+    assert limpa.split("\n") == [
+        "Reunião de avaliação Homologação da avaliação", "ANEXO III",
+        "publicado no Boletim do Trabalho e Emprego, n.º 21, de 8 de junho de 2025."]
+    assert saem == ["Boletim do Trabalho e Emprego 28 29 agosto 2025",
+                    "Boletim do Trabalho e Emprego 5 8 fevereiro 202 5"]
+
+
 def test_citar_o_boletim_no_corpo_nao_e_mobiliario():
     """As menções ao BTE no articulado saíam da referência e contavam como
     resíduo: 5 «resíduos» falsos só no 377."""

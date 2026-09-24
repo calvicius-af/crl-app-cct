@@ -15,7 +15,7 @@ from pathlib import Path
 
 import yaml
 
-from .completude import (diagnostico, invertidas_pela_forma, medir_pdf,
+from .completude import (Medida, diagnostico, invertidas_pela_forma, medir_pdf,
                          ultima_aquisicao)
 from .extractor import extrair_pdf
 from .lexical import codificar
@@ -91,9 +91,12 @@ def _novidades_via_versoes(pasta_versoes: Path, pdf: Path, doc: dict,
                          "— consolidado fica todo na faixa CONSOLIDADO")
         return None
     from .comparar import _ano
+    # o ano do próprio documento não é «anterior». Estava fixo em 2025: numa
+    # corrida de 2026, o consolidado de 2026 entrava como versão anterior
+    ano = _ano(pdf.name)
     versoes = [f for f in sorted(pasta.glob("*.pdf"))
                if not re.match(r"(?i)^(comparei|diferencas)", f.name)
-               and _ano(f.name) != 2025]  # o próprio 2025 não é "anterior"
+               and (ano is None or _ano(f.name) != ano)]
     if not versoes:
         problemas.append(f"{pdf.stem}: pasta {pasta.name} sem versões anteriores")
         return None
@@ -136,6 +139,15 @@ def main():
     p.add_argument("--max-lotes", type=int, default=4)
     p.add_argument("--nome", default="CRL CCT pré-codificado")
     args = p.parse_args()
+
+    # Uma pasta de versões que não existe custava, na corrida de 2025 em
+    # macOS, os 39 documentos com texto consolidado: cada um rebentava na
+    # diacronia, depois de extraído, e ficava fora do QDPX. Diz-se à entrada.
+    if args.pasta_versoes and not Path(args.pasta_versoes).is_dir():
+        raise SystemExit(
+            f"A pasta de versões anteriores não existe: {args.pasta_versoes}\n"
+            "  Corrigir o caminho ou retirar --pasta-versoes (sem ela, os "
+            "consolidados ficam todos na faixa CONSOLIDADO).")
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -316,15 +328,29 @@ def main():
             novidades = None
             if args.pasta_versoes and any(
                     n.get("origem") == "consolidado" for n in doc["nos"]):
-                novidades = _novidades_via_versoes(
-                    Path(args.pasta_versoes), pdf, doc, texto, problemas)
+                # a comparação diacrónica é um extra: uma falha aqui é um
+                # aviso, nunca a perda do documento já extraído e codificado
+                try:
+                    novidades = _novidades_via_versoes(
+                        Path(args.pasta_versoes), pdf, doc, texto, problemas)
+                except Exception as e:
+                    problemas.append(
+                        f"{pdf.stem}: [diacronia] comparação com as versões "
+                        f"anteriores falhou ({e}) — documento mantido, "
+                        "consolidado todo na faixa CONSOLIDADO")
             itens.append((doc, texto, triar(anot, aptos, doc=doc,
                                             novidades=novidades)))
             n_cl = sum(1 for n in doc["nos"] if n["tipo"] == "clausula")
             print(f"[{i}/{len(pdfs)}] {pdf.stem}: {n_cl} cláusulas, "
                   f"{len(anot['anotacoes'])} anotações")
         except Exception as e:
-            problemas.append(f"{pdf.stem}: {e}")
+            erro = f"{type(e).__name__}: {e}"
+            problemas.append(f"{pdf.stem}: ERRO, documento fora do QDPX: {erro}")
+            # o diagnóstico tem de dizer que este documento não chegou ao QDPX
+            if medidas and medidas[-1].documento == pdf.stem:
+                medidas[-1].excluido = erro
+            else:
+                medidas.append(Medida(pdf.stem, excluido=erro))
             print(f"[{i}/{len(pdfs)}] {pdf.stem}: ERRO {e}")
 
     exportar_qdpx(itens, out / "projeto.qdpx", nome_projeto=args.nome, master=master)
@@ -364,6 +390,8 @@ def main():
         resumo=resumo,
         problemas=problemas,
         comando=comando,
+        # documentos fora do QDPX não são um aviso: o resultado está incompleto
+        status="completed_with_errors" if len(itens) < len(pdfs) else None,
     )
     escrever_manifesto(out / "manifest.json", manifesto)
     print(f"\n{relatorio[0]}")
@@ -371,7 +399,8 @@ def main():
           f"\n→ {out/'manifest.json'}\n→ {out/'diagnostico.md'}")
     veredictos = Counter(m.veredicto for m in medidas)
     print(f"Completude: {veredictos['OK']} OK, {veredictos['ATENÇÃO']} com atenção, "
-          f"{veredictos['FALHA']} com falha, {veredictos['SEM MEDIDA']} sem medida "
+          f"{veredictos['FALHA']} com falha, {veredictos['SEM MEDIDA']} sem medida, "
+          f"{veredictos['EXCLUÍDO']} fora do QDPX "
           f"— ver {out/'diagnostico.md'}")
     if problemas:
         print(f"⚠ {len(problemas)} problemas — ver {out/'relatorio.txt'}")
