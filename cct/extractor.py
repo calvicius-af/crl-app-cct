@@ -14,6 +14,8 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from .mobiliario import e_mobiliario, sem_prefixo_de_cabecalho
+
 RE_CAPITULO = re.compile(r"^(?:CAP[IÍ]TULO|T[IÍ]TULO)\s+([IVXLCD]+|\d+)\b(.*)$")
 RE_SECCAO = re.compile(r"^SEC[ÇC][AÃ]O\s+([IVXLCD]+|\d+)\b(.*)$", re.IGNORECASE)
 RE_ANEXO = re.compile(r"^ANEXO\s+([IVXLCD]+|\d+)?\b(.*)$")
@@ -93,7 +95,6 @@ RE_FIM_TITULO_CONVENCAO = re.compile(
 # o bloco de título vive no cabeçalho do documento; a regra acima só lá
 # se aplica, para não partir frases do corpo que acabem nas mesmas palavras
 LINHAS_DO_CABECALHO = 20
-RE_RODAPE_BTE = re.compile(r"^BTE\s+\d+\s*\|\s*\d+$")
 # continuação de enumeração de alíneas partida pelo PDF: "b) e c) do número…"
 # (minúscula ou conjunção após o parêntesis — uma alínea real começa por maiúscula)
 RE_ALINEA_CONTINUACAO = re.compile(r"^[a-z]\)\s+(?:e\b|ou\b|[a-zà-ú])")
@@ -107,6 +108,10 @@ RE_PREAMBULO_LINHA = re.compile(r"^Pre[âa]mbulo\s*$", re.IGNORECASE)
 # sentinelas internas que delimitam tabelas durante a normalização
 MARCA_TABELA_INI = "\x02TABELA"
 MARCA_TABELA_FIM = "\x03TABELA"
+# Fronteira entre as duas colunas de uma página. Só existe entre a extração da
+# página e a remoção do mobiliário, que a usa para saber onde começa e acaba
+# cada coluna, e a retira. Nunca chega ao texto final.
+MARCA_COLUNA = "\x04COLUNA"
 
 
 def _e_cabecalho(linha: str) -> bool:
@@ -448,6 +453,15 @@ def _subsegmentar_paragrafos(nos: list[dict], texto: str) -> list[dict]:
 
 # ---------- PDF ----------
 
+RE_HIFEN_CELULA = re.compile(r"-\s*\n\s*(?=[a-zà-ú])")
+
+
+def _texto_celula(texto: str) -> str:
+    """Uma célula numa linha: a hifenização junta-se como no corpo do texto
+    («estratégi-\nco» → «estratégico»), as outras quebras passam a espaço."""
+    return re.sub(r"[ \t]*\n[ \t]*", " ", RE_HIFEN_CELULA.sub("", texto)).strip()
+
+
 def _formatar_tabela(linhas_tabela: list[list[str | None]]) -> str:
     """Converte uma tabela do pdfplumber em linhas 'célula | célula | célula'.
 
@@ -456,17 +470,181 @@ def _formatar_tabela(linhas_tabela: list[list[str | None]]) -> str:
     """
     linhas = []
     for row in linhas_tabela:
-        celulas = [(c or "").replace("\n", " ").strip() for c in row]
+        celulas = [_texto_celula(c or "") for c in row]
         if any(celulas):
             linhas.append(" | ".join(celulas))
     return "\n".join(linhas)
 
 
+# ---------- texto rodado (ISSUE-0020, #42) ----------
+#
+# Tabelas e escalas desenhadas a 90º numa página que não declara rotação: o
+# pdfplumber, por omissão, lê cada palavra ao contrário («sagloF»). Desde a
+# 0.11 sabe lê-las no sentido certo (`char_dir_rotated`); falta agrupar as
+# palavras em linhas e pôr as tabelas de pé. Só se ativa numa página com texto
+# rodado suficiente: as outras seguem o caminho de sempre.
+MIN_CARACTERES_RODADOS = 10
+
+
+def _sentido_rodado(obj) -> str | None:
+    """«btt» (lê-se de baixo para cima), «ttb» (de cima para baixo) ou None."""
+    a, b, c, d = obj["matrix"][:4]
+    if abs(a) > 0.1 or abs(d) > 0.1:
+        return None
+    return "btt" if b > 0 else "ttb"
+
+
+def _sentido_da_pagina(pag) -> str | None:
+    sentidos = Counter(
+        s for c in pag.chars
+        if not c.get("upright", True) and c["text"].strip()
+        and (s := _sentido_rodado(c)))
+    if sum(sentidos.values()) < MIN_CARACTERES_RODADOS:
+        return None
+    return sentidos.most_common(1)[0][0]
+
+
+def _opcoes(sentido: str) -> dict:
+    # btt: as linhas seguem da esquerda para a direita; ttb: da direita para a esquerda
+    return {"char_dir_rotated": sentido,
+            "line_dir_rotated": "ltr" if sentido == "btt" else "rtl"}
+
+
+def _linhas_rodadas(area, sentido: str) -> str:
+    """O texto rodado de uma área, uma linha por linha do documento."""
+    palavras = [w for w in area.extract_words(**_opcoes(sentido))
+                if not w.get("upright", True)]
+    palavras.sort(key=lambda w: w["x0"], reverse=sentido == "ttb")
+    linhas: list[list[dict]] = []
+    for w in palavras:
+        if linhas and abs(linhas[-1][0]["x0"] - w["x0"]) <= 2:
+            linhas[-1].append(w)
+        else:
+            linhas.append([w])
+    return "\n".join(
+        " ".join(w["text"] for w in sorted(
+            linha, key=lambda w: w["top"], reverse=sentido == "btt"))
+        for linha in linhas)
+
+
+def _texto(area, sentido: str | None) -> str:
+    """O texto de uma área: direito como sempre, e o rodado à parte, no fim."""
+    if sentido is None:
+        return area.extract_text() or ""
+    direito = area.filter(lambda o: o.get("object_type") != "char"
+                          or o.get("upright", True)).extract_text() or ""
+    return "\n".join(t for t in (direito, _linhas_rodadas(area, sentido)) if t.strip())
+
+
+# Uma tabela é toda rodada (e põe-se de pé) só quando quase todo o texto dela
+# está a 90º; uma grelha direita com cabeçalhos verticais (382) não é.
+TABELA_RODADA = 0.8
+
+
+def _celula(pag, cel, sentido: str | None) -> str:
+    """O texto de uma célula, no sentido em que ela está escrita.
+
+    Um carácter pertence à célula pelo seu centro, como no Table.extract do
+    pdfplumber: o within_bbox perdia os que tocam no traço da grelha.
+    """
+    a, b, c, d = cel
+
+    def no_centro(o) -> bool:
+        if o.get("object_type") != "char":
+            return False
+        return (a <= (o["x0"] + o["x1"]) / 2 < c) and (b <= (o["top"] + o["bottom"]) / 2 < d)
+    area = pag.filter(no_centro)
+    if sentido and _rodada(area):
+        return _texto_celula(_linhas_rodadas(area, sentido))
+    return _texto_celula(area.extract_text() or "")
+
+
+def _dados_tabela(tab, sentido: str | None) -> list:
+    """As células da tabela, cada uma lida no seu sentido; uma tabela toda
+    rodada é posta de pé.
+
+    Rodada no sentido «btt», o cabeçalho está à esquerda da página e a
+    primeira coluna em baixo; no sentido «ttb», à direita e em cima.
+    """
+    if sentido is None:
+        return tab.extract()
+    x0, t0, x1, t1 = tab.bbox
+    dentro = [c for c in tab.page.chars
+              if x0 <= c["x0"] <= x1 and t0 <= c["top"] <= t1 and c["text"].strip()]
+    rodados = sum(1 for c in dentro if not c.get("upright", True))
+    celulas = [[None if cel is None else _celula(tab.page, cel, sentido)
+                for cel in linha.cells] for linha in tab.rows]
+    if not celulas or rodados < TABELA_RODADA * len(dentro):
+        return celulas
+    n_linhas, n_colunas = len(celulas), max(len(r) for r in celulas)
+    celulas = [r + [None] * (n_colunas - len(r)) for r in celulas]
+    if sentido == "btt":
+        return [[celulas[n_linhas - 1 - j][i] for j in range(n_linhas)]
+                for i in range(n_colunas)]
+    return [[celulas[j][n_colunas - 1 - i] for j in range(n_linhas)]
+            for i in range(n_colunas)]
+
+
+def _rodada(area) -> bool:
+    """A maior parte dos caracteres da área está rodada."""
+    chars = [c for c in area.chars if c["text"].strip()]
+    return bool(chars) and sum(1 for c in chars if not c.get("upright", True)) * 2 > len(chars)
+
+
+def _fora_das_tabelas(area, tabelas):
+    """A área sem os caracteres que pertencem a alguma tabela.
+
+    O texto de uma tabela lê-se na tabela; uma faixa ou um lado que o
+    apanhasse repetia-o (382, p34: várias grelhas rodadas lado a lado).
+    """
+    caixas = [t.bbox for t in tabelas]
+
+    def fora(o) -> bool:
+        if o.get("object_type") != "char":
+            return True
+        cx, cy = (o["x0"] + o["x1"]) / 2, (o["top"] + o["bottom"]) / 2
+        return not any(a <= cx <= c and b <= cy <= d for a, b, c, d in caixas)
+    return area.filter(fora)
+
+
+def _ao_lado(pag, tab, tabelas, sentido: str | None) -> tuple[str, str]:
+    """O texto à esquerda e à direita de uma tabela, na altura dela.
+
+    As bandas só cobriam o que está acima e abaixo das tabelas; o que estava
+    ao lado perdia-se. Nas páginas rodadas dos CARRISTUR é o título e o
+    «Deve ler-se:», à esquerda da grelha.
+    """
+    x0, t0, x1, t1 = tab.bbox
+    lados = []
+    for a, c in ((pag.bbox[0], x0), (x1, pag.bbox[2])):
+        if c - a < 5:
+            lados.append("")
+            continue
+        lados.append(_texto(_fora_das_tabelas(pag.crop((a, t0, c, t1)), tabelas), sentido))
+    return lados[0], lados[1]
+
+
+def _grelha_atravessa(pag, meio: float) -> bool:
+    """Há traços de tabela a cruzar a goteira no corpo da página?
+
+    Uma tabela com a coluna do meio vazia parece uma página em duas colunas
+    (377, «Enquadramento das profissões»; 384 e 385, grelhas largas): cortá-la
+    ao meio separava as colunas e partia os títulos centrados («ANEX» | «O II»).
+    Os traços do cabeçalho e do rodapé (10% de cima e de baixo) não contam.
+    """
+    topo, fundo = pag.bbox[1], pag.bbox[3]
+    margem = (fundo - topo) * 0.1
+    cruzam = sum(1 for e in pag.horizontal_edges
+                 if e["x0"] < meio - 10 and e["x1"] > meio + 10
+                 and topo + margem < e["top"] < fundo - margem)
+    return cruzam >= 2
+
+
 def _duas_colunas(pag) -> float | None:
     """Devolve o x da goteira se a página estiver em duas colunas (BTE antigo).
 
-    Heurística: poucas palavras atravessam a faixa central e ambas as
-    metades têm texto substancial.
+    Heurística: poucas palavras atravessam a faixa central, ambas as
+    metades têm texto substancial e nenhuma grelha de tabela cruza o meio.
     """
     palavras = pag.extract_words()
     if len(palavras) < 40:
@@ -477,9 +655,70 @@ def _duas_colunas(pag) -> float | None:
     direita = sum(1 for w in palavras if w["x0"] >= meio)
     total = len(palavras)
     if (atravessam / total < 0.02
-            and esquerda / total > 0.25 and direita / total > 0.25):
+            and esquerda / total > 0.25 and direita / total > 0.25
+            and not _grelha_atravessa(pag, meio)
+            and not _tabela_atravessa(pag, meio)):
         return meio
     return None
+
+
+def _tabela_atravessa(pag, meio: float) -> bool:
+    """Há uma tabela detetada que se estende pelos dois lados do meio?
+
+    Quando a fronteira entre duas colunas da grelha cai sobre o meio da
+    página, nenhum traço horizontal atravessa a goteira (384 e 385, p4:
+    «ANEX» | «O II», «Gr» | «upos profissionais»).
+    """
+    return any(t.bbox[0] < meio - 20 and t.bbox[2] > meio + 20
+               for t in pag.find_tables())
+
+
+def _extrair_pagina_deitada(pag, sentido: str) -> str:
+    """Uma página impressa de lado (a maior parte do texto a 90º).
+
+    É o mesmo algoritmo das páginas direitas, no referencial da leitura: as
+    faixas são verticais e seguem a ordem das linhas rodadas (da esquerda para
+    a direita em «btt», ao contrário em «ttb»). Cortar em faixas horizontais,
+    como numa página direita, partia as linhas rodadas nas fronteiras.
+    """
+    x_ini, topo, x_fim, fundo = pag.bbox
+    tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[0], reverse=sentido == "ttb")
+    # o texto direito da página (o cabeçalho do BTE, uma nota) lê-se de uma
+    # vez: as faixas verticais partiam-no («Boletim do Trabalh» | «ho e …»)
+    direito = _fora_das_tabelas(pag, tabelas).filter(
+        lambda o: o.get("object_type") != "char" or o.get("upright", True)).extract_text() or ""
+    partes = [direito] if direito.strip() else []
+
+    def juntar(area) -> None:
+        txt = _linhas_rodadas(_fora_das_tabelas(area, tabelas), sentido)
+        if txt.strip():
+            partes.append(txt)
+
+    # posição já lida, na direção da leitura
+    pos = x_ini if sentido == "btt" else x_fim
+    for tab in tabelas:
+        x0, t0, x1, t1 = tab.bbox
+        antes = (pos, x0) if sentido == "btt" else (x1, pos)
+        if antes[1] - antes[0] > 1:
+            juntar(pag.crop((antes[0], topo, antes[1], fundo)))
+        # ao lado da tabela, na leitura: em «btt», a esquerda lógica é o fundo
+        # da página; em «ttb», é o topo
+        baixo = (x0, t1, x1, fundo) if fundo - t1 > 1 else None
+        cima = (x0, topo, x1, t0) if t0 - topo > 1 else None
+        primeiro, segundo = (baixo, cima) if sentido == "btt" else (cima, baixo)
+        if primeiro:
+            juntar(pag.crop(primeiro))
+        dados = _dados_tabela(tab, sentido)
+        corpo = _formatar_tabela(dados) if dados else ""
+        if corpo:
+            partes.append(f"{MARCA_TABELA_INI}\n{corpo}\n{MARCA_TABELA_FIM}")
+        if segundo:
+            juntar(pag.crop(segundo))
+        pos = max(pos, x1) if sentido == "btt" else min(pos, x0)
+    resto = (pos, x_fim) if sentido == "btt" else (x_ini, pos)
+    if resto[1] - resto[0] > 1:
+        juntar(pag.crop((resto[0], topo, resto[1], fundo)))
+    return "\n".join(partes)
 
 
 def _extrair_pagina(pag) -> str:
@@ -487,74 +726,135 @@ def _extrair_pagina(pag) -> str:
 
     O BTE é de coluna única: fatiamos a página em bandas horizontais entre
     as tabelas detetadas; o texto de cada banda sai com extract_text e as
-    tabelas saem estruturadas entre sentinelas MARCA_TABELA_*.
+    tabelas saem estruturadas entre sentinelas MARCA_TABELA_*. Uma página com
+    texto rodado a 90º não se corta em colunas e lê-se no sentido certo.
     """
-    goteira = _duas_colunas(pag)
+    sentido = _sentido_da_pagina(pag)
+    if sentido and _rodada(pag):
+        return _extrair_pagina_deitada(pag, sentido)
+    goteira = None if sentido else _duas_colunas(pag)
     if goteira is not None:
         esq = pag.crop((pag.bbox[0], pag.bbox[1], goteira, pag.bbox[3]))
         dir_ = pag.crop((goteira, pag.bbox[1], pag.bbox[2], pag.bbox[3]))
-        return "\n".join(t for t in (_extrair_pagina(esq), _extrair_pagina(dir_))
-                         if t.strip())
+        return f"\n{MARCA_COLUNA}\n".join(
+            t for t in (_extrair_pagina(esq), _extrair_pagina(dir_)) if t.strip())
 
     tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[1])
     if not tabelas:
-        return pag.extract_text() or ""
+        return _texto(pag, sentido)
 
     partes = []
     topo = pag.bbox[1]
     for tab in tabelas:
         x0, t0, x1, t1 = tab.bbox
         if t0 > topo:
-            banda = pag.crop((pag.bbox[0], topo, pag.bbox[2], t0))
-            txt = banda.extract_text() or ""
+            banda = _fora_das_tabelas(pag.crop((pag.bbox[0], topo, pag.bbox[2], t0)), tabelas)
+            txt = _texto(banda, sentido)
             if txt.strip():
                 partes.append(txt)
-        dados = tab.extract()
+        esquerda, direita = _ao_lado(pag, tab, tabelas, sentido)
+        if esquerda.strip():
+            partes.append(esquerda)
+        dados = _dados_tabela(tab, sentido)
         if dados:
             corpo = _formatar_tabela(dados)
             if corpo:
                 partes.append(f"{MARCA_TABELA_INI}\n{corpo}\n{MARCA_TABELA_FIM}")
+        if direita.strip():
+            partes.append(direita)
         topo = max(topo, t1)
     if topo < pag.bbox[3]:
-        banda = pag.crop((pag.bbox[0], topo, pag.bbox[2], pag.bbox[3]))
-        txt = banda.extract_text() or ""
+        banda = _fora_das_tabelas(pag.crop((pag.bbox[0], topo, pag.bbox[2], pag.bbox[3])),
+                                  tabelas)
+        txt = _texto(banda, sentido)
         if txt.strip():
             partes.append(txt)
     return "\n".join(partes)
 
 
+# Linhas no topo e no fundo de cada página (ou coluna) onde o BTE põe o seu
+# mobiliário: cabeçalho com o número do boletim, número da página, rodapé.
+ZONA_MOBILIARIO = 3
+
+
+def _segmentos(pagina: str) -> list[list[str]]:
+    """As colunas de uma página, sem a marca que as separa."""
+    segmentos: list[list[str]] = [[]]
+    for linha in pagina.split("\n"):
+        if linha.strip() == MARCA_COLUNA:
+            segmentos.append([])
+        else:
+            segmentos[-1].append(linha)
+    return segmentos
+
+
+def _texto_fora_de_tabela(linhas: list[str]) -> list[int]:
+    """Índices das linhas não vazias, fora das tabelas e das suas marcas."""
+    fora = []
+    em_tabela = False
+    for i, linha in enumerate(linhas):
+        limpa = linha.strip()
+        if limpa == MARCA_TABELA_INI:
+            em_tabela = True
+        elif limpa == MARCA_TABELA_FIM:
+            em_tabela = False
+        elif limpa and not em_tabela:
+            fora.append(i)
+    return fora
+
+
+def _nas_margens(linhas: list[str]) -> set[int]:
+    """Índices das linhas de texto no topo ou no fundo de uma coluna.
+
+    As linhas de tabela contam para a posição, mas nunca são mobiliário: um
+    rodapé depois de uma tabela no fim da página está na margem; uma linha
+    entre duas tabelas a meio da página não está.
+    """
+    cheias = [i for i, l in enumerate(linhas) if l.strip()]
+    # numa página curta, três linhas de cada lado eram a página inteira, e
+    # uma frase do corpo repetida entre páginas curtas desaparecia
+    zona = max(1, min(ZONA_MOBILIARIO, len(cheias) // 4))
+    margens = set(cheias[:zona] + cheias[-zona:])
+    return margens.intersection(_texto_fora_de_tabela(linhas))
+
+
 def _remover_cabecalhos_rodapes(paginas: list[str]) -> list[str]:
-    """Remove mobiliário repetido sem tocar nos delimitadores/células de tabelas."""
+    """Remove o mobiliário do BTE sem tocar no corpo nem nas tabelas.
+
+    Mobiliário é o que se repete no topo ou no fundo das páginas: uma linha
+    de texto que aparece nas margens de pelo menos 30% das páginas, um
+    número de página sozinho nas margens, ou uma linha inteira de cabeçalho,
+    data ou rodapé do BTE em qualquer sítio (`cct/mobiliario.py`). A posição conta: antes, qualquer linha repetida em 30%
+    das páginas desaparecia, incluindo frases legítimas do corpo (issue #47).
+    """
+    colunas = [_segmentos(pag) for pag in paginas]
     contagem: Counter[str] = Counter()
-    for pag in paginas:
-        fora = set()
-        em_tabela = False
-        for linha in pag.split("\n"):
-            limpa = linha.strip()
-            if limpa == MARCA_TABELA_INI:
-                em_tabela = True
-            elif limpa == MARCA_TABELA_FIM:
-                em_tabela = False
-            elif limpa and not em_tabela:
-                fora.add(limpa)
-        contagem.update(fora)
+    for segmentos in colunas:
+        contagem.update({seg[i].strip() for seg in segmentos for i in _nas_margens(seg)})
     limiar = max(2, int(len(paginas) * 0.3))
     repetidas = {l for l, c in contagem.items() if c >= limiar}
     limpas = []
-    for pag in paginas:
+    for segmentos in colunas:
         linhas = []
-        em_tabela = False
-        for linha in pag.split("\n"):
-            limpa = linha.strip()
-            if limpa == MARCA_TABELA_INI:
-                em_tabela = True
-                linhas.append(linha)
-            elif limpa == MARCA_TABELA_FIM:
-                linhas.append(linha)
-                em_tabela = False
-            elif em_tabela or (limpa not in repetidas
-                               and not re.fullmatch(r"\d+", limpa)
-                               and not RE_RODAPE_BTE.match(limpa)):
+        for seg in segmentos:
+            margens = _nas_margens(seg)
+            texto = set(_texto_fora_de_tabela(seg))
+            for i, linha in enumerate(seg):
+                limpa = linha.strip()
+                # cabeçalho, data e rodapé do BTE em linha própria, em
+                # qualquer sítio: nas páginas de 2026 nem sempre se repetem
+                # o bastante para a regra das margens os apanhar (os
+                # CARRISTUR têm três páginas e o cabeçalho só na primeira)
+                if i in texto and e_mobiliario(limpa):
+                    continue
+                if i in texto and (resto := sem_prefixo_de_cabecalho(limpa)) != limpa:
+                    # cabeçalho e data na mesma linha, às vezes com o título
+                    # a seguir (CARRISTUR, primeira página)
+                    if resto:
+                        linhas.append(resto)
+                    continue
+                if i in margens and (limpa in repetidas or re.fullmatch(r"\d+", limpa)):
+                    continue
                 linhas.append(linha)
         limpas.append("\n".join(linhas))
     return limpas
@@ -571,7 +871,9 @@ def extrair_pdf(pdf_path: Path, paginas: tuple[int, int] | None = None,
     with pdfplumber.open(pdf_path) as pdf:
         pags = pdf.pages if paginas is None else pdf.pages[paginas[0]:paginas[1]]
         for pag in pags:
-            t = _extrair_pagina(pag)
+            # negrito simulado: o mesmo carácter desenhado duas vezes, quase
+            # no mesmo sítio («CCaarrrreeiirraa», 382); fica um
+            t = _extrair_pagina(pag.dedupe_chars())
             if t.strip():
                 textos.append(t)
     if not textos:

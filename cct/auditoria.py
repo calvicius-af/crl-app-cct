@@ -48,18 +48,18 @@ def _aviso_tabela_rodada(pagina: int, bbox: tuple[float, float, float, float]
     if largura > 0 and altura > LIMIAR_PROPORCAO_RODADA * largura:
         return (f"p{pagina}: tabela com {largura:.0f}×{altura:.0f} pt "
                 f"(muito mais alta do que larga) — provavelmente rodada "
-                f"90º; o pdfplumber lê-a invertida, usar --extrator docling")
+                f"90º, e o texto extraído tem palavras invertidas; confirmar "
+                f"no PDF ou usar --extrator docling")
     return None
 
 
 def tabelas_rodadas_pdfplumber(pdf_path: Path) -> list[str]:
     """Tabelas cuja bbox sugere rotação 90º, por página (auditor, não segundo extrator).
 
-    O docling lê estas tabelas na orientação correta (verificado nos quatro
-    documentos CARRISTUR do BTE 31/2026); o pdfplumber não deteta a rotação
-    e emite o texto invertido como se fosse conteúdo válido. Isto não
-    corrige a leitura — só avisa, para quem vir a tabela invertida no QDPX
-    saber que a causa é conhecida e que `--extrator docling` a lê bem.
+    Desde 2026-09-24 o extrator lê o texto rodado no sentido certo
+    (`_sentido_da_pagina` em cct/extractor.py). O pipeline só chama este
+    aviso quando o texto extraído ainda tem palavras invertidas: é o sinal de
+    uma rotação que o extrator não reconheceu.
     """
     import pdfplumber
 
@@ -145,6 +145,11 @@ _RE_ANEXO_TABELA = re.compile(
     re.IGNORECASE)
 
 
+def _descendentes(no: dict, nos: list[dict]) -> list[dict]:
+    filhos = [n for n in nos if n.get("pai") == no["id"]]
+    return [d for f in filhos for d in (f, *_descendentes(f, nos))]
+
+
 def tabelas_esperadas(doc: dict, texto: str) -> list[str]:
     """Anexos que pela natureza deviam ter tabela e não têm nenhuma.
 
@@ -163,13 +168,19 @@ def tabelas_esperadas(doc: dict, texto: str) -> list[str]:
     """
     avisos = []
     doc_tem_tabelas = " | " in texto
-    for no in doc.get("nos", []):
-        if no.get("tipo") != "anexo" or not no.get("folha", True):
+    nos = doc.get("nos", [])
+    for no in nos:
+        if no.get("tipo") != "anexo":
             continue
         rotulo = no.get("rotulo", "")
         if not _RE_ANEXO_TABELA.search(rotulo):
             continue
-        bruto = texto[no["char_start"]:no["char_end"]]
+        # O estruturar fecha o nó do anexo no cabeçalho e põe o corpo num
+        # nó filho («Corpo de ANEXO III…»). O corpo do anexo são os dois:
+        # olhar só para o cabeçalho dava «fora do nó» para tabelas que estão
+        # no sítio certo (issue #83).
+        bruto = "".join(texto[n["char_start"]:n["char_end"]]
+                        for n in [no, *_descendentes(no, nos)])
         if " | " not in bruto:
             if doc_tem_tabelas:
                 avisos.append(

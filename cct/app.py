@@ -16,6 +16,10 @@ from cct.subprocesso import ambiente_utf8
 RAIZ = Path(__file__).resolve().parent.parent      # raiz do repositório
 DADOS = RAIZ / "data" / "raw"
 RESULTADOS = RAIZ / "results"
+# Posto na fila pela thread de trabalho quando o subprocesso termina. Só a
+# thread principal mexe nos widgets (issue #45): o Tkinter não é seguro para
+# chamadas de outras threads, e em macOS isso dá falhas intermitentes.
+FIM_DA_CORRIDA = object()
 
 
 class AppCCT(tk.Tk):
@@ -24,7 +28,7 @@ class AppCCT(tk.Tk):
         self.title("Pipeline CCT → MaxQDA")
         self.geometry("760x640")
         self.fila = queue.Queue()
-        self.processo = None
+        self.em_curso = False
         self._construir()
         self._preencher_defaults()
         self.after(150, self._despejar_fila)
@@ -146,15 +150,23 @@ class AppCCT(tk.Tk):
     def _despejar_fila(self):
         try:
             while True:
-                self._escrever(self.fila.get_nowait())
+                mensagem = self.fila.get_nowait()
+                if mensagem is FIM_DA_CORRIDA:
+                    self.em_curso = False
+                    self.b_correr.configure(state="normal")
+                else:
+                    self._escrever(mensagem)
         except queue.Empty:
             pass
         self.after(150, self._despejar_fila)
 
     def _lancar(self, argumentos):
-        if self.processo is not None:
+        if self.em_curso:
             messagebox.showinfo("Em curso", "Já há uma corrida em curso.")
             return
+        # marcado aqui, na thread principal, e não depois de o subprocesso
+        # arrancar: um segundo clique nesse intervalo lançava outra corrida
+        self.em_curso = True
         self._escrever("\n" + "=" * 60 + "\n$ " + " ".join(argumentos) + "\n")
         self.b_correr.configure(state="disabled")
 
@@ -168,21 +180,19 @@ class AppCCT(tk.Tk):
                 # Windows para Unicode) — foi o que aconteceu em estações do
                 # CRL com a codificação regional portuguesa. Ver ISSUE-0007 e
                 # tests/test_subprocesso_utf8.py.
-                p = subprocess.Popen([sys.executable, "-u", "-m", *argumentos],
-                                     cwd=str(RAIZ), stdout=subprocess.PIPE,
-                                     stderr=subprocess.STDOUT, text=True,
-                                     encoding="utf-8", errors="replace",
-                                     env=ambiente_utf8())
-                self.processo = p
-                for linha in p.stdout:
-                    self.fila.put(linha)
-                p.wait()
+                # o `with` fecha o pipe e espera pelo processo
+                with subprocess.Popen([sys.executable, "-u", "-m", *argumentos],
+                                      cwd=str(RAIZ), stdout=subprocess.PIPE,
+                                      stderr=subprocess.STDOUT, text=True,
+                                      encoding="utf-8", errors="replace",
+                                      env=ambiente_utf8()) as p:
+                    for linha in p.stdout:
+                        self.fila.put(linha)
                 self.fila.put(f"\n[terminado com código {p.returncode}]\n")
             except Exception as e:
                 self.fila.put(f"\nERRO: {e}\n")
             finally:
-                self.processo = None
-                self.b_correr.configure(state="normal")
+                self.fila.put(FIM_DA_CORRIDA)
 
         threading.Thread(target=trabalho, daemon=True).start()
 

@@ -10,10 +10,13 @@ Uso mínimo:
 import argparse
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 import yaml
 
+from .completude import (diagnostico, invertidas_pela_forma, medir_pdf,
+                         ultima_aquisicao)
 from .extractor import extrair_pdf
 from .lexical import codificar
 from .nomeacao import FAMILIAS_PROCESSAVEIS, familia_do_nome
@@ -247,6 +250,7 @@ def main():
         return "desconhecido", tipo
 
     itens, problemas = [], []
+    medidas = []
     for i, pdf in enumerate(pdfs, 1):
         try:
             v = None
@@ -256,6 +260,9 @@ def main():
             subtipo, tipo_registo = _subtipo_do(pdf.stem, (v or {}).get("subtipo"))
             doc, texto = extrair(pdf, doc_id=pdf.stem, subtipo=subtipo)
             doc["tipo_registo"] = tipo_registo  # fora do schema: meta para sanidade
+            # completude contra uma leitura independente do PDF: nunca
+            # rebenta, e o resultado vai para o diagnostico.md
+            medidas.append(medir_pdf(pdf.stem, pdf, texto))
             validar_doc(doc)
             for aviso in verificar_sanidade(doc, texto):
                 problemas.append(f"{pdf.stem}: {aviso}")
@@ -277,10 +284,11 @@ def main():
                 problemas.append(
                     f"{pdf.stem}: [auditoria] não foi possível verificar "
                     f"as tabelas ({e}) — documento mantido")
-            # tabelas rodadas 90º (ISSUE-0020): defeito específico do
-            # pdfplumber, que lê o texto invertido sem se queixar — com
-            # --extrator docling a tabela já sai correta, não há o que avisar
-            if args.extrator != "docling":
+            # tabelas rodadas 90º (ISSUE-0020): o extrator lê hoje o texto
+            # rodado no sentido certo; o aviso só se dá quando o texto ainda
+            # traz palavras invertidas, sinal de uma rotação não reconhecida.
+            # Sem essa condição, dizia que estava errado o que já estava certo.
+            if args.extrator != "docling" and invertidas_pela_forma(texto):
                 try:
                     from .auditoria import tabelas_rodadas_pdfplumber
                     for aviso in tabelas_rodadas_pdfplumber(pdf):
@@ -328,7 +336,7 @@ def main():
         relatorio.extend(f"  {p}" for p in problemas)
     (out / "relatorio.txt").write_text("\n".join(relatorio), encoding="utf-8")
     saidas = [out / "projeto.qdpx", out / "sugestoes_peritas.xlsx",
-              out / "relatorio.txt"]
+              out / "relatorio.txt", out / "diagnostico.md"]
     resumo = {
         "documentos_encontrados": len(pdfs),
         "documentos_processados": len(itens),
@@ -338,6 +346,15 @@ def main():
         "anotacoes": sum(len(anot["anotacoes"])
                           for _doc, _texto, anot in itens),
     }
+    # O diagnóstico junta tudo num só ficheiro: completude de cada documento,
+    # relatório, ambiente e a última aquisição. É o que se envia quando algo
+    # corre mal, em vez de abrir os documentos um a um. Escreve-se antes do
+    # manifesto final, que regista o seu hash.
+    (out / "diagnostico.md").write_text(diagnostico(
+        medidas, manifesto_inicial | {"summary": resumo},
+        "\n".join(relatorio),
+        {"Última aquisição": ultima_aquisicao(out.parent / "aquisicao")}),
+        encoding="utf-8", newline="\n")
     manifesto = construir_manifesto(
         raiz=raiz,
         inicio_utc=inicio_utc,
@@ -351,7 +368,11 @@ def main():
     escrever_manifesto(out / "manifest.json", manifesto)
     print(f"\n{relatorio[0]}")
     print(f"→ {out/'projeto.qdpx'}\n→ {out/'sugestoes_peritas.xlsx'}"
-          f"\n→ {out/'manifest.json'}")
+          f"\n→ {out/'manifest.json'}\n→ {out/'diagnostico.md'}")
+    veredictos = Counter(m.veredicto for m in medidas)
+    print(f"Completude: {veredictos['OK']} OK, {veredictos['ATENÇÃO']} com atenção, "
+          f"{veredictos['FALHA']} com falha, {veredictos['SEM MEDIDA']} sem medida "
+          f"— ver {out/'diagnostico.md'}")
     if problemas:
         print(f"⚠ {len(problemas)} problemas — ver {out/'relatorio.txt'}")
 

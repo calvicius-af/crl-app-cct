@@ -79,3 +79,19 @@ os quatro CARRISTUR (`2026_SPE_387` a `390`) produz o aviso `"tabela com 315×67
 corrida equivalente com `--extrator docling` não produz nenhum. O texto invertido
 continua a sair no QDPX quando se usa pdfplumber — o aviso não o corrige, só o torna
 visível, como a issue aceitava como solução mínima.
+
+## Correção no pdfplumber (2026-09-24)
+
+O corpus de regressão mostrou o texto invertido no QDPX dos quatro CARRISTUR e do 382
+(`ahlocsE`, `ocincéT`, `oirótarenumeR`), porque a corrida normal usa o pdfplumber. O
+extrator passa a ler o texto rodado no sentido certo (`char_dir_rotated` do pdfplumber
+0.11, sem dependência nova) e a pôr as tabelas rodadas de pé (`_sentido_da_pagina`,
+`_dados_tabela` em `cct/extractor.py`). Testado com PDF sintéticos nos dois sentidos de
+rotação (`tests/test_extractor.py`); o aviso da auditoria só aparece se o texto ainda
+tiver palavras invertidas.
+
+**Confirmado no corpus real** (job «corpus» do CI, commit `0da8b02`): os quatro
+CARRISTUR com 100% de cobertura e zero palavras invertidas, contra 626 palavras a mais
+antes. O 382 com 99,8%; resta a ordem das grelhas da p34. Ver
+[corpus BTE 31/2026](../docs/validacao/corpus-bte31-2026-09-24.md). Confirmado
+visualmente no MaxQDA a 2026-09-24 (p34 do 382 e uma tabela de um CARRISTUR): sem erros.

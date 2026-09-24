@@ -37,6 +37,25 @@ Casos difíceis vivem em `tests/fixtures/`; para verificação ponta a ponta há
 
 O mapa e a estrutura de destino da suite estão em [`tests/README.md`](tests/README.md).
 
+### Alterações ao extrator: corpus de regressão
+
+Uma alteração que toca na extração (`cct/extractor*.py`, `cct/completude.py`, a
+estruturação) mede-se contra PDF reais antes do merge. Os testes sobre texto escrito
+à mão não chegam: foi assim que várias correções partiram outros documentos.
+
+```bash
+python -m cct.corpus obter --pasta data/raw/bte/bte_2026   # junta os PDF pelo hash
+python -m cct.corpus medir                                  # falha se algum piorar
+```
+
+O manifesto (`tests/corpus/manifesto.json`) identifica cada PDF pelo SHA-256; os PDF
+ficam fora do repositório (ADR-0013). A referência (`tests/corpus/referencia.json`)
+guarda só números. Os dois comandos falham se faltar qualquer PDF do manifesto ou uma
+referência; `--permitir-ausentes` aceita um corpus parcial para leitura offline, e o CI
+nunca o usa. Uma melhoria confirmada grava-se com `medir --atualizar`, e o
+`results/corpus/comparacao.md` segue com o PR. Para testes do extrator sem PDF reais,
+`tests/pdf_sintetico.py` escreve PDF pequenos com o mobiliário do BTE e texto rodado.
+
 ## As três regras que não se quebram
 
 1. **UTF-8 sem BOM, quebras LF** no texto-fonte.

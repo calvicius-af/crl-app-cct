@@ -20,6 +20,15 @@ Recebe PDFs de convenções coletivas do BTE e produz:
 3. **relatorio.txt** — o que correu bem e o que precisa de atenção.
 4. **manifest.json** — proveniência da corrida: comando, commit, ambiente,
    hashes dos inputs/outputs e contagens.
+5. **diagnostico.md** — um só ficheiro com tudo o que é preciso para
+   perceber o que correu mal: para cada documento, se o texto tem todas as
+   palavras do PDF (comparado com uma segunda leitura independente, feita
+   pelo PDFium), palavras a mais ou invertidas, blocos fora de ordem,
+   cabeçalhos do BTE que ficaram no texto e tabelas colapsadas numa linha,
+   com o número de parágrafo que o MaxQDA mostra. Traz também o relatório,
+   o ambiente e a última aquisição. **É este o ficheiro a enviar quando uma
+   corrida tem problemas.** Para o gerar de novo sobre uma corrida já feita:
+   `.venv\Scripts\python -m cct.completude --corrida results\corrida`.
 
 ---
 

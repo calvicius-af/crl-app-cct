@@ -220,3 +220,38 @@ def test_os_exemplos_publicados_nao_sao_retificacoes():
     assert textos
     for p in textos:
         assert not titulo_de_retificacao(p.read_text(encoding="utf-8")), p.name
+
+
+ALTERACAO = ("Acordo de empresa entre a X e o Y - Alteração salarial e outras\n"
+             "Artigo 1.º - Alteração\n"
+             "As cláusulas 5.ª e 7.ª do acordo de empresa publicado no BTE n.º 3, "
+             "de 2020, passam a ter a redação seguinte:\n"
+             "Cláusula 5.ª - Férias\nO período de férias é de 25 dias.\n"
+             "{setima}")
+
+
+def test_artigo_que_anuncia_as_clausulas_seguintes_nao_esta_truncado():
+    """Issue #83 (384 e 385 do BTE 31/2026): o artigo 1.º termina em dois
+    pontos porque as cláusulas que anuncia vêm a seguir."""
+    doc, final = estruturar(ALTERACAO.format(
+        setima="Cláusula 7.ª - Subsídios\nO subsídio é de 5 euros.\n"), "x")
+    assert clausulas_sem_corpo(doc, final) == []
+
+
+def test_enumeracao_sem_alineas_continua_a_ser_truncada():
+    """O caso negativo: uma cláusula que abre uma enumeração e é seguida por
+    outra cláusula perdeu as alíneas. Não anuncia redação nenhuma."""
+    doc, final = estruturar(ALTERACAO.format(
+        setima="Cláusula 7.ª - Subsídios\nOs trabalhadores têm direito a:\n"
+               "Cláusula 8.ª - Outra\nTexto final.\n"), "x")
+    assert clausulas_sem_corpo(doc, final) == [
+        "Cláusula 7.ª - Subsídios: corpo sem frase terminada em ponto"]
+
+
+def test_artigo_que_anuncia_mas_acaba_o_documento_continua_a_dar_aviso():
+    """Anunciar a redação seguinte e não ter nada a seguir é truncagem."""
+    doc, final = estruturar(
+        "Artigo 1.º - Alteração\nAs cláusulas 5.ª e 7.ª passam a ter a redação seguinte:\n",
+        "x")
+    assert clausulas_sem_corpo(doc, final) == [
+        "Artigo 1.º - Alteração: corpo sem frase terminada em ponto"]

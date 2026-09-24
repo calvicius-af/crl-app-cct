@@ -32,7 +32,7 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0003](0003-qdpx-perde-ganhos-do-docling.md) | O QDPX perde os ganhos de legibilidade do extrator Docling | Em curso |
 | [0004](0004-revisao-pr-23.md) | Correções exigidas pela revisão do PR #23 | Resolvida |
 | [0005](0005-programa-qualidade-tecnica.md) | Programa de qualidade técnica pós-PR #23 | Em curso |
-| [0006](0006-colunas-cortam-cabecalhos-centrados.md) | O corte em duas colunas parte cabeçalhos centrados (pdfplumber) | Aberta |
+| [0006](0006-colunas-cortam-cabecalhos-centrados.md) | O corte em duas colunas parte cabeçalhos centrados (pdfplumber) | Em curso |
 | [0007](0007-unicode-cp1252-app-grafica.md) | UnicodeEncodeError na app gráfica em estações Windows com cp1252 | Resolvida |
 | [0008](0008-clausula-previa-nao-reconhecida.md) | O extrator não reconhece "Cláusula prévia" como cabeçalho | Resolvida |
 | [0009](0009-instalacao-offline-falha-em-caminho-unc.md) | A instalação offline falha quando o projeto está num caminho de rede | Resolvida no código — falta gate em estação |
@@ -49,7 +49,7 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0020](0020-tabelas-carristur-rodadas.md) | As tabelas dos CARRISTUR estão rodadas 90º e saem invertidas | Resolvida |
 | [0021](0021-alternativas-tabelas-maxqda.md) | Alternativas para tabelas melhor formatadas no MAXQDA | Aberta |
 | [0022](0022-nomes-nao-seguem-esquema-rnc.md) | Os nomes dos ficheiros não seguem o esquema definido em docs/rnc/README.md | Resolvida |
-| [0023](0023-auditoria-anexos-artigos-falsos-positivos.md) | Auditoria de anexos e artigos sinaliza falsos positivos | Aberta |
+| [0023](0023-auditoria-anexos-artigos-falsos-positivos.md) | Auditoria de anexos e artigos sinaliza falsos positivos | Resolvida no código — falta confirmar na corrida |
 | [0024](0024-tabelas-salariais-colapsadas-bte31.md) | Tabelas salariais colapsadas no TXT do BTE 31/2026 | Aberta |
 
 ## Ronda de 2026-09-18: qualidade da extração (linting e renomeação)

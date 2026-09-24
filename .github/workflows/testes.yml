@@ -186,3 +186,63 @@ jobs:
 
       - name: Correr os testes
         run: python -m pytest -q -rs
+
+  corpus:
+    # Corpus de regressão com PDF reais do BTE (cct/corpus.py). Descarrega os
+    # documentos do manifesto que já têm URL, verifica o hash e mede-os contra
+    # tests/corpus/referencia.json: falha se algum documento piorar. Enquanto
+    # o manifesto não tiver URL ou não houver referência, o teste é ignorado
+    # e o job passa, dizendo porquê.
+    name: corpus de regressão (PDF reais)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c requirements/runtime.txt -c requirements/dev.txt
+
+      # Modo estrito nas duas etapas: falham se faltar qualquer PDF do
+      # manifesto (uma descarga falhada, todas as descargas falhadas) ou se um
+      # documento não tiver referência. Um corpus parcial verde seria uma
+      # garantia falsa sobre os documentos que faltam (revisão do PR #89).
+      - name: Obter os PDF do corpus
+        run: python -m cct.corpus obter --rede
+
+      - name: Medir contra a referência
+        env:
+          CCT_CORPUS_OBRIGATORIO: "1"
+        run: python -m pytest -q -rs tests/test_corpus.py -k corpus_real
+
+      - name: Mostrar as medições deste commit
+        # Informativo, e por isso permissivo: a garantia está nas etapas acima.
+        # Mede de novo e grava as métricas numa referência à parte, que não
+        # substitui a do repositório: a comparação detalhada fica no registo
+        # do job e no artefacto, e a referência proposta pode ser revista e
+        # copiada para tests/corpus/referencia.json quando uma melhoria for
+        # confirmada.
+        if: always()
+        run: |
+          if ls data/corpus/*.pdf >/dev/null 2>&1; then
+            python -m cct.corpus medir --atualizar --permitir-ausentes \
+              --referencia results/corpus/referencia-proposta.json
+            cat results/corpus/comparacao.md
+            cat results/corpus/referencia-proposta.json
+          else
+            echo "Sem PDF do corpus: nada a medir."
+          fi
+
+      - name: Guardar a comparação
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: corpus-comparacao
+          path: results/corpus/
+          if-no-files-found: ignore
