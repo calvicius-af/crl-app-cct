@@ -145,6 +145,11 @@ _RE_ANEXO_TABELA = re.compile(
     re.IGNORECASE)
 
 
+def _descendentes(no: dict, nos: list[dict]) -> list[dict]:
+    filhos = [n for n in nos if n.get("pai") == no["id"]]
+    return [d for f in filhos for d in (f, *_descendentes(f, nos))]
+
+
 def tabelas_esperadas(doc: dict, texto: str) -> list[str]:
     """Anexos que pela natureza deviam ter tabela e não têm nenhuma.
 
@@ -163,13 +168,19 @@ def tabelas_esperadas(doc: dict, texto: str) -> list[str]:
     """
     avisos = []
     doc_tem_tabelas = " | " in texto
-    for no in doc.get("nos", []):
-        if no.get("tipo") != "anexo" or not no.get("folha", True):
+    nos = doc.get("nos", [])
+    for no in nos:
+        if no.get("tipo") != "anexo":
             continue
         rotulo = no.get("rotulo", "")
         if not _RE_ANEXO_TABELA.search(rotulo):
             continue
-        bruto = texto[no["char_start"]:no["char_end"]]
+        # O estruturar fecha o nó do anexo no cabeçalho e põe o corpo num
+        # nó filho («Corpo de ANEXO III…»). O corpo do anexo são os dois:
+        # olhar só para o cabeçalho dava «fora do nó» para tabelas que estão
+        # no sítio certo (issue #83).
+        bruto = "".join(texto[n["char_start"]:n["char_end"]]
+                        for n in [no, *_descendentes(no, nos)])
         if " | " not in bruto:
             if doc_tem_tabelas:
                 avisos.append(

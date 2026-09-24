@@ -27,6 +27,12 @@ RE_RETIFICACAO = re.compile(
 # vir separado por espaços
 RE_FRASE_FECHADA = re.compile(r"[.!?][\s)\]»”\"']*$")
 _TIPOS_COM_CORPO = ("clausula", "artigo")
+# Um artigo de alteração apresenta as cláusulas que se seguem: «As cláusulas
+# 5.ª e 7.ª passam a ter a redação seguinte:». Termina em dois pontos porque
+# o texto que anuncia vem nos nós seguintes, e não por estar truncado.
+RE_ANUNCIO = re.compile(
+    r"(reda[çc][ãa]o|termos seguintes|forma seguinte|seguinte teor"
+    r"|aditad[oa]s?|republicad[oa]s?)\b[^:]*:$", re.IGNORECASE)
 
 
 def clausulas_sem_corpo(doc: dict, texto: str) -> list[str]:
@@ -34,8 +40,12 @@ def clausulas_sem_corpo(doc: dict, texto: str) -> list[str]:
 
     Um cabeçalho seguido logo de outro cabeçalho é o sintoma clássico de
     conteúdo deslocado; um corpo sem qualquer ponto final é quase sempre
-    texto truncado.
+    texto truncado. A exceção é o artigo que anuncia as cláusulas seguintes
+    («passam a ter a redação seguinte:») e é seguido por elas (issue #83). Uma
+    enumeração que acaba em dois pontos sem nada a seguir continua a contar:
+    é o caso típico das alíneas perdidas.
     """
+    comecos = {no["char_start"]: no for no in doc.get("nos", [])}
     falhas = []
     for no in doc.get("nos", []):
         if no.get("tipo") not in _TIPOS_COM_CORPO or not no.get("folha", True):
@@ -46,8 +56,18 @@ def clausulas_sem_corpo(doc: dict, texto: str) -> list[str]:
         if not corpo:
             falhas.append(f"{no['rotulo']}: sem conteúdo")
         elif not any(RE_FRASE_FECHADA.search(l) for l in corpo.split("\n") if l.strip()):
+            if _anuncia_o_que_segue(no, corpo, comecos):
+                continue
             falhas.append(f"{no['rotulo']}: corpo sem frase terminada em ponto")
     return falhas
+
+
+def _anuncia_o_que_segue(no: dict, corpo: str, comecos: dict) -> bool:
+    """Artigo que anuncia cláusulas e é seguido, logo a seguir, por uma."""
+    seguinte = comecos.get(no["char_end"])
+    return (no.get("tipo") == "artigo"
+            and seguinte is not None and seguinte.get("tipo") == "clausula"
+            and bool(RE_ANUNCIO.search(corpo.split("\n")[-1].strip())))
 
 
 def deposito_no_fim(texto: str, e_retificacao: bool = False) -> str | None:

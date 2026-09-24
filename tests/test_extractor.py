@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from cct.extractor import (MARCA_TABELA_FIM, MARCA_TABELA_INI,
+from cct.extractor import (MARCA_COLUNA, MARCA_TABELA_FIM, MARCA_TABELA_INI,
                            _remover_cabecalhos_rodapes, juntar_linhas,
                            estruturar, extrair_pdf)
 from cct.schemas import validar_doc
@@ -71,6 +71,51 @@ def test_marcas_de_tabela_repetidas_nao_sao_cabecalho_bte():
     _, texto = estruturar("\n".join(limpas), "teste")
     assert "Grupo | Valor\nA | 100\nB | 200" in texto
     assert "C | 300\nD | 400" in texto
+
+
+def _pagina(n: int, corpo: str) -> str:
+    return (f"Boletim do Trabalho e Emprego, n.º 31, 22/8/2026\n{corpo}\n"
+            f"BTE 31 | {n}\n{n}")
+
+
+def test_frase_repetida_no_corpo_nao_e_mobiliario():
+    """Issue #47: uma frase legítima repetida em várias páginas desaparecia
+    só por atingir o limiar de repetição. Agora só se remove o que se
+    repete no topo ou no fundo das páginas."""
+    corpo = ("Cláusula {n}.ª - Revogada\nTexto anterior da cláusula.\n"
+             "O disposto no número anterior não prejudica os direitos adquiridos.\n"
+             "Texto posterior da cláusula.")
+    paginas = [_pagina(n, corpo.format(n=n)) for n in range(1, 6)]
+    junto = "\n".join(_remover_cabecalhos_rodapes(paginas))
+    assert junto.count("O disposto no número anterior não prejudica") == 5
+    assert "Boletim do Trabalho e Emprego" not in junto
+    assert "BTE 31 |" not in junto
+    assert not any(l.strip().isdigit() for l in junto.split("\n")), \
+        "o número da página, sozinho no fundo, é mobiliário"
+
+
+def test_numero_sozinho_a_meio_da_pagina_fica():
+    """Um número numa linha própria a meio da página é conteúdo (por
+    exemplo, uma célula de uma grelha que o pdfplumber não detetou)."""
+    corpo = "Primeira linha.\nSegunda linha.\nTerceira linha.\n1250\nQuarta linha.\nQuinta."
+    limpas = _remover_cabecalhos_rodapes([_pagina(n, corpo) for n in range(1, 4)])
+    assert all("\n1250\n" in p for p in limpas)
+
+
+def test_mobiliario_de_paginas_em_duas_colunas():
+    """Numa página em duas colunas o cabeçalho parte-se entre as duas; cada
+    coluna tem as suas margens, e a marca de coluna não chega ao texto."""
+    paginas = [
+        (f"Boletim do Trabalho\nTexto da esquerda {n}.\nMais texto {n}.\n"
+         f"Continua a esquerda {n}.\n{n}\n{MARCA_COLUNA}\n"
+         f"e Emprego, n.º 3\nTexto da direita {n}.\nAinda a direita {n}.\n"
+         f"Fim da direita {n}.")
+        for n in range(10, 14)
+    ]
+    junto = "\n".join(_remover_cabecalhos_rodapes(paginas))
+    assert MARCA_COLUNA not in junto
+    assert "Boletim do Trabalho" not in junto and "e Emprego, n.º 3" not in junto
+    assert junto.count("Texto da direita") == 4 and junto.count("Fim da direita") == 4
 
 
 # ---------- estruturação ----------

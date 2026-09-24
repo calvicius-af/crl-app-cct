@@ -107,6 +107,10 @@ RE_PREAMBULO_LINHA = re.compile(r"^Pre[âa]mbulo\s*$", re.IGNORECASE)
 # sentinelas internas que delimitam tabelas durante a normalização
 MARCA_TABELA_INI = "\x02TABELA"
 MARCA_TABELA_FIM = "\x03TABELA"
+# Fronteira entre as duas colunas de uma página. Só existe entre a extração da
+# página e a remoção do mobiliário, que a usa para saber onde começa e acaba
+# cada coluna, e a retira. Nunca chega ao texto final.
+MARCA_COLUNA = "\x04COLUNA"
 
 
 def _e_cabecalho(linha: str) -> bool:
@@ -493,8 +497,8 @@ def _extrair_pagina(pag) -> str:
     if goteira is not None:
         esq = pag.crop((pag.bbox[0], pag.bbox[1], goteira, pag.bbox[3]))
         dir_ = pag.crop((goteira, pag.bbox[1], pag.bbox[2], pag.bbox[3]))
-        return "\n".join(t for t in (_extrair_pagina(esq), _extrair_pagina(dir_))
-                         if t.strip())
+        return f"\n{MARCA_COLUNA}\n".join(
+            t for t in (_extrair_pagina(esq), _extrair_pagina(dir_)) if t.strip())
 
     tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[1])
     if not tabelas:
@@ -523,38 +527,76 @@ def _extrair_pagina(pag) -> str:
     return "\n".join(partes)
 
 
+# Linhas no topo e no fundo de cada página (ou coluna) onde o BTE põe o seu
+# mobiliário: cabeçalho com o número do boletim, número da página, rodapé.
+ZONA_MOBILIARIO = 3
+
+
+def _segmentos(pagina: str) -> list[list[str]]:
+    """As colunas de uma página, sem a marca que as separa."""
+    segmentos: list[list[str]] = [[]]
+    for linha in pagina.split("\n"):
+        if linha.strip() == MARCA_COLUNA:
+            segmentos.append([])
+        else:
+            segmentos[-1].append(linha)
+    return segmentos
+
+
+def _texto_fora_de_tabela(linhas: list[str]) -> list[int]:
+    """Índices das linhas não vazias, fora das tabelas e das suas marcas."""
+    fora = []
+    em_tabela = False
+    for i, linha in enumerate(linhas):
+        limpa = linha.strip()
+        if limpa == MARCA_TABELA_INI:
+            em_tabela = True
+        elif limpa == MARCA_TABELA_FIM:
+            em_tabela = False
+        elif limpa and not em_tabela:
+            fora.append(i)
+    return fora
+
+
+def _nas_margens(linhas: list[str]) -> set[int]:
+    """Índices das linhas de texto no topo ou no fundo de uma coluna.
+
+    As linhas de tabela contam para a posição, mas nunca são mobiliário: um
+    rodapé depois de uma tabela no fim da página está na margem; uma linha
+    entre duas tabelas a meio da página não está.
+    """
+    cheias = [i for i, l in enumerate(linhas) if l.strip()]
+    margens = set(cheias[:ZONA_MOBILIARIO] + cheias[-ZONA_MOBILIARIO:])
+    return margens.intersection(_texto_fora_de_tabela(linhas))
+
+
 def _remover_cabecalhos_rodapes(paginas: list[str]) -> list[str]:
-    """Remove mobiliário repetido sem tocar nos delimitadores/células de tabelas."""
+    """Remove o mobiliário do BTE sem tocar no corpo nem nas tabelas.
+
+    Mobiliário é o que se repete no topo ou no fundo das páginas: uma linha
+    de texto que aparece nas margens de pelo menos 30% das páginas, um
+    número de página sozinho nas margens, ou o rodapé «BTE n | página» em
+    qualquer sítio. A posição conta: antes, qualquer linha repetida em 30%
+    das páginas desaparecia, incluindo frases legítimas do corpo (issue #47).
+    """
+    colunas = [_segmentos(pag) for pag in paginas]
     contagem: Counter[str] = Counter()
-    for pag in paginas:
-        fora = set()
-        em_tabela = False
-        for linha in pag.split("\n"):
-            limpa = linha.strip()
-            if limpa == MARCA_TABELA_INI:
-                em_tabela = True
-            elif limpa == MARCA_TABELA_FIM:
-                em_tabela = False
-            elif limpa and not em_tabela:
-                fora.add(limpa)
-        contagem.update(fora)
+    for segmentos in colunas:
+        contagem.update({seg[i].strip() for seg in segmentos for i in _nas_margens(seg)})
     limiar = max(2, int(len(paginas) * 0.3))
     repetidas = {l for l, c in contagem.items() if c >= limiar}
     limpas = []
-    for pag in paginas:
+    for segmentos in colunas:
         linhas = []
-        em_tabela = False
-        for linha in pag.split("\n"):
-            limpa = linha.strip()
-            if limpa == MARCA_TABELA_INI:
-                em_tabela = True
-                linhas.append(linha)
-            elif limpa == MARCA_TABELA_FIM:
-                linhas.append(linha)
-                em_tabela = False
-            elif em_tabela or (limpa not in repetidas
-                               and not re.fullmatch(r"\d+", limpa)
-                               and not RE_RODAPE_BTE.match(limpa)):
+        for seg in segmentos:
+            margens = _nas_margens(seg)
+            texto = set(_texto_fora_de_tabela(seg))
+            for i, linha in enumerate(seg):
+                limpa = linha.strip()
+                if i in texto and RE_RODAPE_BTE.match(limpa):
+                    continue
+                if i in margens and (limpa in repetidas or re.fullmatch(r"\d+", limpa)):
+                    continue
                 linhas.append(linha)
         limpas.append("\n".join(linhas))
     return limpas

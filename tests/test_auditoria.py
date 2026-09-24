@@ -127,6 +127,36 @@ def test_anexo_sem_termos_de_tabela_nao_da_aviso():
     assert tabelas_esperadas(doc, texto) == []
 
 
+def _estruturado(corpo_anexo: str, clausula: str = "Aplica-se à empresa."):
+    from cct.extractor import MARCA_TABELA_FIM, MARCA_TABELA_INI, estruturar
+    tabela = f"{MARCA_TABELA_INI}\nNível | Valor\nA | 1 355,48\nB | 1 200,00\n{MARCA_TABELA_FIM}"
+    return estruturar(
+        f"Cláusula 1.ª - Âmbito\n{clausula.format(tabela=tabela)}\n"
+        f"ANEXO III - Tabela de remunerações\n{corpo_anexo.format(tabela=tabela)}\n",
+        "teste")
+
+
+def test_tabela_no_corpo_filho_do_anexo_nao_esta_fora_do_no():
+    """Issue #83 (BTE 31/2026): o estruturar fecha o anexo no cabeçalho e
+    guarda o corpo num nó filho. A tabela está nesse filho, no sítio certo;
+    a auditoria só olhava para o cabeçalho e dizia «fora do nó»."""
+    doc, texto = _estruturado("Os valores mensais são:\n{tabela}")
+    anexo = next(n for n in doc["nos"] if n["tipo"] == "anexo")
+    assert any(n.get("pai") == anexo["id"] for n in doc["nos"]), \
+        "o teste pressupõe o corpo num nó filho, como no estruturar real"
+    assert tabelas_esperadas(doc, texto) == []
+
+
+def test_tabela_que_nao_pertence_ao_anexo_continua_a_dar_aviso():
+    """O verdadeiro positivo: a grelha existe, mas fora da árvore do anexo
+    (aqui, na cláusula do articulado, antes dele)."""
+    doc, texto = _estruturado(
+        "Texto do anexo sem grelha.",
+        clausula="Os valores constam da grelha:\n{tabela}")
+    [aviso] = tabelas_esperadas(doc, texto)
+    assert "fora do corpo do nó" in aviso
+
+
 # -------------------------------------------- tabelas rodadas (ISSUE-0020)
 
 def test_deteta_tabela_muito_mais_alta_que_larga():
