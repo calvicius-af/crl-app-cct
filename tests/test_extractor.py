@@ -332,3 +332,47 @@ def test_negrito_simulado_nao_duplica_letras(tmp_path):
                                              (72.3, 700, "Carreira Técnica")]])
     _doc, texto = extrair_pdf(pdf)
     assert texto.strip() == "Carreira Técnica", texto
+
+
+def test_grelha_com_fronteira_a_meio_da_pagina_nao_e_cortada(tmp_path):
+    """384 e 385, p4: a fronteira entre as colunas cai no meio da página e os
+    traços são desenhados célula a célula; nenhum atravessa a goteira, e o
+    título centrado saía partido («ANEX» | «O II»)."""
+    from tests.pdf_sintetico import escrever_pdf
+    meio, n = 297.5, 12
+    itens = [(200, 760, "ANEXO II Grupos profissionais")]
+    for k in range(n + 1):                       # traços célula a célula
+        y = 300 + 30 * k
+        itens += [("traco", 40, y, meio, y), ("traco", meio, y, 555, y)]
+    for x in (40, meio, 555):
+        itens.append(("traco", x, 300, x, 300 + 30 * n))
+    for k in range(n):
+        y = 300 + 30 * (n - 1 - k) + 10
+        itens += [(45, y, f"Diretor coordenador de área {k}"),
+                  (meio + 5, y, f"Gestor de projetos globais {k}")]
+    pdf = escrever_pdf(tmp_path / "x.pdf", [itens])
+    _doc, texto = extrair_pdf(pdf)
+    assert "ANEXO II" in texto and "Grupos profissionais" in texto, texto
+    assert "Diretor coordenador de área 3 | Gestor de projetos globais 3" in texto, texto
+
+
+def test_cabecalho_e_data_na_mesma_linha_saem():
+    """CARRISTUR, primeira página: o pdfplumber lê o cabeçalho e a data numa
+    só linha, com o título do documento colado."""
+    paginas = ["Boletim do Trabalho e Emprego 31 22 agosto 2026 PRIVADO\nTexto."]
+    assert _remover_cabecalhos_rodapes(paginas) == ["PRIVADO\nTexto."]
+
+
+def test_cabecalho_direito_numa_pagina_deitada_nao_se_parte(tmp_path):
+    """CARRISTUR, pp. 2-3: o cabeçalho está direito numa página deitada; as
+    faixas verticais partiam-no em «Boletim do Trabalh» e «ho e Emprego 31»."""
+    from tests.pdf_sintetico import escrever_pdf
+    [pagina] = _tabela_rodada("btt")
+    pagina = [i for i in pagina if not (len(i) == 3 and i[2].startswith("Assim"))]
+    pagina += [(40, 810, "Boletim do Trabalho e Emprego 31"),
+               (80, 200, "Deve ler-se: ANEXO II Quadro remuneratório e tempos", "rodado"),
+               (60, 200, "de permanência para progressão nas carreiras", "rodado")]
+    pdf = escrever_pdf(tmp_path / "x.pdf", [pagina])
+    _doc, texto = extrair_pdf(pdf)
+    assert "Boletim" not in texto and "Trabalh" not in texto, texto
+    assert "Nível | Valor" in texto

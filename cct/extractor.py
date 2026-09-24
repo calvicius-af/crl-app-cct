@@ -14,7 +14,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from .mobiliario import e_mobiliario
+from .mobiliario import e_mobiliario, sem_prefixo_de_cabecalho
 
 RE_CAPITULO = re.compile(r"^(?:CAP[IÍ]TULO|T[IÍ]TULO)\s+([IVXLCD]+|\d+)\b(.*)$")
 RE_SECCAO = re.compile(r"^SEC[ÇC][AÃ]O\s+([IVXLCD]+|\d+)\b(.*)$", re.IGNORECASE)
@@ -647,9 +647,21 @@ def _duas_colunas(pag) -> float | None:
     total = len(palavras)
     if (atravessam / total < 0.02
             and esquerda / total > 0.25 and direita / total > 0.25
-            and not _grelha_atravessa(pag, meio)):
+            and not _grelha_atravessa(pag, meio)
+            and not _tabela_atravessa(pag, meio)):
         return meio
     return None
+
+
+def _tabela_atravessa(pag, meio: float) -> bool:
+    """Há uma tabela detetada que se estende pelos dois lados do meio?
+
+    Quando a fronteira entre duas colunas da grelha cai sobre o meio da
+    página, nenhum traço horizontal atravessa a goteira (384 e 385, p4:
+    «ANEX» | «O II», «Gr» | «upos profissionais»).
+    """
+    return any(t.bbox[0] < meio - 20 and t.bbox[2] > meio + 20
+               for t in pag.find_tables())
 
 
 def _extrair_pagina_deitada(pag, sentido: str) -> str:
@@ -662,10 +674,14 @@ def _extrair_pagina_deitada(pag, sentido: str) -> str:
     """
     x_ini, topo, x_fim, fundo = pag.bbox
     tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[0], reverse=sentido == "ttb")
-    partes = []
+    # o texto direito da página (o cabeçalho do BTE, uma nota) lê-se de uma
+    # vez: as faixas verticais partiam-no («Boletim do Trabalh» | «ho e …»)
+    direito = _fora_das_tabelas(pag, tabelas).filter(
+        lambda o: o.get("object_type") != "char" or o.get("upright", True)).extract_text() or ""
+    partes = [direito] if direito.strip() else []
 
     def juntar(area) -> None:
-        txt = _texto(_fora_das_tabelas(area, tabelas), sentido)
+        txt = _linhas_rodadas(_fora_das_tabelas(area, tabelas), sentido)
         if txt.strip():
             partes.append(txt)
 
@@ -821,6 +837,12 @@ def _remover_cabecalhos_rodapes(paginas: list[str]) -> list[str]:
                 # o bastante para a regra das margens os apanhar (os
                 # CARRISTUR têm três páginas e o cabeçalho só na primeira)
                 if i in texto and e_mobiliario(limpa):
+                    continue
+                if i in texto and (resto := sem_prefixo_de_cabecalho(limpa)) != limpa:
+                    # cabeçalho e data na mesma linha, às vezes com o título
+                    # a seguir (CARRISTUR, primeira página)
+                    if resto:
+                        linhas.append(resto)
                     continue
                 if i in margens and (limpa in repetidas or re.fullmatch(r"\d+", limpa)):
                     continue
