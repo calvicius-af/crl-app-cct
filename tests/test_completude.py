@@ -271,3 +271,12 @@ def test_trechos_em_falta_mostram_a_frase_e_a_pagina():
               "Primeira página sem problemas nenhuns.\nInício. Fim.")
     assert m.trechos_falta == [(2, frase, "")]
     assert f"p2: «{frase}»" in diagnostico([m])
+
+
+def test_paragrafo_longo_de_texto_nao_e_tabela_colapsada():
+    prosa = "O trabalhador tem direito a férias e a descanso semanal. " * 15
+    tabela = " | ".join(f"Nível {i} | {1000 + i},00" for i in range(40))
+    numeros = " ".join(f"{1000 + i},{i:02d}" for i in range(120))
+    m = medir("x", [prosa, tabela.replace(" | ", "\n"), numeros],
+              "\n".join([prosa.strip(), tabela, numeros]))
+    assert [n for n, _ in m.linhas_longas] == [2, 3]

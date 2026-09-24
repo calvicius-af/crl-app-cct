@@ -376,3 +376,13 @@ def test_cabecalho_direito_numa_pagina_deitada_nao_se_parte(tmp_path):
     _doc, texto = extrair_pdf(pdf)
     assert "Boletim" not in texto and "Trabalh" not in texto, texto
     assert "Nível | Valor" in texto
+
+
+def test_hifenizacao_dentro_das_celulas_junta_a_palavra():
+    """384 e 385, anexo de conteúdos funcionais: «estratégi- co», «procedi-
+    mentos» nas células, que o corpo do texto já juntava."""
+    from cct.extractor import _formatar_tabela
+    assert _formatar_tabela([["Diretor", "atividades de âmbito estratégi-\nco, define"]]) == \
+        "Diretor | atividades de âmbito estratégico, define"
+    assert _formatar_tabela([["Sub-\nCategoria", "A -\n B"]]) == "Sub- Categoria | A - B", \
+        "hífen antes de maiúscula ou de espaço fica"

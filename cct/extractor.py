@@ -453,6 +453,15 @@ def _subsegmentar_paragrafos(nos: list[dict], texto: str) -> list[dict]:
 
 # ---------- PDF ----------
 
+RE_HIFEN_CELULA = re.compile(r"-\s*\n\s*(?=[a-zà-ú])")
+
+
+def _texto_celula(texto: str) -> str:
+    """Uma célula numa linha: a hifenização junta-se como no corpo do texto
+    («estratégi-\nco» → «estratégico»), as outras quebras passam a espaço."""
+    return re.sub(r"[ \t]*\n[ \t]*", " ", RE_HIFEN_CELULA.sub("", texto)).strip()
+
+
 def _formatar_tabela(linhas_tabela: list[list[str | None]]) -> str:
     """Converte uma tabela do pdfplumber em linhas 'célula | célula | célula'.
 
@@ -461,7 +470,7 @@ def _formatar_tabela(linhas_tabela: list[list[str | None]]) -> str:
     """
     linhas = []
     for row in linhas_tabela:
-        celulas = [(c or "").replace("\n", " ").strip() for c in row]
+        celulas = [_texto_celula(c or "") for c in row]
         if any(celulas):
             linhas.append(" | ".join(celulas))
     return "\n".join(linhas)
@@ -546,8 +555,8 @@ def _celula(pag, cel, sentido: str | None) -> str:
         return (a <= (o["x0"] + o["x1"]) / 2 < c) and (b <= (o["top"] + o["bottom"]) / 2 < d)
     area = pag.filter(no_centro)
     if sentido and _rodada(area):
-        return _linhas_rodadas(area, sentido).replace("\n", " ")
-    return (area.extract_text() or "").replace("\n", " ")
+        return _texto_celula(_linhas_rodadas(area, sentido))
+    return _texto_celula(area.extract_text() or "")
 
 
 def _dados_tabela(tab, sentido: str | None) -> list:

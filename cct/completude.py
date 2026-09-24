@@ -71,6 +71,14 @@ def _juntar_hifenizacao(texto: str) -> str:
     return RE_HIFEN_FIM.sub("", texto).replace(HIFEN_PDFIUM, "-")
 
 
+def _parece_tabela(linha: str) -> bool:
+    """Uma linha longa só é sinal de tabela colapsada se tiver células ou for
+    sobretudo números: um parágrafo de 800 caracteres é normal numa cláusula."""
+    tokens = linha.split()
+    numeros = sum(1 for t in tokens if any(c.isdigit() for c in t))
+    return " | " in linha or (bool(tokens) and numeros / len(tokens) > 0.4)
+
+
 def invertidas_pela_forma(texto: str) -> list[str]:
     """Palavras com a maiúscula no fim («sagloF»): texto rodado lido ao contrário."""
     return [p for p in RE_PALAVRA.findall(texto) if len(p) >= 4 and RE_INVERTIDA.match(p)]
@@ -274,7 +282,7 @@ def medir(documento: str, paginas_pdf: list[str], texto: str) -> Medida:
     for n, linha in enumerate(paragrafos, 1):
         if tem_mobiliario(linha):
             m.residuos.append((n, linha))
-        if len(linha) > LINHA_LONGA:
+        if len(linha) > LINHA_LONGA and _parece_tabela(linha):
             m.linhas_longas.append((n, len(linha)))
 
     def classes(t: str) -> dict[str, int]:
@@ -361,7 +369,8 @@ def diagnostico(medidas: list[Medida], manifesto: dict | None = None,
                "4. **Mobiliário:** linhas de cabeçalho ou rodapé do BTE que "
                "ficaram no texto.",
                f"5. **Linhas longas:** linhas com mais de {LINHA_LONGA} "
-               "caracteres, típicas de uma tabela colapsada.",
+               "caracteres com células « | » ou sobretudo números: uma tabela "
+               "colapsada. Parágrafos longos de texto não contam.",
                "6. A referência é a leitura do PDFium, outro motor. Uma "
                "diferença pode vir dele; o contexto de cada palavra permite "
                "decidir.", ""]
