@@ -32,7 +32,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .mobiliario import RE_NUMERO_PAGINA, e_mobiliario, tem_mobiliario
+from .mobiliario import (RE_NUMERO_PAGINA, e_mobiliario, sem_prefixo_de_cabecalho,
+                         tem_mobiliario)
 
 # ---------- limiares do veredicto (explicados no próprio diagnóstico) ----------
 
@@ -41,6 +42,9 @@ COBERTURA_FALHA = 0.97
 EXCESSO_OK = 0.005          # palavras no texto que o PDF não tem
 ORDEM_OK = 0.97             # palavras do PDF na mesma ordem no texto
 LINHA_LONGA = 600           # caracteres: sinal de tabela colapsada numa linha
+TRECHO_MINIMO = 4           # palavras seguidas para um trecho contar
+TRECHOS = 12                # trechos mostrados por documento
+TRECHO_MAXIMO = 300         # caracteres de cada trecho no relatório
 
 RE_PALAVRA = re.compile(r"\w+")
 MARGEM = 2
@@ -130,7 +134,16 @@ def sem_mobiliario(pagina: str) -> tuple[str, list[str]]:
         limpa = linha.strip()
         mobiliario = (e_mobiliario(limpa)
                       or (i in margens and RE_NUMERO_PAGINA.match(limpa)))
-        (saem if mobiliario else ficam).append(linha)
+        if mobiliario:
+            saem.append(linha)
+            continue
+        resto = sem_prefixo_de_cabecalho(limpa)
+        if resto != limpa:
+            saem.append(limpa[:len(limpa) - len(resto)])
+            if resto:
+                ficam.append(resto)
+            continue
+        ficam.append(linha)
     return "\n".join(ficam), [l.strip() for l in saem if l.strip()]
 
 
@@ -158,6 +171,10 @@ class Medida:
     ordem: float = 1.0
     perda_por_pagina: list[tuple[int, float]] = field(default_factory=list)
     invertidas: list[tuple[str, str]] = field(default_factory=list)
+    # trechos contínuos: (página, no PDF, no texto em vez dele); e os do texto
+    # que o PDF não tem. Mostram o que se perdeu, e não só palavras soltas.
+    trechos_falta: list[tuple[int, str, str]] = field(default_factory=list)
+    trechos_mais: list[str] = field(default_factory=list)
     # páginas em que a referência veio do pdfplumber (o PDFium não as lê)
     paginas_cegas: list[int] = field(default_factory=list)
     # (parágrafo, conteúdo): o parágrafo conta só as linhas não vazias, como
@@ -233,9 +250,20 @@ def medir(documento: str, paginas_pdf: list[str], texto: str) -> Medida:
             m.perda_por_pagina.append((n, perda))
 
     if ref_palavras and txt_palavras:
-        blocos = difflib.SequenceMatcher(
-            None, ref_palavras, txt_palavras, autojunk=False).get_matching_blocks()
-        m.ordem = sum(b.size for b in blocos) / len(ref_palavras)
+        comparador = difflib.SequenceMatcher(
+            None, ref_palavras, txt_palavras, autojunk=False)
+        m.ordem = sum(b.size for b in comparador.get_matching_blocks()) / len(ref_palavras)
+        pagina_de = [n for n, limpa in enumerate(limpas, 1) for _ in palavras(limpa)]
+        falta, mais = [], []
+        for tag, i1, i2, j1, j2 in comparador.get_opcodes():
+            if tag in ("delete", "replace") and i2 - i1 >= TRECHO_MINIMO:
+                falta.append((i2 - i1, pagina_de[i1], " ".join(ref_palavras[i1:i2]),
+                              " ".join(txt_palavras[j1:j2])))
+            if tag in ("insert", "replace") and j2 - j1 >= TRECHO_MINIMO:
+                mais.append((j2 - j1, " ".join(txt_palavras[j1:j2])))
+        m.trechos_falta = [(pg, a, b) for _, pg, a, b in
+                           sorted(falta, key=lambda x: -x[0])[:TRECHOS]]
+        m.trechos_mais = [t for _, t in sorted(mais, key=lambda x: -x[0])[:TRECHOS]]
 
     # invertidas: o par exato quando a referência tem a palavra certa, e a
     # forma (maiúscula no fim) quando não tem, como nas páginas cegas
@@ -376,6 +404,17 @@ def diagnostico(medidas: list[Medida], manifesto: dict | None = None,
         if m.linhas_longas:
             linhas += ["Linhas longas (parágrafo no MAXQDA): " + ", ".join(
                 f"{n} ({c} caracteres)" for n, c in m.linhas_longas[:10]) + ".", ""]
+        if m.trechos_falta:
+            linhas += ["Trechos do PDF que faltam no texto (ou que aparecem "
+                       "noutra ordem), por tamanho:", ""]
+            for i, (pg, trecho, em_vez) in enumerate(m.trechos_falta, 1):
+                linhas.append(f"{i}. p{pg}: «{trecho[:TRECHO_MAXIMO]}»"
+                              + (f" → no texto: «{em_vez[:TRECHO_MAXIMO]}»" if em_vez else ""))
+            linhas.append("")
+        if m.trechos_mais:
+            linhas += ["Trechos do texto que o PDF não tem nesse sítio:", ""]
+            linhas += [f"{i}. «{t[:TRECHO_MAXIMO]}»" for i, t in enumerate(m.trechos_mais, 1)]
+            linhas.append("")
         for titulo, contagem_p, contextos in (
                 ("Em falta no texto (contexto no PDF)", m.em_falta, m.contexto_falta),
                 ("A mais no texto (contexto no texto)", m.a_mais, m.contexto_mais)):

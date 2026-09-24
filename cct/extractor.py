@@ -527,8 +527,32 @@ def _texto(area, sentido: str | None) -> str:
     return "\n".join(t for t in (direito, _linhas_rodadas(area, sentido)) if t.strip())
 
 
+# Uma tabela é toda rodada (e põe-se de pé) só quando quase todo o texto dela
+# está a 90º; uma grelha direita com cabeçalhos verticais (382) não é.
+TABELA_RODADA = 0.8
+
+
+def _celula(pag, cel, sentido: str | None) -> str:
+    """O texto de uma célula, no sentido em que ela está escrita.
+
+    Um carácter pertence à célula pelo seu centro, como no Table.extract do
+    pdfplumber: o within_bbox perdia os que tocam no traço da grelha.
+    """
+    a, b, c, d = cel
+
+    def no_centro(o) -> bool:
+        if o.get("object_type") != "char":
+            return False
+        return (a <= (o["x0"] + o["x1"]) / 2 < c) and (b <= (o["top"] + o["bottom"]) / 2 < d)
+    area = pag.filter(no_centro)
+    if sentido and _rodada(area):
+        return _linhas_rodadas(area, sentido).replace("\n", " ")
+    return (area.extract_text() or "").replace("\n", " ")
+
+
 def _dados_tabela(tab, sentido: str | None) -> list:
-    """As células da tabela; uma tabela rodada é posta de pé.
+    """As células da tabela, cada uma lida no seu sentido; uma tabela toda
+    rodada é posta de pé.
 
     Rodada no sentido «btt», o cabeçalho está à esquerda da página e a
     primeira coluna em baixo; no sentido «ttb», à direita e em cima.
@@ -538,15 +562,10 @@ def _dados_tabela(tab, sentido: str | None) -> list:
     x0, t0, x1, t1 = tab.bbox
     dentro = [c for c in tab.page.chars
               if x0 <= c["x0"] <= x1 and t0 <= c["top"] <= t1 and c["text"].strip()]
-    if sum(1 for c in dentro if not c.get("upright", True)) * 2 < len(dentro):
-        return tab.extract()
-    # célula a célula, com o mesmo agrupamento do texto rodado: o
-    # extract_text do pdfplumber põe cada palavra rodada na sua linha e, no
-    # sentido «btt», pela ordem inversa («355,48 1»)
-    celulas = [[None if cel is None else
-                _linhas_rodadas(tab.page.crop(cel), sentido).replace("\n", " ")
+    rodados = sum(1 for c in dentro if not c.get("upright", True))
+    celulas = [[None if cel is None else _celula(tab.page, cel, sentido)
                 for cel in linha.cells] for linha in tab.rows]
-    if not celulas:
+    if not celulas or rodados < TABELA_RODADA * len(dentro):
         return celulas
     n_linhas, n_colunas = len(celulas), max(len(r) for r in celulas)
     celulas = [r + [None] * (n_colunas - len(r)) for r in celulas]
@@ -555,6 +574,39 @@ def _dados_tabela(tab, sentido: str | None) -> list:
                 for i in range(n_colunas)]
     return [[celulas[j][n_colunas - 1 - i] for j in range(n_linhas)]
             for i in range(n_colunas)]
+
+
+def _rodada(area) -> bool:
+    """A maior parte dos caracteres da área está rodada."""
+    chars = [c for c in area.chars if c["text"].strip()]
+    return bool(chars) and sum(1 for c in chars if not c.get("upright", True)) * 2 > len(chars)
+
+
+def _ao_lado(pag, tab, tabelas, sentido: str | None) -> tuple[str, str]:
+    """O texto à esquerda e à direita de uma tabela, na altura dela.
+
+    As bandas só cobriam o que está acima e abaixo das tabelas; o que estava
+    ao lado perdia-se. Nas páginas rodadas dos CARRISTUR é o título e o
+    «Deve ler-se:», à esquerda da grelha. Os caracteres de outras tabelas
+    ficam de fora, para não se repetirem.
+    """
+    x0, t0, x1, t1 = tab.bbox
+
+    def fora_das_tabelas(o) -> bool:
+        if o.get("object_type") != "char":
+            return True
+        cx, cy = (o["x0"] + o["x1"]) / 2, (o["top"] + o["bottom"]) / 2
+        return not any(a <= cx <= c and b <= cy <= d for a, b, c, d in
+                       (t.bbox for t in tabelas))
+
+    lados = []
+    for a, c in ((pag.bbox[0], x0), (x1, pag.bbox[2])):
+        if c - a < 5:
+            lados.append("")
+            continue
+        area = pag.crop((a, t0, c, t1)).filter(fora_das_tabelas)
+        lados.append(_texto(area, sentido))
+    return lados[0], lados[1]
 
 
 def _grelha_atravessa(pag, meio: float) -> bool:
@@ -594,6 +646,50 @@ def _duas_colunas(pag) -> float | None:
     return None
 
 
+def _extrair_pagina_deitada(pag, sentido: str) -> str:
+    """Uma página impressa de lado (a maior parte do texto a 90º).
+
+    É o mesmo algoritmo das páginas direitas, no referencial da leitura: as
+    faixas são verticais e seguem a ordem das linhas rodadas (da esquerda para
+    a direita em «btt», ao contrário em «ttb»). Cortar em faixas horizontais,
+    como numa página direita, partia as linhas rodadas nas fronteiras.
+    """
+    x_ini, topo, x_fim, fundo = pag.bbox
+    tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[0], reverse=sentido == "ttb")
+    partes = []
+
+    def juntar(area) -> None:
+        txt = _texto(area, sentido)
+        if txt.strip():
+            partes.append(txt)
+
+    # posição já lida, na direção da leitura
+    pos = x_ini if sentido == "btt" else x_fim
+    for tab in tabelas:
+        x0, t0, x1, t1 = tab.bbox
+        antes = (pos, x0) if sentido == "btt" else (x1, pos)
+        if antes[1] - antes[0] > 1:
+            juntar(pag.crop((antes[0], topo, antes[1], fundo)))
+        # ao lado da tabela, na leitura: em «btt», a esquerda lógica é o fundo
+        # da página; em «ttb», é o topo
+        baixo = (x0, t1, x1, fundo) if fundo - t1 > 1 else None
+        cima = (x0, topo, x1, t0) if t0 - topo > 1 else None
+        primeiro, segundo = (baixo, cima) if sentido == "btt" else (cima, baixo)
+        if primeiro:
+            juntar(pag.crop(primeiro))
+        dados = _dados_tabela(tab, sentido)
+        corpo = _formatar_tabela(dados) if dados else ""
+        if corpo:
+            partes.append(f"{MARCA_TABELA_INI}\n{corpo}\n{MARCA_TABELA_FIM}")
+        if segundo:
+            juntar(pag.crop(segundo))
+        pos = max(pos, x1) if sentido == "btt" else min(pos, x0)
+    resto = (pos, x_fim) if sentido == "btt" else (x_ini, pos)
+    if resto[1] - resto[0] > 1:
+        juntar(pag.crop((resto[0], topo, resto[1], fundo)))
+    return "\n".join(partes)
+
+
 def _extrair_pagina(pag) -> str:
     """Extrai uma página intercalando bandas de texto e tabelas na ordem de leitura.
 
@@ -603,6 +699,8 @@ def _extrair_pagina(pag) -> str:
     texto rodado a 90º não se corta em colunas e lê-se no sentido certo.
     """
     sentido = _sentido_da_pagina(pag)
+    if sentido and _rodada(pag):
+        return _extrair_pagina_deitada(pag, sentido)
     goteira = None if sentido else _duas_colunas(pag)
     if goteira is not None:
         esq = pag.crop((pag.bbox[0], pag.bbox[1], goteira, pag.bbox[3]))
@@ -623,11 +721,16 @@ def _extrair_pagina(pag) -> str:
             txt = _texto(banda, sentido)
             if txt.strip():
                 partes.append(txt)
+        esquerda, direita = _ao_lado(pag, tab, tabelas, sentido)
+        if esquerda.strip():
+            partes.append(esquerda)
         dados = _dados_tabela(tab, sentido)
         if dados:
             corpo = _formatar_tabela(dados)
             if corpo:
                 partes.append(f"{MARCA_TABELA_INI}\n{corpo}\n{MARCA_TABELA_FIM}")
+        if direita.strip():
+            partes.append(direita)
         topo = max(topo, t1)
     if topo < pag.bbox[3]:
         banda = pag.crop((pag.bbox[0], topo, pag.bbox[2], pag.bbox[3]))

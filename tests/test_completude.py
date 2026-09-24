@@ -253,3 +253,21 @@ def test_invertidas_pela_forma_quando_a_referencia_nao_tem_a_palavra():
     m = medir("x", ["Assim, na página 225, onde se lê:"],
               "Assim, na página 225, onde se lê:\nahlocsE ¦ ocincéT ¦ levíN ¦ Escolha")
     assert [a for a, _ in m.invertidas] == ["ahlocsE", "levíN", "ocincéT"]
+
+
+def test_cabecalho_do_pdfium_numa_so_linha_e_colado_ao_texto():
+    """CI de 24-09-2026: o PDFium lê o cabeçalho e a data numa só linha e, nas
+    páginas rodadas, cola-lhe o texto seguinte. Eram 9 palavras «em falta» por
+    página, que não são texto da convenção."""
+    paginas = ["Boletim do Trabalho e Emprego 31 22 agosto 2026\nPRIVADO\nTexto.",
+               "Boletim do Trabalho e Emprego 31 22 agosto 2026 Deve ler-se:\nMais."]
+    m = medir("x", paginas, "PRIVADO\nTexto.\nDeve ler-se:\nMais.")
+    assert m.cobertura == 1.0 and not m.a_mais, diagnostico([m])
+
+
+def test_trechos_em_falta_mostram_a_frase_e_a_pagina():
+    frase = "O trabalhador tem direito a vinte e cinco dias úteis de férias"
+    m = medir("x", ["Primeira página sem problemas nenhuns.", f"Início. {frase}. Fim."],
+              "Primeira página sem problemas nenhuns.\nInício. Fim.")
+    assert m.trechos_falta == [(2, frase, "")]
+    assert f"p2: «{frase}»" in diagnostico([m])

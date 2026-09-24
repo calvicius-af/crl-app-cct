@@ -26,6 +26,13 @@ RE_DATA = re.compile(rf"^\d{{1,2}}\s+(?:{MESES})\s+\d{{4}}$", re.IGNORECASE)
 RE_RODAPE = re.compile(r"^BTE\s+\d+(?:\s*\|\s*\d+)?$")
 RE_NUMERO_PAGINA = re.compile(r"^\d{1,4}$")
 
+# O PDFium lê o cabeçalho e a data numa só linha e, nas páginas rodadas, cola-
+# lhe o texto seguinte: «Boletim do Trabalho e Emprego 31 22 agosto 2026 Deve
+# ler-se: …». No início de uma linha, esse prefixo é sempre mobiliário.
+RE_PREFIXO_CABECALHO = re.compile(
+    rf"^Boletim do Trabalho e Emprego\s+\d+(?:\s+\d{{1,2}}\s+(?:{MESES})\s+\d{{4}})?"
+    r"(?=\s|$)\s*", re.IGNORECASE)
+
 # o mesmo mobiliário colado a outro texto, depois de juntar linhas:
 # «Boletim do Trabalho e Emprego 31 ANEX Categorias e gru», «1 | 139 Boletim …»
 RE_COLADO = re.compile(
@@ -37,6 +44,11 @@ def e_mobiliario(linha: str) -> bool:
     limpa = linha.strip()
     return bool(RE_CABECALHO.match(limpa) or RE_DATA.match(limpa)
                 or RE_RODAPE.match(limpa))
+
+
+def sem_prefixo_de_cabecalho(linha: str) -> str:
+    """A linha sem o cabeçalho do BTE que a abra (pode ficar vazia)."""
+    return RE_PREFIXO_CABECALHO.sub("", linha.strip(), count=1)
 
 
 def tem_mobiliario(linha: str) -> bool:

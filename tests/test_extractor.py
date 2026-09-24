@@ -263,3 +263,48 @@ def test_duas_colunas_de_texto_sem_grelha_continuam_a_ser_cortadas(tmp_path):
     pdf = escrever_pdf(tmp_path / "x.pdf", [itens])
     _doc, texto = extrair_pdf(pdf)
     assert texto.index("Esquerda linha 24") < texto.index("Direita linha 0"), texto
+
+
+def test_texto_ao_lado_de_uma_tabela_nao_se_perde(tmp_path):
+    """As bandas só liam acima e abaixo das tabelas: o que estava ao lado,
+    na mesma altura, desaparecia (CARRISTUR: «Deve ler-se:» e o título)."""
+    from tests.pdf_sintetico import escrever_pdf, grelha
+    itens = [(72, 780, "Texto antes da tabela."), *grelha(300, 500, [100, 100], [30, 30])]
+    itens += [(305, 540, "Nível"), (405, 540, "Valor"), (305, 510, "A"), (405, 510, "100")]
+    itens += [(72, 530, "Deve ler-se:"), (72, 400, "Texto depois da tabela.")]
+    pdf = escrever_pdf(tmp_path / "x.pdf", [itens])
+    _doc, texto = extrair_pdf(pdf)
+    assert "Deve ler-se:" in texto
+    assert texto.index("Deve ler-se:") < texto.index("Nível | Valor"), texto
+
+
+def test_pagina_rodada_com_titulo_ao_lado_da_tabela(tmp_path):
+    """A página inteira rodada dos CARRISTUR: o título está «acima» da tabela
+    na leitura, mas à esquerda dela na página."""
+    from tests.pdf_sintetico import escrever_pdf
+    pagina = _tabela_rodada("btt")
+    pagina[0].append((80, 300, "ANEXO II Quadro remuneratório", "rodado"))
+    pdf = escrever_pdf(tmp_path / "x.pdf", pagina)
+    _doc, texto = extrair_pdf(pdf)
+    # o estruturar reconhece o anexo e escreve o rótulo «ANEXO II - …»
+    assert "ANEXO II - Quadro remuneratório\nNível | Valor" in texto, texto
+    assert "\no\n" not in texto and not texto.rstrip().endswith("\nA"), \
+        "nenhuma letra solta de uma linha rodada partida"
+
+
+def test_cabecalho_vertical_numa_tabela_direita(tmp_path):
+    """382: células de cabeçalho escritas na vertical, numa grelha direita,
+    saíam invertidas («levíN») ou faltavam."""
+    from tests.pdf_sintetico import escrever_pdf, grelha
+    # de baixo para cima: duas linhas de dados e o cabeçalho, mais alto
+    itens = grelha(100, 400, [60, 60, 60], [20, 20, 80])
+    itens += [(135, 445, "Nível", "rodado"), (195, 445, "Escalão", "rodado"),
+              (255, 445, "Valor", "rodado")]
+    for y, (a, b, c) in ((425, ("I", "1", "900")), (405, ("II", "2", "950"))):
+        itens += [(105, y, a), (165, y, b), (225, y, c)]
+    itens += [(72, 780, "Categoria profissional e remuneração mensal."),
+              (72, 766, "Texto da página em linhas direitas, como no corpo da convenção.")]
+    pdf = escrever_pdf(tmp_path / "x.pdf", [itens])
+    _doc, texto = extrair_pdf(pdf)
+    assert "Nível | Escalão | Valor\nI | 1 | 900\nII | 2 | 950" in texto, texto
+    assert "levíN" not in texto
