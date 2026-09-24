@@ -90,7 +90,8 @@ extrator passa a ler o texto rodado no sentido certo (`char_dir_rotated` do pdfp
 rotação (`tests/test_extractor.py`); o aviso da auditoria só aparece se o texto ainda
 tiver palavras invertidas.
 
-**Por confirmar:** a medição no corpus real (job «corpus» do CI ou
-`python -m cct.corpus medir` na estação). Nas páginas das tabelas dos CARRISTUR o
-PDFium não lê texto nenhum; aí a referência passa a ser o pdfplumber e o diagnóstico
-indica-o.
+**Confirmado no corpus real** (job «corpus» do CI, commit `0da8b02`): os quatro
+CARRISTUR com 100% de cobertura e zero palavras invertidas, contra 626 palavras a mais
+antes. O 382 com 99,8%; resta a ordem das grelhas da p34. Ver
+[corpus BTE 31/2026](../docs/validacao/corpus-bte31-2026-09-24.md). Falta a confirmação
+visual das grelhas no MaxQDA.

@@ -24,6 +24,7 @@ Há duas formas de medir, e são complementares:
 | PR #23 | Docling opcional, ordem de leitura, spans, sanidade e offsets QDPX | [revisão técnica](../../issues/0004-revisao-pr-23.md) |
 | Instalação | Primeira instalação numa estação real do CRL: Windows 11, Python 3.13, projeto em unidade de rede | [instalacao-estacao-crl-2026-09-17.md](instalacao-estacao-crl-2026-09-17.md) |
 | Docling | Docling sem modelos, texto rodado e peso da instalação em Windows | [docling-sem-modelos-2026-09-24.md](docling-sem-modelos-2026-09-24.md) |
+| Corpus | Primeiro corpus de regressão com PDF reais (BTE 31/2026): evolução da cobertura e defeitos corrigidos | [corpus-bte31-2026-09-24.md](corpus-bte31-2026-09-24.md) |
 
 A validação visual do QDPX Docling final no MaxQDA continua pendente na
 [ISSUE-0003](../../issues/0003-qdpx-perde-ganhos-do-docling.md). Testes automáticos e
