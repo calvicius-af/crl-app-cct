@@ -3,8 +3,11 @@ pdfplumber>=0.11
 openpyxl>=3.1
 pyyaml>=6.0
 jsonschema>=4.0
-# extrator docling, opcional (--extrator docling): pesado (PyTorch, ~4 GB)
-# e requer Python arm64 no macOS Apple Silicon
+# extrator docling, opcional (--extrator docling): precisa do PyTorch e de
+# modelos descarregados à parte. Em Windows/Python 3.13 são ~222 MB de wheels
+# (PyTorch sem GPU); os ~4 GB são da instalação Linux com CUDA. Sem modelos
+# não serve: ver docs/validacao/docling-sem-modelos-2026-09-24.md.
+# Requer Python arm64 no macOS Apple Silicon
 # docling>=2.121
 # NÃO instalar docling-hierarchical-pdf: foi avaliado e retirado do código
 # (rebentava com page_range, falhava em silêncio e a ordem de leitura passou

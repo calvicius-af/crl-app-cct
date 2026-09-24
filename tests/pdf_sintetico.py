@@ -7,7 +7,9 @@ Estes PDF são pequenos, mas passam pelo pdfplumber e pelo PDFium como um PDF
 real: cada linha tem uma posição na página.
 
 Só usa a fonte Helvetica com a codificação WinAnsi, que cobre os acentos do
-português. Não serve para tabelas com grelha nem para texto rodado.
+português. Não desenha grelhas. Uma linha com um quarto elemento `"rodado"`
+é escrita a 90º, como as escalas laterais do TINITA e as tabelas dos
+CARRISTUR, numa página que não declara rotação.
 """
 from pathlib import Path
 
@@ -20,15 +22,16 @@ def _escapar(texto: str) -> bytes:
             .replace(b")", b"\\)"))
 
 
-def _conteudo(linhas: list[tuple[float, float, str]]) -> bytes:
+def _conteudo(linhas: list[tuple]) -> bytes:
     partes = [b"BT /F1 10 Tf"]
-    for x, y, texto in linhas:
-        partes.append(b"1 0 0 1 %.1f %.1f Tm (" % (x, y) + _escapar(texto) + b") Tj")
+    for x, y, texto, *modo in linhas:
+        matriz = b"0 1 -1 0" if modo == ["rodado"] else b"1 0 0 1"
+        partes.append(matriz + b" %.1f %.1f Tm (" % (x, y) + _escapar(texto) + b") Tj")
     partes.append(b"ET")
     return b"\n".join(partes)
 
 
-def escrever_pdf(destino: Path, paginas: list[list[tuple[float, float, str]]]) -> Path:
+def escrever_pdf(destino: Path, paginas: list[list[tuple]]) -> Path:
     """Escreve um PDF; cada página é uma lista de (x, y, texto), y a contar de baixo."""
     objetos: list[bytes] = []
 

@@ -177,3 +177,36 @@ def test_gerador_de_pdf_e_legivel_pelos_dois_motores(tmp_path):
     with pdfplumber.open(pdf) as p:
         assert p.pages[0].extract_text() == "Olá, ação à mão (sim)"
     assert paginas_de_referencia(Path(pdf))[0] == "Olá, ação à mão (sim)"
+
+
+ESCALA = ["Folgas Serviço Semana 1", "Motorista Guarda-freio Folga",
+          "Segunda Terça Quarta"]
+
+
+def test_a_referencia_le_bem_o_texto_rodado(tmp_path):
+    """O PDFium lê na ordem certa o texto a 90º numa página sem rotação."""
+    pdf = escrever_pdf(tmp_path / "x.pdf",
+                       [[(100 + 20 * i, 100, t, "rodado") for i, t in enumerate(ESCALA)]])
+    assert paginas_de_referencia(pdf)[0].split("\n") == ESCALA
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "defeito conhecido do pdfplumber (ISSUE-0020, #42): lê o texto rodado "
+    "90º letra a letra e ao contrário. Quando o extrator o corrigir, este "
+    "teste passa e o xfail tem de sair."))
+def test_extrator_le_bem_o_texto_rodado(tmp_path):
+    pdf = escrever_pdf(tmp_path / "x.pdf",
+                       [[(100 + 20 * i, 100, t, "rodado") for i, t in enumerate(ESCALA)]])
+    _doc, texto = extrair_pdf(pdf)
+    m = medir_pdf("x", pdf, texto)
+    assert not m.invertidas and m.cobertura == 1.0, diagnostico([m])
+
+
+def test_o_diagnostico_apanha_o_texto_rodado_invertido(tmp_path):
+    """Enquanto o defeito existir, o diagnóstico tem de o mostrar."""
+    pdf = escrever_pdf(tmp_path / "x.pdf",
+                       [[(100 + 20 * i, 100, t, "rodado") for i, t in enumerate(ESCALA)]])
+    _doc, texto = extrair_pdf(pdf)
+    m = medir_pdf("x", pdf, texto)
+    assert ("sagloF", "Folgas") in m.invertidas
+    assert m.veredicto == "FALHA"
