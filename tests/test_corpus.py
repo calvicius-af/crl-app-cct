@@ -7,6 +7,7 @@ algum documento piorar. Sem os PDF (o caso normal fora da estação), é ignorad
 """
 import hashlib
 import json
+import os
 
 import pytest
 
@@ -134,12 +135,61 @@ def test_manifesto_do_corpus_esta_bem_formado():
     assert all(len(d["sha256"]) == 64 and d.get("motivo") for d in docs)
 
 
-_PRESENTES = [d["nome"] for d in corpus.carregar(corpus.MANIFESTO).get("documentos", [])
+def test_descarga_parcial_falha(ambiente, capsys):
+    """Revisão do PR #89: com 13 descargas falhadas e 1 PDF igual à
+    referência, as três etapas do CI passavam. Um corpus incompleto não
+    garante nada sobre os documentos que faltam."""
+    tmp, manifesto = ambiente
+    _obter(tmp, manifesto)
+    assert _medir(tmp, manifesto, "--atualizar") == 0
+    (tmp / "corpus" / "outro_nome.pdf").unlink()           # uma «descarga» falhada
+
+    assert corpus.main(["obter", "--manifesto", str(manifesto),
+                        "--corpus", str(tmp / "corpus")]) == 1
+    assert "FALHA: faltam 1 PDF" in capsys.readouterr().out
+    assert _medir(tmp, manifesto) == 1, "o documento presente mede igual, mas falta outro"
+    assert "corpus incompleto (1 PDF em falta)" in capsys.readouterr().out
+    # a leitura offline pode aceitar o corpus parcial, mas só se o pedir
+    assert _medir(tmp, manifesto, "--permitir-ausentes") == 0
+    assert corpus.main(["obter", "--permitir-ausentes", "--manifesto", str(manifesto),
+                        "--corpus", str(tmp / "corpus")]) == 0
+
+
+def test_falta_de_todos_os_pdf_falha(ambiente):
+    tmp, manifesto = ambiente
+    assert corpus.main(["obter", "--manifesto", str(manifesto),
+                        "--corpus", str(tmp / "corpus")]) == 1
+    assert _medir(tmp, manifesto) == 2
+    assert _medir(tmp, manifesto, "--permitir-ausentes") == 2, \
+        "sem nenhum PDF não há nada a medir, nem em modo permissivo"
+
+
+def test_documento_sem_referencia_falha(ambiente, capsys):
+    """Um documento acrescentado ao manifesto sem referência não é medido
+    contra nada: passava como «sem referência»."""
+    tmp, manifesto = ambiente
+    _obter(tmp, manifesto)
+    assert _medir(tmp, manifesto, "--atualizar") == 0
+    referencia = json.loads((tmp / "referencia.json").read_text(encoding="utf-8"))
+    del referencia["pdfplumber"]["outro_nome"]
+    corpus.gravar(tmp / "referencia.json", referencia)
+    assert _medir(tmp, manifesto) == 1
+    assert "1 documento(s) sem referência" in capsys.readouterr().out
+
+
+_MANIFESTO_REAL = corpus.carregar(corpus.MANIFESTO).get("documentos", [])
+_PRESENTES = [d["nome"] for d in _MANIFESTO_REAL
               if (corpus.PASTA / f"{d['nome']}.pdf").exists()]
+# no CI o corpus é obrigatório: sem PDF, o teste falha em vez de ser ignorado
+_OBRIGATORIO = os.environ.get("CCT_CORPUS_OBRIGATORIO") == "1"
 
 
-@pytest.mark.skipif(not _PRESENTES or not corpus.REFERENCIA.exists(),
+@pytest.mark.skipif(not (_PRESENTES or _OBRIGATORIO),
                     reason="corpus real ausente (python -m cct.corpus obter)")
 def test_corpus_real_sem_regressoes(tmp_path):
-    assert corpus.main(["medir", "--saida", str(tmp_path)]) == 0, \
-        (tmp_path / "comparacao.md").read_text(encoding="utf-8")
+    """Corre sobre os PDF de data/corpus em modo estrito: falha se algum
+    documento do manifesto faltar, não tiver referência ou piorar."""
+    codigo = corpus.main(["medir", "--saida", str(tmp_path)])
+    comparacao = tmp_path / "comparacao.md"
+    assert codigo == 0, (comparacao.read_text(encoding="utf-8") if comparacao.exists()
+                         else f"{len(_PRESENTES)}/{len(_MANIFESTO_REAL)} PDF presentes")

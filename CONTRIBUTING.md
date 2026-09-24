@@ -50,7 +50,9 @@ python -m cct.corpus medir                                  # falha se algum pio
 
 O manifesto (`tests/corpus/manifesto.json`) identifica cada PDF pelo SHA-256; os PDF
 ficam fora do repositório (ADR-0013). A referência (`tests/corpus/referencia.json`)
-guarda só números. Uma melhoria confirmada grava-se com `medir --atualizar`, e o
+guarda só números. Os dois comandos falham se faltar qualquer PDF do manifesto ou uma
+referência; `--permitir-ausentes` aceita um corpus parcial para leitura offline, e o CI
+nunca o usa. Uma melhoria confirmada grava-se com `medir --atualizar`, e o
 `results/corpus/comparacao.md` segue com o PR. Para testes do extrator sem PDF reais,
 `tests/pdf_sintetico.py` escreve PDF pequenos com o mobiliário do BTE e texto rodado.
 

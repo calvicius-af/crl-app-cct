@@ -17,6 +17,10 @@ conhece, o URL no BTE. O texto extraído também não: a referência só tem nú
 indicadas, depois no BTE (só com --rede). Com --registo, acrescenta ao manifesto
 os URL que o registo da recolha conhece. `medir` escreve results/corpus/
 comparacao.md e sai com 1 se houver regressões.
+
+Os dois comandos são estritos: falham se faltar qualquer PDF do manifesto ou,
+no `medir`, qualquer documento na referência. `--permitir-ausentes` aceita um
+corpus parcial, para leitura offline; o CI nunca o usa.
 """
 from __future__ import annotations
 
@@ -263,6 +267,9 @@ def main(argv: list[str] | None = None) -> int:
     for s in (o, m):
         s.add_argument("--manifesto", default=str(MANIFESTO))
         s.add_argument("--corpus", default=str(PASTA))
+        s.add_argument("--permitir-ausentes", action="store_true",
+                       help="não falhar por faltarem PDF ou referências (leitura "
+                            "parcial offline; nunca no CI)")
     m.add_argument("--referencia", default=str(REFERENCIA))
     m.add_argument("--saida", default=str(RESULTADOS))
     args = p.parse_args(argv)
@@ -281,6 +288,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {nome}: {estado}")
         faltam = sum(1 for e in estados.values() if e.startswith("em falta"))
         print(f"Corpus: {len(estados) - faltam}/{len(estados)} PDF em {args.corpus}")
+        if faltam and not args.permitir_ausentes:
+            print(f"FALHA: faltam {faltam} PDF do corpus. Um corpus incompleto não "
+                  "garante nada sobre os documentos que faltam.")
+            return 1
         return 0
 
     resultados, medidas, ausentes = medir_corpus(manifesto, Path(args.corpus), args.extrator)
@@ -290,6 +301,8 @@ def main(argv: list[str] | None = None) -> int:
     referencia_toda = carregar(Path(args.referencia))
     referencia = referencia_toda.get(args.extrator, {})
     texto, regressoes = relatorio(resultados, referencia, ausentes, args.extrator)
+    sem_referencia = [n for n, r in resultados.items()
+                      if "erro" not in r and n not in referencia]
     saida = Path(args.saida)
     saida.mkdir(parents=True, exist_ok=True)
     (saida / "comparacao.md").write_text(
@@ -301,6 +314,19 @@ def main(argv: list[str] | None = None) -> int:
             **referencia, **{n: r for n, r in resultados.items() if "erro" not in r}}
         gravar(Path(args.referencia), referencia_toda)
         print(f"Referência atualizada: {args.referencia} (fazer commit)")
+        sem_referencia = []
+    # Modo estrito, o do CI: o corpus só garante alguma coisa se os documentos
+    # todos forem medidos contra a referência. Um PDF que falta, ou sem
+    # referência, é uma falha, e não uma linha no relatório que ninguém lê.
+    incompleto = []
+    if ausentes:
+        incompleto.append(f"{len(ausentes)} PDF em falta")
+    if sem_referencia:
+        incompleto.append(f"{len(sem_referencia)} documento(s) sem referência")
+    if incompleto and not args.permitir_ausentes:
+        print(f"FALHA: corpus incompleto ({'; '.join(incompleto)}).")
+        return 1
+    if args.atualizar:
         return 0
     return 1 if regressoes else 0
 

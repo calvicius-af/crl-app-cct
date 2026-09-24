@@ -209,13 +209,20 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c requirements/runtime.txt -c requirements/dev.txt
 
+      # Modo estrito nas duas etapas: falham se faltar qualquer PDF do
+      # manifesto (uma descarga falhada, todas as descargas falhadas) ou se um
+      # documento não tiver referência. Um corpus parcial verde seria uma
+      # garantia falsa sobre os documentos que faltam (revisão do PR #89).
       - name: Obter os PDF do corpus
         run: python -m cct.corpus obter --rede
 
       - name: Medir contra a referência
+        env:
+          CCT_CORPUS_OBRIGATORIO: "1"
         run: python -m pytest -q -rs tests/test_corpus.py -k corpus_real
 
       - name: Mostrar as medições deste commit
+        # Informativo, e por isso permissivo: a garantia está nas etapas acima.
         # Mede de novo e grava as métricas numa referência à parte, que não
         # substitui a do repositório: a comparação detalhada fica no registo
         # do job e no artefacto, e a referência proposta pode ser revista e
@@ -224,7 +231,7 @@ jobs:
         if: always()
         run: |
           if ls data/corpus/*.pdf >/dev/null 2>&1; then
-            python -m cct.corpus medir --atualizar \
+            python -m cct.corpus medir --atualizar --permitir-ausentes \
               --referencia results/corpus/referencia-proposta.json
             cat results/corpus/comparacao.md
             cat results/corpus/referencia-proposta.json
