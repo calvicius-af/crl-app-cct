@@ -40,7 +40,9 @@ def _correr_doctor(monkeypatch, tmp_path, capsys, venv_existe=True,
     # O tkinter é do Python e não do projeto: há interpretadores (contentores,
     # algumas builds do Linux) sem ele. Sem este módulo falso, o resultado dos
     # testes dependia da máquina e não do que o doctor faz.
-    monkeypatch.setitem(sys.modules, "tkinter", types.ModuleType("tkinter"))
+    tkinter = types.ModuleType("tkinter")
+    tkinter.TkVersion = 8.6
+    monkeypatch.setitem(sys.modules, "tkinter", tkinter)
     # sys.prefix/base_prefix: simular que NÃO estamos num venv do projeto
     monkeypatch.setattr(doctor.sys, "prefix", "/usr")
     monkeypatch.setattr(doctor.sys, "base_prefix", "/usr")
@@ -100,3 +102,43 @@ def test_doctor_distingue_dados_em_falta_de_instalacao(monkeypatch, tmp_path, ca
     assert "Instalação pronta. Faltam dados de entrada" in out
     assert "a ausência de PDFs antes da recolha é normal" in out
     assert "não impede a recolha" in out
+
+
+def _sem_tkinter(monkeypatch, plataforma, base):
+    monkeypatch.setitem(sys.modules, "tkinter", None)   # import tkinter → ImportError
+    monkeypatch.setattr(doctor.sys, "platform", plataforma)
+    monkeypatch.setattr(doctor.sys, "base_prefix", base)
+
+
+def test_python_do_homebrew_sem_tk_aponta_o_pacote_certo(monkeypatch):
+    """Corrida de 2025 em macOS: a app não abriu; o terminal funcionou."""
+    _sem_tkinter(monkeypatch, "darwin", "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks")
+    problema = doctor.problema_tkinter()
+    versao = f"{sys.version_info.major}.{sys.version_info.minor}"
+    assert problema and f"brew install python-tk@{versao}" in problema
+
+
+def test_python_da_apple_aponta_o_python_org(monkeypatch):
+    _sem_tkinter(monkeypatch, "darwin", "/Library/Developer/CommandLineTools/Library")
+    assert "python.org" in doctor.problema_tkinter()
+
+
+def test_tk_antigo_e_um_problema(monkeypatch):
+    tkinter = types.ModuleType("tkinter")
+    tkinter.TkVersion = 8.5
+    monkeypatch.setitem(sys.modules, "tkinter", tkinter)
+    monkeypatch.setattr(doctor.sys, "platform", "darwin")
+    assert "Tk 8.5" in doctor.problema_tkinter()
+
+
+def test_app_sem_tk_explica_em_vez_de_rebentar(monkeypatch, capsys):
+    import importlib
+    monkeypatch.setitem(sys.modules, "tkinter", None)
+    monkeypatch.delitem(sys.modules, "cct.app", raising=False)
+    app = importlib.import_module("cct.app")
+    try:
+        assert app.main() == 1
+    finally:
+        sys.modules.pop("cct.app", None)
+    erro = capsys.readouterr().err
+    assert "A app gráfica não pode abrir" in erro and "tkinter" in erro

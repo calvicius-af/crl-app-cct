@@ -7,9 +7,15 @@ import queue
 import subprocess
 import sys
 import threading
-import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+
+try:
+    import tkinter as tk
+    from tkinter import filedialog, messagebox, ttk
+    _JANELA = tk.Tk
+except ImportError:      # sem o Tk: main() explica o que falta e como resolver
+    tk = filedialog = messagebox = ttk = None  # type: ignore[assignment]
+    _JANELA = object  # type: ignore[misc, assignment]
 
 from cct.subprocesso import ambiente_utf8
 
@@ -22,7 +28,7 @@ RESULTADOS = RAIZ / "results"
 FIM_DA_CORRIDA = object()
 
 
-class AppCCT(tk.Tk):
+class AppCCT(_JANELA):
     def __init__(self):
         super().__init__()
         self.title("Pipeline CCT → MaxQDA")
@@ -266,9 +272,29 @@ class AppCCT(tk.Tk):
             subprocess.run(["xdg-open", str(out)])
 
 
-def main():
-    AppCCT().mainloop()
+def main() -> int:
+    """Abre a janela; sem o Tk, diz no terminal porquê e como resolver.
+
+    No macOS a app fechava sem mensagem quando o Python não tinha o Tk
+    (corrida de 2025): o lançador fechava a janela do terminal com o erro.
+    """
+    from cct.doctor import problema_tkinter
+
+    problema = problema_tkinter()
+    if problema:
+        print(f"A app gráfica não pode abrir: {problema}\n"
+              "O pipeline continua a funcionar no terminal "
+              "(docs/operacao/guia-operacao.md).", file=sys.stderr)
+        return 1
+    try:
+        app = AppCCT()
+    except tk.TclError as e:
+        print(f"O Tk não conseguiu abrir a janela: {e}\n"
+              "Correr «python -m cct.doctor» e enviar o resultado.", file=sys.stderr)
+        return 1
+    app.mainloop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
