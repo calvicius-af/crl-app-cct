@@ -582,30 +582,36 @@ def _rodada(area) -> bool:
     return bool(chars) and sum(1 for c in chars if not c.get("upright", True)) * 2 > len(chars)
 
 
+def _fora_das_tabelas(area, tabelas):
+    """A área sem os caracteres que pertencem a alguma tabela.
+
+    O texto de uma tabela lê-se na tabela; uma faixa ou um lado que o
+    apanhasse repetia-o (382, p34: várias grelhas rodadas lado a lado).
+    """
+    caixas = [t.bbox for t in tabelas]
+
+    def fora(o) -> bool:
+        if o.get("object_type") != "char":
+            return True
+        cx, cy = (o["x0"] + o["x1"]) / 2, (o["top"] + o["bottom"]) / 2
+        return not any(a <= cx <= c and b <= cy <= d for a, b, c, d in caixas)
+    return area.filter(fora)
+
+
 def _ao_lado(pag, tab, tabelas, sentido: str | None) -> tuple[str, str]:
     """O texto à esquerda e à direita de uma tabela, na altura dela.
 
     As bandas só cobriam o que está acima e abaixo das tabelas; o que estava
     ao lado perdia-se. Nas páginas rodadas dos CARRISTUR é o título e o
-    «Deve ler-se:», à esquerda da grelha. Os caracteres de outras tabelas
-    ficam de fora, para não se repetirem.
+    «Deve ler-se:», à esquerda da grelha.
     """
     x0, t0, x1, t1 = tab.bbox
-
-    def fora_das_tabelas(o) -> bool:
-        if o.get("object_type") != "char":
-            return True
-        cx, cy = (o["x0"] + o["x1"]) / 2, (o["top"] + o["bottom"]) / 2
-        return not any(a <= cx <= c and b <= cy <= d for a, b, c, d in
-                       (t.bbox for t in tabelas))
-
     lados = []
     for a, c in ((pag.bbox[0], x0), (x1, pag.bbox[2])):
         if c - a < 5:
             lados.append("")
             continue
-        area = pag.crop((a, t0, c, t1)).filter(fora_das_tabelas)
-        lados.append(_texto(area, sentido))
+        lados.append(_texto(_fora_das_tabelas(pag.crop((a, t0, c, t1)), tabelas), sentido))
     return lados[0], lados[1]
 
 
@@ -659,7 +665,7 @@ def _extrair_pagina_deitada(pag, sentido: str) -> str:
     partes = []
 
     def juntar(area) -> None:
-        txt = _texto(area, sentido)
+        txt = _texto(_fora_das_tabelas(area, tabelas), sentido)
         if txt.strip():
             partes.append(txt)
 
@@ -717,7 +723,7 @@ def _extrair_pagina(pag) -> str:
     for tab in tabelas:
         x0, t0, x1, t1 = tab.bbox
         if t0 > topo:
-            banda = pag.crop((pag.bbox[0], topo, pag.bbox[2], t0))
+            banda = _fora_das_tabelas(pag.crop((pag.bbox[0], topo, pag.bbox[2], t0)), tabelas)
             txt = _texto(banda, sentido)
             if txt.strip():
                 partes.append(txt)
@@ -733,7 +739,8 @@ def _extrair_pagina(pag) -> str:
             partes.append(direita)
         topo = max(topo, t1)
     if topo < pag.bbox[3]:
-        banda = pag.crop((pag.bbox[0], topo, pag.bbox[2], pag.bbox[3]))
+        banda = _fora_das_tabelas(pag.crop((pag.bbox[0], topo, pag.bbox[2], pag.bbox[3])),
+                                  tabelas)
         txt = _texto(banda, sentido)
         if txt.strip():
             partes.append(txt)
@@ -833,7 +840,9 @@ def extrair_pdf(pdf_path: Path, paginas: tuple[int, int] | None = None,
     with pdfplumber.open(pdf_path) as pdf:
         pags = pdf.pages if paginas is None else pdf.pages[paginas[0]:paginas[1]]
         for pag in pags:
-            t = _extrair_pagina(pag)
+            # negrito simulado: o mesmo carácter desenhado duas vezes, quase
+            # no mesmo sítio («CCaarrrreeiirraa», 382); fica um
+            t = _extrair_pagina(pag.dedupe_chars())
             if t.strip():
                 textos.append(t)
     if not textos:

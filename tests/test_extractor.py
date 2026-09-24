@@ -207,15 +207,15 @@ def test_pdf_real_acip_fesaht():
 
 # ---------- PDF sintéticos: rotação e colunas (corpus de 24-09-2026) ----------
 
-def _tabela_rodada(sentido):
+def _tabela_rodada(sentido, y0=300, logica=None):
     """Tabela «Nível | Valor» desenhada a 90º, com grelha, como as dos CARRISTUR.
 
     Na página, cada linha lógica da tabela é uma coluna; «btt» lê-se de baixo
     para cima (cabeçalho à esquerda), «ttb» de cima para baixo (à direita).
     """
     from tests.pdf_sintetico import grelha
-    logica = [["Nível", "Valor"], ["A", "1 355,48"], ["B", "1 200,00"]]
-    x0, y0, w, h = 100, 300, 20, 70
+    logica = logica or [["Nível", "Valor"], ["A", "1 355,48"], ["B", "1 200,00"]]
+    x0, w, h = 100, 20, 70
     itens = grelha(x0, y0, [w] * 3, [h] * 2)
     for i, linha in enumerate(logica):
         for j, texto in enumerate(linha):
@@ -308,3 +308,27 @@ def test_cabecalho_vertical_numa_tabela_direita(tmp_path):
     _doc, texto = extrair_pdf(pdf)
     assert "Nível | Escalão | Valor\nI | 1 | 900\nII | 2 | 950" in texto, texto
     assert "levíN" not in texto
+
+
+def test_tabelas_rodadas_lado_a_lado_nao_se_repetem(tmp_path):
+    """382, p34: várias grelhas rodadas na mesma página deitada. As faixas
+    entre tabelas cobriam a página inteira e voltavam a ler as outras
+    tabelas: 2527 palavras a mais no corpus."""
+    from tests.pdf_sintetico import escrever_pdf
+    [a] = _tabela_rodada("btt", y0=150)
+    [b] = _tabela_rodada("btt", y0=450, logica=[["Carreira", "Nível"],
+                                               ["Técnico", "XII"], ["Diretor", "XVI"]])
+    pdf = escrever_pdf(tmp_path / "x.pdf", [a + b[1:]])
+    _doc, texto = extrair_pdf(pdf)
+    assert texto.count("1 355,48") == 1 and texto.count("Diretor") == 1, texto
+    assert "Nível | Valor\nA | 1 355,48" in texto
+    assert "Carreira | Nível\nTécnico | XII\nDiretor | XVI" in texto
+
+
+def test_negrito_simulado_nao_duplica_letras(tmp_path):
+    """O mesmo carácter desenhado duas vezes, meio ponto ao lado: «CCaarrrreeiirraa»."""
+    from tests.pdf_sintetico import escrever_pdf
+    pdf = escrever_pdf(tmp_path / "x.pdf", [[(72, 700, "Carreira Técnica"),
+                                             (72.3, 700, "Carreira Técnica")]])
+    _doc, texto = extrair_pdf(pdf)
+    assert texto.strip() == "Carreira Técnica", texto
