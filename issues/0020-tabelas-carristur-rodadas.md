@@ -93,5 +93,5 @@ tiver palavras invertidas.
 **Confirmado no corpus real** (job «corpus» do CI, commit `0da8b02`): os quatro
 CARRISTUR com 100% de cobertura e zero palavras invertidas, contra 626 palavras a mais
 antes. O 382 com 99,8%; resta a ordem das grelhas da p34. Ver
-[corpus BTE 31/2026](../docs/validacao/corpus-bte31-2026-09-24.md). Falta a confirmação
-visual das grelhas no MaxQDA.
+[corpus BTE 31/2026](../docs/validacao/corpus-bte31-2026-09-24.md). Confirmado
+visualmente no MaxQDA a 2026-09-24 (p34 do 382 e uma tabela de um CARRISTUR): sem erros.
