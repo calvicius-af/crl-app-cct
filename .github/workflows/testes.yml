@@ -215,6 +215,23 @@ jobs:
       - name: Medir contra a referência
         run: python -m pytest -q -rs tests/test_corpus.py -k corpus_real
 
+      - name: Mostrar as medições deste commit
+        # Mede de novo e grava as métricas numa referência à parte, que não
+        # substitui a do repositório: a comparação detalhada fica no registo
+        # do job e no artefacto, e a referência proposta pode ser revista e
+        # copiada para tests/corpus/referencia.json quando uma melhoria for
+        # confirmada.
+        if: always()
+        run: |
+          if ls data/corpus/*.pdf >/dev/null 2>&1; then
+            python -m cct.corpus medir --atualizar \
+              --referencia results/corpus/referencia-proposta.json
+            cat results/corpus/comparacao.md
+            cat results/corpus/referencia-proposta.json
+          else
+            echo "Sem PDF do corpus: nada a medir."
+          fi
+
       - name: Guardar a comparação
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0

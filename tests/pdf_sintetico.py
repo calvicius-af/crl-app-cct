@@ -7,9 +7,10 @@ Estes PDF são pequenos, mas passam pelo pdfplumber e pelo PDFium como um PDF
 real: cada linha tem uma posição na página.
 
 Só usa a fonte Helvetica com a codificação WinAnsi, que cobre os acentos do
-português. Não desenha grelhas. Uma linha com um quarto elemento `"rodado"`
+português. Uma linha com um quarto elemento `"rodado"` (ou `"rodado_horario"`)
 é escrita a 90º, como as escalas laterais do TINITA e as tabelas dos
-CARRISTUR, numa página que não declara rotação.
+CARRISTUR, numa página que não declara rotação; `grelha()` desenha os traços
+de uma tabela.
 """
 from pathlib import Path
 
@@ -23,12 +24,35 @@ def _escapar(texto: str) -> bytes:
 
 
 def _conteudo(linhas: list[tuple]) -> bytes:
+    """Texto e traços. Um item ("traco", x0, y0, x1, y1) desenha uma linha."""
+    tracos = [b"0.5 w"]
     partes = [b"BT /F1 10 Tf"]
-    for x, y, texto, *modo in linhas:
-        matriz = b"0 1 -1 0" if modo == ["rodado"] else b"1 0 0 1"
+    for item in linhas:
+        if item[0] == "traco":
+            _, x0, y0, x1, y1 = item
+            tracos.append(b"%.1f %.1f m %.1f %.1f l S" % (x0, y0, x1, y1))
+            continue
+        x, y, texto, *modo = item
+        matriz = {"rodado": b"0 1 -1 0", "rodado_horario": b"0 -1 1 0"}.get(
+            modo[0] if modo else "", b"1 0 0 1")
         partes.append(matriz + b" %.1f %.1f Tm (" % (x, y) + _escapar(texto) + b") Tj")
     partes.append(b"ET")
-    return b"\n".join(partes)
+    return b"\n".join(tracos + partes)
+
+
+def grelha(x0: float, y0: float, larguras: list[float], alturas: list[float]) -> list[tuple]:
+    """Traços de uma grelha com o canto inferior esquerdo em (x0, y0)."""
+    x1, y1 = x0 + sum(larguras), y0 + sum(alturas)
+    tracos = []
+    y = y0
+    for h in [0.0, *alturas]:
+        y += h
+        tracos.append(("traco", x0, y, x1, y))
+    x = x0
+    for w in [0.0, *larguras]:
+        x += w
+        tracos.append(("traco", x, y0, x, y1))
+    return tracos
 
 
 def escrever_pdf(destino: Path, paginas: list[list[tuple]]) -> Path:

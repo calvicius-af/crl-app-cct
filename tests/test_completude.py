@@ -190,11 +190,9 @@ def test_a_referencia_le_bem_o_texto_rodado(tmp_path):
     assert paginas_de_referencia(pdf)[0].split("\n") == ESCALA
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "defeito conhecido do pdfplumber (ISSUE-0020, #42): lê o texto rodado "
-    "90º letra a letra e ao contrário. Quando o extrator o corrigir, este "
-    "teste passa e o xfail tem de sair."))
 def test_extrator_le_bem_o_texto_rodado(tmp_path):
+    """ISSUE-0020 e #42: era um xfail estrito até o extrator ler o texto
+    rodado no sentido certo (char_dir_rotated do pdfplumber 0.11)."""
     pdf = escrever_pdf(tmp_path / "x.pdf",
                        [[(100 + 20 * i, 100, t, "rodado") for i, t in enumerate(ESCALA)]])
     _doc, texto = extrair_pdf(pdf)
@@ -203,10 +201,55 @@ def test_extrator_le_bem_o_texto_rodado(tmp_path):
 
 
 def test_o_diagnostico_apanha_o_texto_rodado_invertido(tmp_path):
-    """Enquanto o defeito existir, o diagnóstico tem de o mostrar."""
+    """A leitura antiga (extract_text sem sentido) tem de dar FALHA."""
+    import pdfplumber
     pdf = escrever_pdf(tmp_path / "x.pdf",
                        [[(100 + 20 * i, 100, t, "rodado") for i, t in enumerate(ESCALA)]])
-    _doc, texto = extrair_pdf(pdf)
-    m = medir_pdf("x", pdf, texto)
+    with pdfplumber.open(pdf) as p:
+        texto_antigo = p.pages[0].extract_text()
+    m = medir_pdf("x", pdf, texto_antigo)
     assert ("sagloF", "Folgas") in m.invertidas
     assert m.veredicto == "FALHA"
+
+
+# ---------- casos reais do corpus (comparacao.md de 24-09-2026) ----------
+
+def test_hifen_do_pdfium_com_rodape_colado_nao_parte_palavras():
+    """O PDFium marca a hifenização com U+FFFE e cola-lhe o rodapé; «pro» e
+    «fissional» contavam como em falta e «profissional» como a mais."""
+    paginas = ["o trabalho prestado, não podendo o pro￾BTE 31 | 34",
+               "fissional receber em relação a esse trabalho uma remuneração.\n"
+               "a necessária corre￾ção."]
+    texto = ("o trabalho prestado, não podendo o profissional receber em relação "
+             "a esse trabalho uma remuneração.\na necessária correção.")
+    m = medir("x", paginas, texto)
+    assert m.cobertura == 1.0 and not m.a_mais, diagnostico([m])
+    assert not m.perda_por_pagina
+
+
+def test_citar_o_boletim_no_corpo_nao_e_mobiliario():
+    """As menções ao BTE no articulado saíam da referência e contavam como
+    resíduo: 5 «resíduos» falsos só no 377."""
+    frase = ("1- A presente convenção entra em vigor a partir do quinto dia "
+             "posterior ao da sua publicação no Boletim do Trabalho e Emprego.")
+    citacao = "publicado no Boletim do Trabalho e Emprego, n.º 21, 8 de junho de 2026"
+    m = medir("x", [f"{frase}\n{citacao}"], f"{frase}\n{citacao}")
+    assert m.cobertura == 1.0 and not m.a_mais and not m.residuos
+
+
+def test_mobiliario_do_bte_de_2026_sai_da_referencia_e_e_apanhado_no_texto():
+    pagina = ("Boletim do Trabalho e Emprego 31\n22 agosto 2026\n"
+              "Texto da cláusula.\nBTE 31 | 139")
+    texto = ("Texto da cláusula.\nBoletim do Trabalho e Emprego 31 ANEX Categorias e gru\n"
+             "1 | 139 Boletim do Trabalho e Emprego 31\nBTE 3\n22 agosto 2026")
+    m = medir("x", [pagina], texto)
+    assert m.em_falta == {}, "o cabeçalho, a data e o rodapé não são texto a exigir"
+    assert [n for n, _ in m.residuos] == [2, 3, 4, 5]
+
+
+def test_invertidas_pela_forma_quando_a_referencia_nao_tem_a_palavra():
+    """Nas tabelas rodadas dos CARRISTUR o PDFium não lê nada; o par exato não
+    existe, mas «ahlocsE» e «ocincéT» denunciam-se pela maiúscula no fim."""
+    m = medir("x", ["Assim, na página 225, onde se lê:"],
+              "Assim, na página 225, onde se lê:\nahlocsE ¦ ocincéT ¦ levíN ¦ Escolha")
+    assert [a for a, _ in m.invertidas] == ["ahlocsE", "levíN", "ocincéT"]

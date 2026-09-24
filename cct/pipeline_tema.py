@@ -15,7 +15,8 @@ from pathlib import Path
 
 import yaml
 
-from .completude import diagnostico, medir_pdf, ultima_aquisicao
+from .completude import (diagnostico, invertidas_pela_forma, medir_pdf,
+                         ultima_aquisicao)
 from .extractor import extrair_pdf
 from .lexical import codificar
 from .nomeacao import FAMILIAS_PROCESSAVEIS, familia_do_nome
@@ -283,10 +284,11 @@ def main():
                 problemas.append(
                     f"{pdf.stem}: [auditoria] não foi possível verificar "
                     f"as tabelas ({e}) — documento mantido")
-            # tabelas rodadas 90º (ISSUE-0020): defeito específico do
-            # pdfplumber, que lê o texto invertido sem se queixar — com
-            # --extrator docling a tabela já sai correta, não há o que avisar
-            if args.extrator != "docling":
+            # tabelas rodadas 90º (ISSUE-0020): o extrator lê hoje o texto
+            # rodado no sentido certo; o aviso só se dá quando o texto ainda
+            # traz palavras invertidas, sinal de uma rotação não reconhecida.
+            # Sem essa condição, dizia que estava errado o que já estava certo.
+            if args.extrator != "docling" and invertidas_pela_forma(texto):
                 try:
                     from .auditoria import tabelas_rodadas_pdfplumber
                     for aviso in tabelas_rodadas_pdfplumber(pdf):
@@ -352,7 +354,7 @@ def main():
         medidas, manifesto_inicial | {"summary": resumo},
         "\n".join(relatorio),
         {"Última aquisição": ultima_aquisicao(out.parent / "aquisicao")}),
-        encoding="utf-8")
+        encoding="utf-8", newline="\n")
     manifesto = construir_manifesto(
         raiz=raiz,
         inicio_utc=inicio_utc,

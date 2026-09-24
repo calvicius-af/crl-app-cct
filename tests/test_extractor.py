@@ -203,3 +203,63 @@ def test_pdf_real_acip_fesaht():
     # zero perda
     folhas = [n for n in doc["nos"] if n.get("folha")]
     assert "".join(texto[n["char_start"]:n["char_end"]] for n in folhas) == texto
+
+
+# ---------- PDF sintéticos: rotação e colunas (corpus de 24-09-2026) ----------
+
+def _tabela_rodada(sentido):
+    """Tabela «Nível | Valor» desenhada a 90º, com grelha, como as dos CARRISTUR.
+
+    Na página, cada linha lógica da tabela é uma coluna; «btt» lê-se de baixo
+    para cima (cabeçalho à esquerda), «ttb» de cima para baixo (à direita).
+    """
+    from tests.pdf_sintetico import grelha
+    logica = [["Nível", "Valor"], ["A", "1 355,48"], ["B", "1 200,00"]]
+    x0, y0, w, h = 100, 300, 20, 70
+    itens = grelha(x0, y0, [w] * 3, [h] * 2)
+    for i, linha in enumerate(logica):
+        for j, texto in enumerate(linha):
+            if sentido == "btt":        # linha i: coluna i; coluna j: de baixo
+                itens.append((x0 + w * i + 15, y0 + h * j + 5, texto, "rodado"))
+            else:                       # linha i: coluna da direita; coluna j: de cima
+                itens.append((x0 + w * (2 - i) + 5, y0 + h * (2 - j) - 5, texto,
+                              "rodado_horario"))
+    return [[(72, 780, "Assim, na página 225, onde se lê:"), *itens]]
+
+
+@pytest.mark.parametrize("sentido", ["btt", "ttb"])
+def test_tabela_rodada_sai_de_pe_e_legivel(tmp_path, sentido):
+    """ISSUE-0020 e #42: as tabelas rodadas saíam com as palavras invertidas
+    («levíN», «rolaV») e com as linhas trocadas pelas colunas."""
+    from tests.pdf_sintetico import escrever_pdf
+    pdf = escrever_pdf(tmp_path / "x.pdf", _tabela_rodada(sentido))
+    _doc, texto = extrair_pdf(pdf)
+    assert "Nível | Valor\nA | 1 355,48\nB | 1 200,00" in texto, texto
+
+
+def test_tabela_com_coluna_do_meio_vazia_nao_e_cortada_em_colunas(tmp_path):
+    """377, «Enquadramento das profissões»: a coluna do meio quase vazia fazia
+    a página passar por duas colunas; o corte separava a primeira coluna da
+    terceira e punha o cabeçalho do BTE a meio do texto."""
+    from tests.pdf_sintetico import escrever_pdf, grelha
+    linhas = 10
+    itens = grelha(40, 200, [200, 60, 200], [30] * linhas)
+    for k in range(linhas):
+        y = 200 + 30 * (linhas - 1 - k) + 10
+        itens.append((45, y, f"Categoria profissional número {k}"))
+        itens.append((305, y, f"Técnico administrativo de segunda {k}"))
+    pdf = escrever_pdf(tmp_path / "x.pdf", [[(200, 760, "Enquadramento das profissões"), *itens]])
+    _doc, texto = extrair_pdf(pdf)
+    assert "Categoria profissional número 3 |  | Técnico administrativo de segunda 3" in texto, texto
+
+
+def test_duas_colunas_de_texto_sem_grelha_continuam_a_ser_cortadas(tmp_path):
+    """O BTE antigo em duas colunas continua a ler-se coluna a coluna."""
+    from tests.pdf_sintetico import escrever_pdf
+    itens = []
+    for k in range(25):
+        itens.append((40, 760 - 14 * k, f"Esquerda linha {k} do texto."))
+        itens.append((320, 760 - 14 * k, f"Direita linha {k} do texto."))
+    pdf = escrever_pdf(tmp_path / "x.pdf", [itens])
+    _doc, texto = extrair_pdf(pdf)
+    assert texto.index("Esquerda linha 24") < texto.index("Direita linha 0"), texto

@@ -14,6 +14,8 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from .mobiliario import e_mobiliario
+
 RE_CAPITULO = re.compile(r"^(?:CAP[IÍ]TULO|T[IÍ]TULO)\s+([IVXLCD]+|\d+)\b(.*)$")
 RE_SECCAO = re.compile(r"^SEC[ÇC][AÃ]O\s+([IVXLCD]+|\d+)\b(.*)$", re.IGNORECASE)
 RE_ANEXO = re.compile(r"^ANEXO\s+([IVXLCD]+|\d+)?\b(.*)$")
@@ -93,7 +95,6 @@ RE_FIM_TITULO_CONVENCAO = re.compile(
 # o bloco de título vive no cabeçalho do documento; a regra acima só lá
 # se aplica, para não partir frases do corpo que acabem nas mesmas palavras
 LINHAS_DO_CABECALHO = 20
-RE_RODAPE_BTE = re.compile(r"^BTE\s+\d+\s*\|\s*\d+$")
 # continuação de enumeração de alíneas partida pelo PDF: "b) e c) do número…"
 # (minúscula ou conjunção após o parêntesis — uma alínea real começa por maiúscula)
 RE_ALINEA_CONTINUACAO = re.compile(r"^[a-z]\)\s+(?:e\b|ou\b|[a-zà-ú])")
@@ -466,11 +467,117 @@ def _formatar_tabela(linhas_tabela: list[list[str | None]]) -> str:
     return "\n".join(linhas)
 
 
+# ---------- texto rodado (ISSUE-0020, #42) ----------
+#
+# Tabelas e escalas desenhadas a 90º numa página que não declara rotação: o
+# pdfplumber, por omissão, lê cada palavra ao contrário («sagloF»). Desde a
+# 0.11 sabe lê-las no sentido certo (`char_dir_rotated`); falta agrupar as
+# palavras em linhas e pôr as tabelas de pé. Só se ativa numa página com texto
+# rodado suficiente: as outras seguem o caminho de sempre.
+MIN_CARACTERES_RODADOS = 10
+
+
+def _sentido_rodado(obj) -> str | None:
+    """«btt» (lê-se de baixo para cima), «ttb» (de cima para baixo) ou None."""
+    a, b, c, d = obj["matrix"][:4]
+    if abs(a) > 0.1 or abs(d) > 0.1:
+        return None
+    return "btt" if b > 0 else "ttb"
+
+
+def _sentido_da_pagina(pag) -> str | None:
+    sentidos = Counter(
+        s for c in pag.chars
+        if not c.get("upright", True) and c["text"].strip()
+        and (s := _sentido_rodado(c)))
+    if sum(sentidos.values()) < MIN_CARACTERES_RODADOS:
+        return None
+    return sentidos.most_common(1)[0][0]
+
+
+def _opcoes(sentido: str) -> dict:
+    # btt: as linhas seguem da esquerda para a direita; ttb: da direita para a esquerda
+    return {"char_dir_rotated": sentido,
+            "line_dir_rotated": "ltr" if sentido == "btt" else "rtl"}
+
+
+def _linhas_rodadas(area, sentido: str) -> str:
+    """O texto rodado de uma área, uma linha por linha do documento."""
+    palavras = [w for w in area.extract_words(**_opcoes(sentido))
+                if not w.get("upright", True)]
+    palavras.sort(key=lambda w: w["x0"], reverse=sentido == "ttb")
+    linhas: list[list[dict]] = []
+    for w in palavras:
+        if linhas and abs(linhas[-1][0]["x0"] - w["x0"]) <= 2:
+            linhas[-1].append(w)
+        else:
+            linhas.append([w])
+    return "\n".join(
+        " ".join(w["text"] for w in sorted(
+            linha, key=lambda w: w["top"], reverse=sentido == "btt"))
+        for linha in linhas)
+
+
+def _texto(area, sentido: str | None) -> str:
+    """O texto de uma área: direito como sempre, e o rodado à parte, no fim."""
+    if sentido is None:
+        return area.extract_text() or ""
+    direito = area.filter(lambda o: o.get("object_type") != "char"
+                          or o.get("upright", True)).extract_text() or ""
+    return "\n".join(t for t in (direito, _linhas_rodadas(area, sentido)) if t.strip())
+
+
+def _dados_tabela(tab, sentido: str | None) -> list:
+    """As células da tabela; uma tabela rodada é posta de pé.
+
+    Rodada no sentido «btt», o cabeçalho está à esquerda da página e a
+    primeira coluna em baixo; no sentido «ttb», à direita e em cima.
+    """
+    if sentido is None:
+        return tab.extract()
+    x0, t0, x1, t1 = tab.bbox
+    dentro = [c for c in tab.page.chars
+              if x0 <= c["x0"] <= x1 and t0 <= c["top"] <= t1 and c["text"].strip()]
+    if sum(1 for c in dentro if not c.get("upright", True)) * 2 < len(dentro):
+        return tab.extract()
+    # célula a célula, com o mesmo agrupamento do texto rodado: o
+    # extract_text do pdfplumber põe cada palavra rodada na sua linha e, no
+    # sentido «btt», pela ordem inversa («355,48 1»)
+    celulas = [[None if cel is None else
+                _linhas_rodadas(tab.page.crop(cel), sentido).replace("\n", " ")
+                for cel in linha.cells] for linha in tab.rows]
+    if not celulas:
+        return celulas
+    n_linhas, n_colunas = len(celulas), max(len(r) for r in celulas)
+    celulas = [r + [None] * (n_colunas - len(r)) for r in celulas]
+    if sentido == "btt":
+        return [[celulas[n_linhas - 1 - j][i] for j in range(n_linhas)]
+                for i in range(n_colunas)]
+    return [[celulas[j][n_colunas - 1 - i] for j in range(n_linhas)]
+            for i in range(n_colunas)]
+
+
+def _grelha_atravessa(pag, meio: float) -> bool:
+    """Há traços de tabela a cruzar a goteira no corpo da página?
+
+    Uma tabela com a coluna do meio vazia parece uma página em duas colunas
+    (377, «Enquadramento das profissões»; 384 e 385, grelhas largas): cortá-la
+    ao meio separava as colunas e partia os títulos centrados («ANEX» | «O II»).
+    Os traços do cabeçalho e do rodapé (10% de cima e de baixo) não contam.
+    """
+    topo, fundo = pag.bbox[1], pag.bbox[3]
+    margem = (fundo - topo) * 0.1
+    cruzam = sum(1 for e in pag.horizontal_edges
+                 if e["x0"] < meio - 10 and e["x1"] > meio + 10
+                 and topo + margem < e["top"] < fundo - margem)
+    return cruzam >= 2
+
+
 def _duas_colunas(pag) -> float | None:
     """Devolve o x da goteira se a página estiver em duas colunas (BTE antigo).
 
-    Heurística: poucas palavras atravessam a faixa central e ambas as
-    metades têm texto substancial.
+    Heurística: poucas palavras atravessam a faixa central, ambas as
+    metades têm texto substancial e nenhuma grelha de tabela cruza o meio.
     """
     palavras = pag.extract_words()
     if len(palavras) < 40:
@@ -481,7 +588,8 @@ def _duas_colunas(pag) -> float | None:
     direita = sum(1 for w in palavras if w["x0"] >= meio)
     total = len(palavras)
     if (atravessam / total < 0.02
-            and esquerda / total > 0.25 and direita / total > 0.25):
+            and esquerda / total > 0.25 and direita / total > 0.25
+            and not _grelha_atravessa(pag, meio)):
         return meio
     return None
 
@@ -491,9 +599,11 @@ def _extrair_pagina(pag) -> str:
 
     O BTE é de coluna única: fatiamos a página em bandas horizontais entre
     as tabelas detetadas; o texto de cada banda sai com extract_text e as
-    tabelas saem estruturadas entre sentinelas MARCA_TABELA_*.
+    tabelas saem estruturadas entre sentinelas MARCA_TABELA_*. Uma página com
+    texto rodado a 90º não se corta em colunas e lê-se no sentido certo.
     """
-    goteira = _duas_colunas(pag)
+    sentido = _sentido_da_pagina(pag)
+    goteira = None if sentido else _duas_colunas(pag)
     if goteira is not None:
         esq = pag.crop((pag.bbox[0], pag.bbox[1], goteira, pag.bbox[3]))
         dir_ = pag.crop((goteira, pag.bbox[1], pag.bbox[2], pag.bbox[3]))
@@ -502,7 +612,7 @@ def _extrair_pagina(pag) -> str:
 
     tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[1])
     if not tabelas:
-        return pag.extract_text() or ""
+        return _texto(pag, sentido)
 
     partes = []
     topo = pag.bbox[1]
@@ -510,10 +620,10 @@ def _extrair_pagina(pag) -> str:
         x0, t0, x1, t1 = tab.bbox
         if t0 > topo:
             banda = pag.crop((pag.bbox[0], topo, pag.bbox[2], t0))
-            txt = banda.extract_text() or ""
+            txt = _texto(banda, sentido)
             if txt.strip():
                 partes.append(txt)
-        dados = tab.extract()
+        dados = _dados_tabela(tab, sentido)
         if dados:
             corpo = _formatar_tabela(dados)
             if corpo:
@@ -521,7 +631,7 @@ def _extrair_pagina(pag) -> str:
         topo = max(topo, t1)
     if topo < pag.bbox[3]:
         banda = pag.crop((pag.bbox[0], topo, pag.bbox[2], pag.bbox[3]))
-        txt = banda.extract_text() or ""
+        txt = _texto(banda, sentido)
         if txt.strip():
             partes.append(txt)
     return "\n".join(partes)
@@ -578,8 +688,8 @@ def _remover_cabecalhos_rodapes(paginas: list[str]) -> list[str]:
 
     Mobiliário é o que se repete no topo ou no fundo das páginas: uma linha
     de texto que aparece nas margens de pelo menos 30% das páginas, um
-    número de página sozinho nas margens, ou o rodapé «BTE n | página» em
-    qualquer sítio. A posição conta: antes, qualquer linha repetida em 30%
+    número de página sozinho nas margens, ou uma linha inteira de cabeçalho,
+    data ou rodapé do BTE em qualquer sítio (`cct/mobiliario.py`). A posição conta: antes, qualquer linha repetida em 30%
     das páginas desaparecia, incluindo frases legítimas do corpo (issue #47).
     """
     colunas = [_segmentos(pag) for pag in paginas]
@@ -596,7 +706,11 @@ def _remover_cabecalhos_rodapes(paginas: list[str]) -> list[str]:
             texto = set(_texto_fora_de_tabela(seg))
             for i, linha in enumerate(seg):
                 limpa = linha.strip()
-                if i in texto and RE_RODAPE_BTE.match(limpa):
+                # cabeçalho, data e rodapé do BTE em linha própria, em
+                # qualquer sítio: nas páginas de 2026 nem sempre se repetem
+                # o bastante para a regra das margens os apanhar (os
+                # CARRISTUR têm três páginas e o cabeçalho só na primeira)
+                if i in texto and e_mobiliario(limpa):
                     continue
                 if i in margens and (limpa in repetidas or re.fullmatch(r"\d+", limpa)):
                     continue

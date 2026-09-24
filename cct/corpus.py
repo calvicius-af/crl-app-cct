@@ -59,8 +59,9 @@ def carregar(caminho: Path) -> dict:
 
 def gravar(caminho: Path, dados: dict) -> None:
     caminho.parent.mkdir(parents=True, exist_ok=True)
+    # LF também em Windows: estes ficheiros vão para o repositório
     caminho.write_text(json.dumps(dados, ensure_ascii=False, indent=2) + "\n",
-                       encoding="utf-8")
+                       encoding="utf-8", newline="\n")
 
 
 # ---------- obter ----------
@@ -292,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
     saida = Path(args.saida)
     saida.mkdir(parents=True, exist_ok=True)
     (saida / "comparacao.md").write_text(
-        texto + "\n" + diagnostico(medidas), encoding="utf-8")
+        texto + "\n" + diagnostico(medidas), encoding="utf-8", newline="\n")
     print(texto)
     print(f"→ {saida / 'comparacao.md'}")
     if args.atualizar:

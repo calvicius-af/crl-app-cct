@@ -32,6 +32,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .mobiliario import RE_NUMERO_PAGINA, e_mobiliario, tem_mobiliario
+
 # ---------- limiares do veredicto (explicados no próprio diagnóstico) ----------
 
 COBERTURA_OK = 0.995        # palavras do PDF presentes no texto
@@ -41,19 +43,33 @@ ORDEM_OK = 0.97             # palavras do PDF na mesma ordem no texto
 LINHA_LONGA = 600           # caracteres: sinal de tabela colapsada numa linha
 
 RE_PALAVRA = re.compile(r"\w+")
-# mobiliário conhecido do BTE; o resto que falte conta como perda
-RE_MOBILIARIO = re.compile(
-    r"Boletim do Trabalho e Emprego|^BTE\s+\d+\s*(\|\s*\d+)?$", re.IGNORECASE)
-# um número sozinho só é número de página nas margens: a meio da página pode
-# ser o valor de uma tabela salarial, que tem de contar
-RE_NUMERO_PAGINA = re.compile(r"^\d{1,4}$")
 MARGEM = 2
-RE_HIFEN_FIM = re.compile(r"[-\x02\xad￾]\n(?=[a-zà-ÿ])")
+# O PDFium marca a hifenização de fim de linha com U+FFFE e cola-lhe a linha
+# seguinte («pro\ufffeposta»), às vezes o próprio rodapé («pro\ufffeBTE 31 | 34»).
+HIFEN_PDFIUM = "\ufffe"
+RE_HIFEN_FIM = re.compile(r"[-\x02\xad\ufffe]\n(?=[a-zà-ÿ])")
+# Uma palavra invertida tem a maiúscula no fim: «sagloF», «ocincéT», «levíN».
+RE_INVERTIDA = re.compile(r"^[a-zà-ÿ]{2,}[A-ZÀ-Ý]$")
+# Uma página em que o PDFium lê menos de metade dos caracteres que o pdfplumber
+# vê não serve de referência (sucede nas tabelas rodadas dos CARRISTUR).
+PDFIUM_CEGO = 0.5
 
 
 def _normalizar(texto: str) -> str:
     texto = unicodedata.normalize("NFC", texto.replace("\r\n", "\n").replace("\r", "\n"))
-    return RE_HIFEN_FIM.sub("", texto)
+    # o hífen do PDFium passa a fim de linha, para o mobiliário que vem colado
+    # a ele ficar numa linha própria e a junção se fazer como no extrator
+    return texto.replace(HIFEN_PDFIUM, HIFEN_PDFIUM + "\n").replace(
+        HIFEN_PDFIUM + "\n\n", HIFEN_PDFIUM + "\n")
+
+
+def _juntar_hifenizacao(texto: str) -> str:
+    return RE_HIFEN_FIM.sub("", texto).replace(HIFEN_PDFIUM, "-")
+
+
+def invertidas_pela_forma(texto: str) -> list[str]:
+    """Palavras com a maiúscula no fim («sagloF»): texto rodado lido ao contrário."""
+    return [p for p in RE_PALAVRA.findall(texto) if len(p) >= 4 and RE_INVERTIDA.match(p)]
 
 
 def palavras(texto: str) -> list[str]:
@@ -64,22 +80,43 @@ def palavras(texto: str) -> list[str]:
 
 def paginas_de_referencia(pdf: Path) -> list[str]:
     """Texto de cada página, lido pelo PDFium."""
+    return ler_referencia(pdf)[0]
+
+
+def ler_referencia(pdf: Path) -> tuple[list[str], list[int]]:
+    """Texto de cada página e as páginas em que o PDFium não serve.
+
+    Nessas páginas (o PDFium lê menos de metade dos caracteres que o pdfplumber
+    vê), a referência passa a ser o pdfplumber, com o texto rodado lido no
+    sentido certo. A comparação aí deixa de ser independente, e o diagnóstico
+    di-lo; mas as palavras invertidas continuam a ser apanhadas pela forma.
+    """
+    import pdfplumber
     import pypdfium2 as pdfium
 
     documento = pdfium.PdfDocument(str(pdf))
+    paginas, cegas = [], []
     try:
-        paginas = []
-        for i in range(len(documento)):
-            pagina = documento[i]
-            textpage = pagina.get_textpage()
-            try:
-                paginas.append(_normalizar(textpage.get_text_range()))
-            finally:
-                textpage.close()
-                pagina.close()
-        return paginas
+        with pdfplumber.open(pdf) as plumber:
+            for i in range(len(documento)):
+                pagina = documento[i]
+                textpage = pagina.get_textpage()
+                try:
+                    texto = _normalizar(textpage.get_text_range())
+                finally:
+                    textpage.close()
+                    pagina.close()
+                pp = plumber.pages[i]
+                vistos = sum(1 for c in pp.chars if c["text"].strip())
+                lidos = sum(1 for c in texto if not c.isspace())
+                if vistos and lidos < PDFIUM_CEGO * vistos:
+                    cegas.append(i + 1)
+                    texto = _normalizar(pp.extract_text(
+                        line_dir_rotated="ltr", char_dir_rotated="btt") or "")
+                paginas.append(texto)
     finally:
         documento.close()
+    return paginas, cegas
 
 
 def sem_mobiliario(pagina: str) -> tuple[str, list[str]]:
@@ -91,10 +128,23 @@ def sem_mobiliario(pagina: str) -> tuple[str, list[str]]:
     saem: list[str] = []
     for i, linha in enumerate(linhas):
         limpa = linha.strip()
-        mobiliario = (RE_MOBILIARIO.search(limpa)
+        mobiliario = (e_mobiliario(limpa)
                       or (i in margens and RE_NUMERO_PAGINA.match(limpa)))
         (saem if mobiliario else ficam).append(linha)
     return "\n".join(ficam), [l.strip() for l in saem if l.strip()]
+
+
+def _juntar_paginas(limpas: list[str]) -> list[str]:
+    """Junta a palavra partida entre duas páginas na página onde começa."""
+    limpas = [l.rstrip() for l in limpas]
+    for i in range(len(limpas) - 1):
+        if limpas[i].endswith(("-", HIFEN_PDFIUM)):
+            seguinte = limpas[i + 1].lstrip()
+            m = re.match(r"[a-zà-ÿ]\w*", seguinte)
+            if m:
+                limpas[i] = limpas[i][:-1] + m.group(0)
+                limpas[i + 1] = seguinte[m.end():]
+    return [_juntar_hifenizacao(l) for l in limpas]
 
 
 @dataclass
@@ -108,6 +158,8 @@ class Medida:
     ordem: float = 1.0
     perda_por_pagina: list[tuple[int, float]] = field(default_factory=list)
     invertidas: list[tuple[str, str]] = field(default_factory=list)
+    # páginas em que a referência veio do pdfplumber (o PDFium não as lê)
+    paginas_cegas: list[int] = field(default_factory=list)
     # (parágrafo, conteúdo): o parágrafo conta só as linhas não vazias, como
     # a numeração que o MAXQDA mostra ao lado do texto
     residuos: list[tuple[int, str]] = field(default_factory=list)
@@ -154,12 +206,10 @@ def _contexto(texto: str, palavra: str, largura: int = 70) -> str:
 def medir(documento: str, paginas_pdf: list[str], texto: str) -> Medida:
     """Compara as páginas lidas do PDF com o texto extraído."""
     m = Medida(documento, paginas=len(paginas_pdf))
-    limpas = []
-    for pagina in paginas_pdf:
-        limpa, _mobiliario = sem_mobiliario(_normalizar(pagina))
-        limpas.append(limpa)
+    limpas = _juntar_paginas(
+        [sem_mobiliario(_normalizar(pagina))[0] for pagina in paginas_pdf])
     referencia = "\n".join(limpas)
-    texto = _normalizar(texto)
+    texto = _juntar_hifenizacao(_normalizar(texto))
 
     ref_palavras = palavras(referencia)
     txt_palavras = palavras(texto)
@@ -187,11 +237,14 @@ def medir(documento: str, paginas_pdf: list[str], texto: str) -> Medida:
             None, ref_palavras, txt_palavras, autojunk=False).get_matching_blocks()
         m.ordem = sum(b.size for b in blocos) / len(ref_palavras)
 
+    # invertidas: o par exato quando a referência tem a palavra certa, e a
+    # forma (maiúscula no fim) quando não tem, como nas páginas cegas
     m.invertidas = sorted(
-        (p, p[::-1]) for p in m.a_mais if len(p) >= 4 and p[::-1] in m.em_falta)
+        (p, p[::-1]) for p in m.a_mais
+        if len(p) >= 4 and (p[::-1] in m.em_falta or RE_INVERTIDA.match(p)))
     paragrafos = [l.strip() for l in texto.split("\n") if l.strip()]
     for n, linha in enumerate(paragrafos, 1):
-        if RE_MOBILIARIO.search(linha):
+        if tem_mobiliario(linha):
             m.residuos.append((n, linha))
         if len(linha) > LINHA_LONGA:
             m.linhas_longas.append((n, len(linha)))
@@ -214,7 +267,10 @@ def medir(documento: str, paginas_pdf: list[str], texto: str) -> Medida:
 def medir_pdf(documento: str, pdf: Path, texto: str) -> Medida:
     """Como `medir`, mas nunca rebenta: um PDF ilegível dá SEM MEDIDA."""
     try:
-        return medir(documento, paginas_de_referencia(pdf), texto)
+        paginas, cegas = ler_referencia(pdf)
+        m = medir(documento, paginas, texto)
+        m.paginas_cegas = cegas
+        return m
     except Exception as e:                       # o diagnóstico nunca custa a corrida
         return Medida(documento, erro=f"{type(e).__name__}: {e}")
 
@@ -297,6 +353,10 @@ def diagnostico(medidas: list[Medida], manifesto: dict | None = None,
             f"{m.palavras_texto} no texto.")
         cls = "; ".join(f"{k}: {a} no PDF, {b} no texto" for k, (a, b) in m.caracteres.items())
         linhas += ["", f"Caracteres: {cls}.", ""]
+        if m.paginas_cegas:
+            linhas += ["O PDFium não lê o texto das páginas " + ", ".join(
+                f"p{n}" for n in m.paginas_cegas) + "; aí a referência é o "
+                "pdfplumber e a comparação não é independente.", ""]
         if m.veredicto == "OK":
             continue
         piores = sorted(m.perda_por_pagina, key=lambda x: -x[1])[:8]
@@ -375,7 +435,7 @@ def main(argv: list[str] | None = None) -> int:
         medidas, manifesto,
         relatorio.read_text(encoding="utf-8") if relatorio.exists() else "",
         {"Última aquisição": ultima_aquisicao(corrida.parent / "aquisicao")}),
-        encoding="utf-8")
+        encoding="utf-8", newline="\n")
     print(f"→ {saida}")
     return 0
 

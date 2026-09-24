@@ -38,9 +38,11 @@ modelos) nem ao BTE. Os ensaios usaram PDF sintéticos (`tests/pdf_sintetico.py`
 Por ordem, cada passo medido no corpus de regressão (`python -m cct.corpus medir`) antes
 de avançar:
 
-1. **Texto rodado com o PDFium.** Nas páginas onde o pdfplumber vê texto não vertical,
-   ler essas zonas com o PDFium. Não há dependência nova e o teste
-   `test_extrator_le_bem_o_texto_rodado` (hoje `xfail`) passa a ser o critério.
+1. **Texto rodado.** Feito no mesmo dia, e sem o PDFium: o próprio pdfplumber 0.11 lê
+   o texto rodado no sentido certo com `char_dir_rotated`, e o extrator põe as tabelas
+   rodadas de pé. O teste `test_extrator_le_bem_o_texto_rodado` deixou de ser `xfail`.
+   Nas tabelas rodadas dos CARRISTUR o corpus mostrou que o PDFium não lê texto nenhum,
+   o que confirma a escolha.
 2. **Docling com modelos numa máquina preparada.** Medir no corpus a completude e as
    tabelas dos dois extratores lado a lado (`medir --extrator docling`). Se ganhar,
    decidir entre instalá-lo nas estações (cerca de 222 MB mais os modelos) ou extrair

@@ -48,18 +48,18 @@ def _aviso_tabela_rodada(pagina: int, bbox: tuple[float, float, float, float]
     if largura > 0 and altura > LIMIAR_PROPORCAO_RODADA * largura:
         return (f"p{pagina}: tabela com {largura:.0f}×{altura:.0f} pt "
                 f"(muito mais alta do que larga) — provavelmente rodada "
-                f"90º; o pdfplumber lê-a invertida, usar --extrator docling")
+                f"90º, e o texto extraído tem palavras invertidas; confirmar "
+                f"no PDF ou usar --extrator docling")
     return None
 
 
 def tabelas_rodadas_pdfplumber(pdf_path: Path) -> list[str]:
     """Tabelas cuja bbox sugere rotação 90º, por página (auditor, não segundo extrator).
 
-    O docling lê estas tabelas na orientação correta (verificado nos quatro
-    documentos CARRISTUR do BTE 31/2026); o pdfplumber não deteta a rotação
-    e emite o texto invertido como se fosse conteúdo válido. Isto não
-    corrige a leitura — só avisa, para quem vir a tabela invertida no QDPX
-    saber que a causa é conhecida e que `--extrator docling` a lê bem.
+    Desde 2026-09-24 o extrator lê o texto rodado no sentido certo
+    (`_sentido_da_pagina` em cct/extractor.py). O pipeline só chama este
+    aviso quando o texto extraído ainda tem palavras invertidas: é o sinal de
+    uma rotação que o extrator não reconheceu.
     """
     import pdfplumber
 

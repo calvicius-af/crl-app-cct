@@ -1,6 +1,6 @@
 # ISSUE-0006: o corte em duas colunas parte cabeçalhos centrados (extrator pdfplumber)
 
-- **Estado:** Aberta
+- **Estado:** Em curso — 2026-09-24: o corte deixa de se aplicar a páginas com grelha a atravessar a goteira
 - **Data:** 2026-08-27
 - **Onde dói:** `cct/extractor.py` (`_duas_colunas`, `_extrair_pagina`)
 
@@ -64,3 +64,16 @@ item como uma unidade (ver `ordenar_por_leitura`).
 
 Relacionada com a ISSUE-0001 (numeração por extenso) apenas por tocarem no mesmo
 módulo.
+
+## Evidência e correção parcial (2026-09-24)
+
+O corpus de regressão (BTE 31/2026) mostrou o defeito em páginas de coluna única com
+tabelas de coluna do meio vazia: 377 («Enquadramento das profissões», cabeçalho do BTE a
+meio do texto, primeira coluna separada da terceira) e 384/385 (títulos partidos:
+`ANEX` | `XO II`, `Gr` | `upos profissionais`). `_duas_colunas` passa a recusar o corte
+quando há pelo menos dois traços horizontais a cruzar a goteira no corpo da página
+(`_grelha_atravessa`), e nunca corta páginas com texto rodado. Testes com PDF sintéticos
+para a tabela (não corta) e para duas colunas de texto sem grelha (continua a cortar).
+
+Fica por resolver o caso original desta issue, um cabeçalho centrado numa página de duas
+colunas verdadeiras, que precisa de um PDF do BTE antigo no corpus.
