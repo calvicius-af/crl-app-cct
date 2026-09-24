@@ -566,7 +566,10 @@ def _nas_margens(linhas: list[str]) -> set[int]:
     entre duas tabelas a meio da página não está.
     """
     cheias = [i for i, l in enumerate(linhas) if l.strip()]
-    margens = set(cheias[:ZONA_MOBILIARIO] + cheias[-ZONA_MOBILIARIO:])
+    # numa página curta, três linhas de cada lado eram a página inteira, e
+    # uma frase do corpo repetida entre páginas curtas desaparecia
+    zona = max(1, min(ZONA_MOBILIARIO, len(cheias) // 4))
+    margens = set(cheias[:zona] + cheias[-zona:])
     return margens.intersection(_texto_fora_de_tabela(linhas))
 
 

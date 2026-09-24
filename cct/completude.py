@@ -1,0 +1,384 @@
+"""Completude da extração: o texto que chega ao MaxQDA tem tudo o que o PDF tem?
+
+Compara o texto extraído com uma leitura independente do mesmo PDF, feita pelo
+PDFium (`pypdfium2`, que já vem instalado com o pdfplumber). Os dois motores
+leem o PDF de formas diferentes, mas as palavras são as mesmas: o que o PDF tem
+e o texto não tem é perda; o que o texto tem e o PDF não tem é lixo (palavras
+invertidas, letras separadas, pedaços de palavras).
+
+A comparação é por contagem de palavras, e não linha a linha, porque a ordem e
+as quebras de linha diferem legitimamente entre motores. A ordem mede-se à
+parte, e o mobiliário do BTE (cabeçalho, rodapé, número de página) sai da
+referência antes de comparar, porque removê-lo é o comportamento esperado.
+
+Uso sobre uma corrida já feita (lê o QDPX e o manifest.json):
+
+    python -m cct.completude --corrida results/corrida
+
+O pipeline chama isto no fim de cada corrida e escreve `diagnostico.md` na
+pasta de resultados: um só ficheiro com tudo o que é preciso para perceber o
+que correu mal, sem abrir os documentos um a um.
+"""
+from __future__ import annotations
+
+import argparse
+import difflib
+import json
+import re
+import unicodedata
+import xml.etree.ElementTree as ET
+import zipfile
+from collections import Counter
+from dataclasses import dataclass, field
+from pathlib import Path
+
+# ---------- limiares do veredicto (explicados no próprio diagnóstico) ----------
+
+COBERTURA_OK = 0.995        # palavras do PDF presentes no texto
+COBERTURA_FALHA = 0.97
+EXCESSO_OK = 0.005          # palavras no texto que o PDF não tem
+ORDEM_OK = 0.97             # palavras do PDF na mesma ordem no texto
+LINHA_LONGA = 600           # caracteres: sinal de tabela colapsada numa linha
+
+RE_PALAVRA = re.compile(r"\w+")
+# mobiliário conhecido do BTE; o resto que falte conta como perda
+RE_MOBILIARIO = re.compile(
+    r"Boletim do Trabalho e Emprego|^BTE\s+\d+\s*(\|\s*\d+)?$", re.IGNORECASE)
+# um número sozinho só é número de página nas margens: a meio da página pode
+# ser o valor de uma tabela salarial, que tem de contar
+RE_NUMERO_PAGINA = re.compile(r"^\d{1,4}$")
+MARGEM = 2
+RE_HIFEN_FIM = re.compile(r"[-\x02\xad￾]\n(?=[a-zà-ÿ])")
+
+
+def _normalizar(texto: str) -> str:
+    texto = unicodedata.normalize("NFC", texto.replace("\r\n", "\n").replace("\r", "\n"))
+    return RE_HIFEN_FIM.sub("", texto)
+
+
+def palavras(texto: str) -> list[str]:
+    """As palavras, com as formas de compatibilidade unificadas (ligaduras
+    como «ﬁ», que um motor dá e o outro não)."""
+    return [unicodedata.normalize("NFKC", p) for p in RE_PALAVRA.findall(texto)]
+
+
+def paginas_de_referencia(pdf: Path) -> list[str]:
+    """Texto de cada página, lido pelo PDFium."""
+    import pypdfium2 as pdfium
+
+    documento = pdfium.PdfDocument(str(pdf))
+    try:
+        paginas = []
+        for i in range(len(documento)):
+            pagina = documento[i]
+            textpage = pagina.get_textpage()
+            try:
+                paginas.append(_normalizar(textpage.get_text_range()))
+            finally:
+                textpage.close()
+                pagina.close()
+        return paginas
+    finally:
+        documento.close()
+
+
+def sem_mobiliario(pagina: str) -> tuple[str, list[str]]:
+    """A página sem as linhas de mobiliário, e as linhas retiradas."""
+    linhas = pagina.split("\n")
+    cheias = [i for i, l in enumerate(linhas) if l.strip()]
+    margens = set(cheias[:MARGEM] + cheias[-MARGEM:])
+    ficam: list[str] = []
+    saem: list[str] = []
+    for i, linha in enumerate(linhas):
+        limpa = linha.strip()
+        mobiliario = (RE_MOBILIARIO.search(limpa)
+                      or (i in margens and RE_NUMERO_PAGINA.match(limpa)))
+        (saem if mobiliario else ficam).append(linha)
+    return "\n".join(ficam), [l.strip() for l in saem if l.strip()]
+
+
+@dataclass
+class Medida:
+    documento: str
+    paginas: int = 0
+    palavras_pdf: int = 0
+    palavras_texto: int = 0
+    em_falta: Counter = field(default_factory=Counter)
+    a_mais: Counter = field(default_factory=Counter)
+    ordem: float = 1.0
+    perda_por_pagina: list[tuple[int, float]] = field(default_factory=list)
+    invertidas: list[tuple[str, str]] = field(default_factory=list)
+    # (parágrafo, conteúdo): o parágrafo conta só as linhas não vazias, como
+    # a numeração que o MAXQDA mostra ao lado do texto
+    residuos: list[tuple[int, str]] = field(default_factory=list)
+    linhas_longas: list[tuple[int, int]] = field(default_factory=list)
+    caracteres: dict[str, tuple[int, int]] = field(default_factory=dict)
+    contexto_falta: dict[str, str] = field(default_factory=dict)
+    contexto_mais: dict[str, str] = field(default_factory=dict)
+    erro: str | None = None
+
+    @property
+    def cobertura(self) -> float:
+        if not self.palavras_pdf:
+            return 1.0
+        return 1 - sum(self.em_falta.values()) / self.palavras_pdf
+
+    @property
+    def excesso(self) -> float:
+        if not self.palavras_texto:
+            return 0.0
+        return sum(self.a_mais.values()) / self.palavras_texto
+
+    @property
+    def veredicto(self) -> str:
+        if self.erro:
+            return "SEM MEDIDA"
+        if self.cobertura < COBERTURA_FALHA or len(self.invertidas) >= 5:
+            return "FALHA"
+        if (self.cobertura < COBERTURA_OK or self.excesso > EXCESSO_OK
+                or self.ordem < ORDEM_OK or self.invertidas or self.residuos
+                or self.linhas_longas):
+            return "ATENÇÃO"
+        return "OK"
+
+
+def _contexto(texto: str, palavra: str, largura: int = 70) -> str:
+    m = re.search(rf"(?<!\w){re.escape(palavra)}(?!\w)", texto)
+    if not m:
+        return ""
+    ini, fim = max(0, m.start() - largura), min(len(texto), m.end() + largura)
+    trecho = texto[ini:fim].replace("\n", " ⏎ ")
+    return ("…" if ini else "") + trecho + ("…" if fim < len(texto) else "")
+
+
+def medir(documento: str, paginas_pdf: list[str], texto: str) -> Medida:
+    """Compara as páginas lidas do PDF com o texto extraído."""
+    m = Medida(documento, paginas=len(paginas_pdf))
+    limpas = []
+    for pagina in paginas_pdf:
+        limpa, _mobiliario = sem_mobiliario(_normalizar(pagina))
+        limpas.append(limpa)
+    referencia = "\n".join(limpas)
+    texto = _normalizar(texto)
+
+    ref_palavras = palavras(referencia)
+    txt_palavras = palavras(texto)
+    m.palavras_pdf, m.palavras_texto = len(ref_palavras), len(txt_palavras)
+    ref, txt = Counter(ref_palavras), Counter(txt_palavras)
+    m.em_falta, m.a_mais = ref - txt, txt - ref
+
+    # onde está a perda: cada página consome as palavras que encontra no texto
+    disponiveis = Counter(txt)
+    for n, limpa in enumerate(limpas, 1):
+        da_pagina = palavras(limpa)
+        if not da_pagina:
+            continue
+        achadas = 0
+        for p in da_pagina:
+            if disponiveis[p] > 0:
+                disponiveis[p] -= 1
+                achadas += 1
+        perda = 1 - achadas / len(da_pagina)
+        if perda > 0:
+            m.perda_por_pagina.append((n, perda))
+
+    if ref_palavras and txt_palavras:
+        blocos = difflib.SequenceMatcher(
+            None, ref_palavras, txt_palavras, autojunk=False).get_matching_blocks()
+        m.ordem = sum(b.size for b in blocos) / len(ref_palavras)
+
+    m.invertidas = sorted(
+        (p, p[::-1]) for p in m.a_mais if len(p) >= 4 and p[::-1] in m.em_falta)
+    paragrafos = [l.strip() for l in texto.split("\n") if l.strip()]
+    for n, linha in enumerate(paragrafos, 1):
+        if RE_MOBILIARIO.search(linha):
+            m.residuos.append((n, linha))
+        if len(linha) > LINHA_LONGA:
+            m.linhas_longas.append((n, len(linha)))
+
+    def classes(t: str) -> dict[str, int]:
+        return {"letras": sum(c.isalpha() for c in t),
+                "dígitos": sum(c.isdigit() for c in t),
+                "vírgulas": t.count(","), "pontos": t.count("."),
+                "a": t.lower().count("a")}
+    c_ref, c_txt = classes(referencia), classes(texto)
+    m.caracteres = {k: (c_ref[k], c_txt[k]) for k in c_ref}
+
+    for p, _ in m.em_falta.most_common(25):
+        m.contexto_falta[p] = _contexto(referencia, p)
+    for p, _ in m.a_mais.most_common(25):
+        m.contexto_mais[p] = _contexto(texto, p)
+    return m
+
+
+def medir_pdf(documento: str, pdf: Path, texto: str) -> Medida:
+    """Como `medir`, mas nunca rebenta: um PDF ilegível dá SEM MEDIDA."""
+    try:
+        return medir(documento, paginas_de_referencia(pdf), texto)
+    except Exception as e:                       # o diagnóstico nunca custa a corrida
+        return Medida(documento, erro=f"{type(e).__name__}: {e}")
+
+
+# ---------- o relatório único ----------
+
+def _pct(x: float) -> str:
+    return f"{100 * x:.1f}%"
+
+
+def diagnostico(medidas: list[Medida], manifesto: dict | None = None,
+                relatorio: str = "", extras: dict[str, str] | None = None) -> str:
+    """Markdown com tudo o que é preciso para diagnosticar a corrida."""
+    manifesto = manifesto or {}
+    ambiente = manifesto.get("environment", {})
+    parametros = manifesto.get("parameters", {})
+    resumo = manifesto.get("summary", {})
+    contagem = Counter(m.veredicto for m in medidas)
+
+    linhas = ["# Diagnóstico da corrida", ""]
+    linhas += [
+        f"Início: {manifesto.get('started_at_utc', '?')} (UTC). "
+        f"Aplicação {ambiente.get('app_version', '?')}, "
+        f"Python {ambiente.get('python', '?')}, {ambiente.get('platform', '?')}.",
+        f"Commit: {(ambiente.get('git') or {}).get('commit') or 'desconhecido'}. "
+        f"Extrator: {parametros.get('extrator', '?')}.",
+        f"Comando: `{' '.join(manifesto.get('command', []))}`",
+        "",
+        f"Documentos: {len(medidas)}. OK: {contagem['OK']}. "
+        f"Atenção: {contagem['ATENÇÃO']}. Falha: {contagem['FALHA']}. "
+        f"Sem medida: {contagem['SEM MEDIDA']}. "
+        f"Cláusulas: {resumo.get('clausulas', '?')}. "
+        f"Anotações: {resumo.get('anotacoes', '?')}.",
+        "",
+        "## Resumo por documento",
+        "",
+        "| Documento | Veredicto | Cobertura | Em falta | A mais | Ordem "
+        "| Invertidas | Mobiliário | Linhas longas |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for m in medidas:
+        if m.erro:
+            linhas.append(f"| {m.documento} | SEM MEDIDA | | | | | | | |")
+            continue
+        linhas.append(
+            f"| {m.documento} | {m.veredicto} | {_pct(m.cobertura)} "
+            f"| {sum(m.em_falta.values())} | {sum(m.a_mais.values())} "
+            f"| {_pct(m.ordem)} | {len(m.invertidas)} | {len(m.residuos)} "
+            f"| {len(m.linhas_longas)} |")
+
+    linhas += ["", "## Como ler", "",
+               "1. **Cobertura:** palavras do PDF (sem cabeçalho, rodapé e número "
+               "de página) que estão no texto. OK a partir de "
+               f"{_pct(COBERTURA_OK)}; falha abaixo de {_pct(COBERTURA_FALHA)}.",
+               "2. **A mais:** palavras do texto que o PDF não tem: letras "
+               "separadas, palavras invertidas ou partidas.",
+               "3. **Ordem:** palavras do PDF que aparecem pela mesma ordem no "
+               f"texto. Abaixo de {_pct(ORDEM_OK)} há blocos trocados (colunas, "
+               "tabelas).",
+               "4. **Mobiliário:** linhas de cabeçalho ou rodapé do BTE que "
+               "ficaram no texto.",
+               f"5. **Linhas longas:** linhas com mais de {LINHA_LONGA} "
+               "caracteres, típicas de uma tabela colapsada.",
+               "6. A referência é a leitura do PDFium, outro motor. Uma "
+               "diferença pode vir dele; o contexto de cada palavra permite "
+               "decidir.", ""]
+
+    if relatorio.strip():
+        linhas += ["## Relatório da corrida", "", "```", relatorio.strip(), "```", ""]
+
+    linhas += ["## Detalhe por documento", ""]
+    for m in medidas:
+        linhas.append(f"### {m.documento}: {m.veredicto}")
+        linhas.append("")
+        if m.erro:
+            linhas += [f"Não foi possível ler o PDF: {m.erro}", ""]
+            continue
+        linhas.append(
+            f"{m.paginas} páginas; {m.palavras_pdf} palavras no PDF e "
+            f"{m.palavras_texto} no texto.")
+        cls = "; ".join(f"{k}: {a} no PDF, {b} no texto" for k, (a, b) in m.caracteres.items())
+        linhas += ["", f"Caracteres: {cls}.", ""]
+        if m.veredicto == "OK":
+            continue
+        piores = sorted(m.perda_por_pagina, key=lambda x: -x[1])[:8]
+        if piores:
+            linhas.append("Páginas com perda: " + ", ".join(
+                f"p{n} ({_pct(p)})" for n, p in piores) + ".")
+            linhas.append("")
+        if m.invertidas:
+            linhas.append("Palavras invertidas: " + ", ".join(
+                f"`{a}` (é `{b}`)" for a, b in m.invertidas[:15]) + ".")
+            linhas.append("")
+        if m.residuos:
+            linhas.append("Mobiliário no texto (parágrafo no MAXQDA):")
+            linhas += [f"{i}. parágrafo {n}: `{r}`"
+                       for i, (n, r) in enumerate(m.residuos[:10], 1)]
+            linhas.append("")
+        if m.linhas_longas:
+            linhas += ["Linhas longas (parágrafo no MAXQDA): " + ", ".join(
+                f"{n} ({c} caracteres)" for n, c in m.linhas_longas[:10]) + ".", ""]
+        for titulo, contagem_p, contextos in (
+                ("Em falta no texto (contexto no PDF)", m.em_falta, m.contexto_falta),
+                ("A mais no texto (contexto no texto)", m.a_mais, m.contexto_mais)):
+            if not contagem_p:
+                continue
+            linhas += [f"{titulo}:", "", "| Palavra | Vezes | Contexto |", "|---|---|---|"]
+            for p, n in contagem_p.most_common(25):
+                ctx = contextos.get(p, "").replace("|", "¦")
+                linhas.append(f"| `{p}` | {n} | {ctx} |")
+            linhas.append("")
+
+    for titulo, conteudo in (extras or {}).items():
+        if conteudo.strip():
+            linhas += [f"## {titulo}", "", "```", conteudo.strip(), "```", ""]
+    return "\n".join(linhas) + "\n"
+
+
+# ---------- sobre uma corrida já feita ----------
+
+def textos_do_qdpx(qdpx: Path) -> dict[str, str]:
+    """Nome da fonte → texto, tal como o MaxQDA o recebe."""
+    with zipfile.ZipFile(qdpx) as zf:
+        raiz = ET.fromstring(zf.read("project.qde"))
+        textos = {}
+        for el in raiz.iter():
+            if el.tag.endswith("TextSource"):
+                caminho = el.attrib["plainTextPath"].replace("internal://", "Sources/")
+                textos[el.attrib["name"]] = zf.read(caminho).decode("utf-8")
+    return textos
+
+
+def ultima_aquisicao(pasta: Path) -> str:
+    relatorios = sorted(pasta.glob("relatorio_*.txt")) if pasta.is_dir() else []
+    return relatorios[-1].read_text(encoding="utf-8") if relatorios else ""
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    p.add_argument("--corrida", required=True,
+                   help="pasta de resultados com projeto.qdpx e manifest.json")
+    p.add_argument("--raiz", default=str(Path(__file__).resolve().parent.parent),
+                   help="raiz do projeto, contra a qual o manifesto guarda os PDF")
+    args = p.parse_args(argv)
+    corrida, raiz = Path(args.corrida), Path(args.raiz)
+    manifesto = json.loads((corrida / "manifest.json").read_text(encoding="utf-8"))
+    textos = textos_do_qdpx(corrida / "projeto.qdpx")
+    pdfs = {Path(e["path"]).stem: raiz / e["path"] for e in manifesto.get("inputs", [])
+            if e["path"].lower().endswith(".pdf")}
+    medidas = []
+    for nome, texto in textos.items():
+        pdf = pdfs.get(nome)
+        medidas.append(medir_pdf(nome, pdf, texto) if pdf else
+                       Medida(nome, erro="PDF não encontrado no manifesto"))
+    relatorio = corrida / "relatorio.txt"
+    saida = corrida / "diagnostico.md"
+    saida.write_text(diagnostico(
+        medidas, manifesto,
+        relatorio.read_text(encoding="utf-8") if relatorio.exists() else "",
+        {"Última aquisição": ultima_aquisicao(corrida.parent / "aquisicao")}),
+        encoding="utf-8")
+    print(f"→ {saida}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
