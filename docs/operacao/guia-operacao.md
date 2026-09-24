@@ -231,11 +231,14 @@ Sai um Excel com cada cláusula classificada: `=` / `alteracao` / `nova` /
 |---|---|---|
 | "Sem PDFs em …" | pasta errada ou vazia | confirmar o caminho em --pdfs |
 | "sem pasta de versões correspondente" | nome da subpasta não está contido no nome do PDF | renomear a subpasta (ex.: `ACIP_FESAHT`) |
+| "A pasta de versões anteriores não existe" | `--pasta-versoes` (ou o campo «Versões anteriores» da app) aponta para uma pasta que não existe | corrigir o caminho, ou retirar a opção: sem ela os consolidados ficam todos na faixa CONSOLIDADO. Antes, cada documento consolidado ficava fora do QDPX (corrida de 2025) |
+| "ERRO, documento fora do QDPX" / `EXCLUÍDO` no diagnostico.md | o documento foi extraído mas falhou num passo seguinte | enviar o `diagnostico.md`: diz o erro de cada documento excluído |
 | "a versão antiga parece parcial" | a base da comparação é uma revisão de 2-3 páginas | juntar à subpasta o último texto completo |
 | "PDF digitalizado?" / 0 cláusulas | o PDF é uma imagem (scan) | obter o PDF nativo do BTE; OCR ainda não suportado |
 | subtipo sempre "desconhecido" | falta o ficheiro de variáveis ou o nome do PDF não bate certo com o MaxQDA | ver 3.2; o cruzamento usa os primeiros ~30 caracteres do nome |
 | códigos todos em REVER, nada em AUTO | falta `--metricas` (calibração) | usar o metricas.json da última avaliação contra a amostra de referência |
 | erro ao importar QDPX no MaxQDA | versão antiga do MaxQDA | usar MaxQDA 2022 ou superior (REFI-QDA) |
+| a app gráfica não abre no macOS | o Python não tem o Tk (Homebrew) ou tem um Tk antigo (o Python da Apple) | abrir `scripts/AppCCT.command`: a janela do terminal fica aberta com a causa e a solução (por exemplo, `brew install python-tk@3.11`); o mesmo em `python -m cct.doctor`. O pipeline no terminal não precisa do Tk |
 | a app/comando "não faz nada" | ambiente por instalar | correr `python -m cct.doctor` e seguir as instruções |
 | `.venv/bin/python` não é reconhecido no PowerShell | caminho de macOS usado em Windows | usar `.\.venv\Scripts\python.exe` em todos os comandos; não é necessário ativar o ambiente |
 | `ModuleNotFoundError: No module named 'jsonschema'` depois de instalar as dependências | `python` chama outro interpretador | repetir com `.\.venv\Scripts\python.exe`; confirmar o caminho mostrado pelo `doctor` antes de reinstalar |
