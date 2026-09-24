@@ -30,6 +30,15 @@ def test_deteta_texto_depois_do_deposito():
     # AguasNorte e AguasSerraEstrela: matéria de anexos aparecia no fim
     aviso = deposito_no_fim(DEPOSITO + "\n2- Reenquadramento nas categorias.\n")
     assert aviso and "depois da nota de depósito" in aviso
+    # o aviso diz qual é a linha (corrida de 2025: 74 avisos sem ela)
+    assert "«2- Reenquadramento nas categorias.»" in aviso
+
+
+def test_nota_de_deposito_partida_em_duas_linhas():
+    partida = DEPOSITO.replace(", de 12 de fevereiro.", "")
+    assert deposito_no_fim(f"Texto.\n{partida}\nde 12 de fevereiro.\n") is None
+    aviso = deposito_no_fim(f"Texto.\n{DEPOSITO}\nde 12 de fevereiro.\n")
+    assert aviso and aviso.startswith("1 linha(s)"), "uma nota já fechada não continua"
 
 
 def test_deteta_ausencia_do_deposito():
@@ -255,3 +264,17 @@ def test_artigo_que_anuncia_mas_acaba_o_documento_continua_a_dar_aviso():
         "x")
     assert clausulas_sem_corpo(doc, final) == [
         "Artigo 1.º - Alteração: corpo sem frase terminada em ponto"]
+
+
+def test_corpo_de_tabela_formula_ou_omitido_nao_e_truncado():
+    """Corrida de 2025: «Cálculo da remuneração» (uma fórmula), uma tabela
+    de valores e «Cláusula transitória (...)» não se escrevem em frases."""
+    texto = ("Cláusula 34.ª - Cálculo da remuneração\n"
+             "RH = (Rm × 12) / (52 × n)\n"
+             "Cláusula 37.ª - Cláusula transitória\n(...)\n"
+             "Cláusula 38.ª - Valores\n"
+             "\x02TABELA\nDiária completa | 88,20 €\n\x03TABELA\n"
+             "Cláusula 39.ª - Parentalidade\nAplica-se o regime legal\n")
+    doc, final = estruturar(texto, "t")
+    assert clausulas_sem_corpo(doc, final) == [
+        "Cláusula 39.ª - Parentalidade: corpo sem frase terminada em ponto"]

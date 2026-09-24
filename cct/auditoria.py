@@ -145,6 +145,15 @@ _RE_ANEXO_TABELA = re.compile(
     re.IGNORECASE)
 
 
+# o rótulo promete uma tabela de valores, e não só um texto sobre carreiras
+_RE_ANEXO_DE_VALORES = re.compile(
+    r"tabela|remunera|sal[áa]ri|venciment|retribui", re.IGNORECASE)
+# um valor em euros com cêntimos: «1 087,90», «88,20 €»
+_RE_VALOR = re.compile(r"\d(?:[\d .]*\d)?,\d{2}\b")
+MIN_VALORES = 3
+MIN_LINHAS_TEXTO = 3
+
+
 def _descendentes(no: dict, nos: list[dict]) -> list[dict]:
     filhos = [n for n in nos if n.get("pai") == no["id"]]
     return [d for f in filhos for d in (f, *_descendentes(f, nos))]
@@ -182,6 +191,17 @@ def tabelas_esperadas(doc: dict, texto: str) -> list[str]:
         bruto = "".join(texto[n["char_start"]:n["char_end"]]
                         for n in [no, *_descendentes(no, nos)])
         if " | " not in bruto:
+            # Na corrida de 2025, 40 avisos «fora do nó» eram anexos de texto:
+            # regulamentos de carreiras, descrições de funções, regras de
+            # progressão. Não se avisa quando o anexo tem os valores (a tabela
+            # lida como texto) ou quando é um texto e o rótulo não promete
+            # uma tabela de valores.
+            corpo = [l for l in bruto.split("\n")[1:] if l.strip()]
+            if len(_RE_VALOR.findall(bruto)) >= MIN_VALORES:
+                continue
+            if (len(corpo) >= MIN_LINHAS_TEXTO
+                    and not _RE_ANEXO_DE_VALORES.search(rotulo)):
+                continue
             if doc_tem_tabelas:
                 avisos.append(
                     f"{rotulo}: anexo de remuneração/mapa com a tabela fora "

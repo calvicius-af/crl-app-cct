@@ -245,3 +245,33 @@ def test_auditoria_a_rebentar_nao_exclui_o_documento(tmp_path, monkeypatch):
     rel = (out / "relatorio.txt").read_text(encoding="utf-8")
     assert "[auditoria] não foi possível verificar" in rel
     assert "Convenções processadas: 1/1" in rel
+
+
+def test_anexo_de_carreiras_em_texto_nao_da_aviso():
+    """Corrida de 2025: 40 avisos «fora do nó» eram anexos de texto
+    (regulamentos de carreiras, regras de progressão), com tabelas noutro
+    sítio do documento."""
+    doc, texto = _doc_com_anexo(
+        "ANEXO VII - Regulamento de Carreiras Profissionais do AE",
+        "Artigo 1.º - Objeto\nO presente regulamento define as carreiras.\n"
+        "Artigo 2.º - Progressão\nA progressão depende da avaliação.",
+        tabela_fora="Nível | Escalão\nI | 1 000,00")
+    assert tabelas_esperadas(doc, texto) == []
+
+
+def test_anexo_com_os_valores_em_texto_nao_da_aviso():
+    """A tabela lida como texto continua a ter os valores: não se perdeu."""
+    doc, texto = _doc_com_anexo(
+        "ANEXO I - Tabela salarial",
+        "Nível I 1 087,90\nNível II 1 154,20\nNível III 1 216,00",
+        tabela_fora="Outra | Tabela\nx | 1,00")
+    assert tabelas_esperadas(doc, texto) == []
+
+
+def test_tabela_salarial_sem_valores_continua_a_dar_aviso():
+    doc, texto = _doc_com_anexo(
+        "ANEXO I - Tabela salarial",
+        "Os valores produzem efeitos a 1 de janeiro.\nNota 1.\nNota 2.",
+        tabela_fora="Nível | Escalão\nI | 1 000,00")
+    [aviso] = tabelas_esperadas(doc, texto)
+    assert "fora do corpo do nó" in aviso
