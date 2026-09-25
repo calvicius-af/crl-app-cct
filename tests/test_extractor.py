@@ -237,20 +237,22 @@ def test_pdf_real_acip_fesaht():
 
 # ---------- PDF sintéticos: rotação e colunas (corpus de 24-09-2026) ----------
 
-def _tabela_rodada(sentido, y0=300, logica=None):
+def _tabela_rodada(sentido, y0=300, logica=None, quase=False):
     """Tabela «Nível | Valor» desenhada a 90º, com grelha, como as dos CARRISTUR.
 
     Na página, cada linha lógica da tabela é uma coluna; «btt» lê-se de baixo
     para cima (cabeçalho à esquerda), «ttb» de cima para baixo (à direita).
+    Com `quase`, a rotação e os traços desviam-se uns centésimos (TINITA).
     """
     from tests.pdf_sintetico import grelha
     logica = logica or [["Nível", "Valor"], ["A", "1 355,48"], ["B", "1 200,00"]]
     x0, w, h = 100, 20, 70
-    itens = grelha(x0, y0, [w] * 3, [h] * 2)
+    itens = grelha(x0, y0, [w] * 3, [h] * 2, desvio=0.07 if quase else 0.0)
     for i, linha in enumerate(logica):
         for j, texto in enumerate(linha):
             if sentido == "btt":        # linha i: coluna i; coluna j: de baixo
-                itens.append((x0 + w * i + 15, y0 + h * j + 5, texto, "rodado"))
+                itens.append((x0 + w * i + 15, y0 + h * j + 5, texto,
+                              "quase_rodado" if quase else "rodado"))
             else:                       # linha i: coluna da direita; coluna j: de cima
                 itens.append((x0 + w * (2 - i) + 5, y0 + h * (2 - j) - 5, texto,
                               "rodado_horario"))
@@ -265,6 +267,32 @@ def test_tabela_rodada_sai_de_pe_e_legivel(tmp_path, sentido):
     pdf = escrever_pdf(tmp_path / "x.pdf", _tabela_rodada(sentido))
     _doc, texto = extrair_pdf(pdf)
     assert "Nível | Valor\nA | 1 355,48\nB | 1 200,00" in texto, texto
+
+
+def test_tabela_quase_rodada_le_se_como_a_rodada(tmp_path):
+    """#42, TINITA de 2025: em metade das páginas das escalas, a rotação de
+    90º vinha com a matriz desviada uns centésimos e os traços da grelha
+    tortos. O pdfplumber dava as letras como direitas e não via a grelha:
+    «F ol g a s», nomes partidos em duas linhas, nenhuma célula."""
+    from tests.pdf_sintetico import escrever_pdf
+    pdf = escrever_pdf(tmp_path / "x.pdf", _tabela_rodada("btt", quase=True))
+    _doc, texto = extrair_pdf(pdf)
+    assert "Nível | Valor\nA | 1 355,48\nB | 1 200,00" in texto, texto
+
+
+def test_linha_rente_a_tabela_rodada_sai_uma_vez(tmp_path):
+    """INOVA de 2025, grelhas deitadas: uma linha de valores rente à tabela
+    seguinte entrava na zona antes da tabela e na zona por baixo dela, e saía
+    duas vezes, a segunda entrelaçada com a linha vizinha («1.080400,,0000
+    €€»). Uma letra pertence à zona do seu centro."""
+    from tests.pdf_sintetico import escrever_pdf
+    [pagina] = _tabela_rodada("btt")
+    # a primeira linha acaba rente ao traço esquerdo da tabela (x=100); a
+    # segunda está por baixo da tabela, na largura dela
+    pagina += [(103, 120, "Primeira nota", "rodado"), (115, 120, "Segunda nota", "rodado")]
+    pdf = escrever_pdf(tmp_path / "x.pdf", [pagina])
+    _doc, texto = extrair_pdf(pdf)
+    assert texto.count("Primeira nota") == 1 and "Segunda nota" in texto, texto
 
 
 def test_tabela_com_coluna_do_meio_vazia_nao_e_cortada_em_colunas(tmp_path):
@@ -338,6 +366,24 @@ def test_cabecalho_vertical_numa_tabela_direita(tmp_path):
     _doc, texto = extrair_pdf(pdf)
     assert "Nível | Escalão | Valor\nI | 1 | 900\nII | 2 | 950" in texto, texto
     assert "levíN" not in texto
+
+
+def test_uma_so_palavra_vertical_numa_tabela_direita(tmp_path):
+    """AGEAS de 2025: a única palavra rodada da página, a célula vertical
+    «Gestão» de uma grelha de carreiras, ficava abaixo do mínimo de letras
+    rodadas e saía invertida («oãtseG»)."""
+    from tests.pdf_sintetico import escrever_pdf
+    # a primeira coluna é uma célula fundida, da altura das três linhas
+    itens = [("traco", 100, y, 260, y) for y in (400, 460)]
+    itens += [("traco", 140, y, 260, y) for y in (420, 440)]
+    itens += [("traco", x, 400, x, 460) for x in (100, 140, 260)]
+    itens += [(125, 410, "Gestão", "rodado"),
+              (145, 445, "Diretor geral"), (145, 425, "Diretor grau II"),
+              (145, 405, "Diretor grau I"),
+              (72, 780, "Enquadramento das carreiras e categorias profissionais.")]
+    pdf = escrever_pdf(tmp_path / "x.pdf", [itens])
+    _doc, texto = extrair_pdf(pdf)
+    assert "Gestão" in texto and "oãtseG" not in texto, texto
 
 
 def test_tabelas_rodadas_lado_a_lado_nao_se_repetem(tmp_path):
@@ -607,3 +653,19 @@ def test_frase_na_linha_seguinte_nao_e_titulo():
     assert _rotulos(texto) == ["Artigo 7.º", "Artigo 8.º - Âmbito"]
     from cct.sanidade import clausulas_sem_corpo
     assert clausulas_sem_corpo(doc, final) == []
+
+
+def test_tabela_dentro_de_outra_le_se_uma_vez(tmp_path):
+    """EPAL de 2025: a tabela salarial em escada tem a grelha de fora e,
+    dentro dela, grelhas pequenas que não tocam nos traços de fora. O
+    pdfplumber via as duas, e o texto das de dentro saía duas vezes."""
+    from tests.pdf_sintetico import escrever_pdf, grelha
+    itens = grelha(80, 300, [200, 220], [250, 30])          # a de fora
+    itens += grelha(120, 360, [40, 60], [20, 20])           # uma de dentro
+    itens += [(90, 565, "TÉCNICO AUXILIAR"), (290, 565, "QUADRO"),
+              (125, 385, "B15"), (165, 385, "1,177.4"),
+              (125, 365, "B14"), (165, 365, "1,154.2"),
+              (72, 780, "Tabela salarial de 2025 da empresa, com a grelha em escada.")]
+    pdf = escrever_pdf(tmp_path / "x.pdf", [itens])
+    _doc, texto = extrair_pdf(pdf)
+    assert texto.count("1,177.4") == 1 and texto.count("B14") == 1, texto

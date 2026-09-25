@@ -101,3 +101,49 @@ def test_versao_do_proprio_ano_nao_e_anterior(tmp_path, monkeypatch):
     pdf = tmp_path / "26_PR_001_BTE_31_TESTE_X_Y.pdf"
     pipeline_tema._novidades_via_versoes(tmp_path / "versoes", pdf, {"nos": []}, "x", [])
     assert vistos == ["25_PR_007_BTE_03_TESTE_X_Y.pdf"]
+
+
+def test_documentos_sem_pasta_de_versoes_numa_so_linha(tmp_path, monkeypatch):
+    """Corrida de 2025: 39 linhas iguais, uma por documento. A causa é o nome
+    das subpastas, e diz-se uma vez, com o total e a regra."""
+    pasta, codebook = _pasta(tmp_path)
+    versoes = tmp_path / "versoes"
+    (versoes / "OUTRA_CONVENCAO").mkdir(parents=True)
+    real = pipeline_tema.extrair_pdf
+
+    def com_consolidado(pdf, **kw):
+        doc, texto = real(pdf, **kw)
+        for no in doc["nos"]:
+            no["origem"] = "consolidado"
+        return doc, texto
+    monkeypatch.setattr(pipeline_tema, "extrair_pdf", com_consolidado)
+    out = tmp_path / "out"
+    _correr(monkeypatch, "--pdfs", pasta, "--codebook", codebook, "--out", out,
+            "--pasta-versoes", versoes)
+
+    relatorio = (out / "relatorio.txt").read_text(encoding="utf-8")
+    linhas = [l for l in relatorio.splitlines() if "pasta de versões" in l]
+    assert len(linhas) == 1, relatorio
+    assert "2 documento(s)" in linhas[0] and "contido no nome do PDF" in linhas[0]
+    assert "26_PR_001_BTE_31_TESTE_X_Y, 26_PR_002_BTE_31_TESTE_Z_W" in linhas[0]
+
+
+def test_pasta_de_versoes_vazia_diz_que_esta_vazia(tmp_path, monkeypatch):
+    """Corrida de 2026-09-25: a pasta existia mas sem subpastas. A regra dos
+    nomes levava a procurar um erro de nome que não havia."""
+    pasta, codebook = _pasta(tmp_path)
+    versoes = tmp_path / "versoes"
+    versoes.mkdir()
+    real = pipeline_tema.extrair_pdf
+
+    def com_consolidado(pdf, **kw):
+        doc, texto = real(pdf, **kw)
+        for no in doc["nos"]:
+            no["origem"] = "consolidado"
+        return doc, texto
+    monkeypatch.setattr(pipeline_tema, "extrair_pdf", com_consolidado)
+    out = tmp_path / "out"
+    _correr(monkeypatch, "--pdfs", pasta, "--codebook", codebook, "--out", out,
+            "--pasta-versoes", versoes)
+    relatorio = (out / "relatorio.txt").read_text(encoding="utf-8")
+    assert "não tem subpastas" in relatorio and "contido no nome" not in relatorio

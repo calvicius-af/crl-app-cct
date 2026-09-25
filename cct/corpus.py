@@ -202,6 +202,7 @@ def melhorias(atual: dict, referencia: dict) -> list[str]:
 
 def medir_corpus(manifesto: dict, pasta: Path, extrator: str = "pdfplumber"):
     """Extrai e mede cada PDF presente. Devolve (resultados, medidas, ausentes)."""
+    from .auditoria import paginas_com_imagem
     from .sanidade import verificar
     if extrator == "docling":
         from .extractor_docling import extrair_pdf_docling as extrair
@@ -221,7 +222,8 @@ def medir_corpus(manifesto: dict, pasta: Path, extrator: str = "pdfplumber"):
             continue
         m = medir_pdf(doc_m["nome"], pdf, texto)
         medidas.append(m)
-        resultados[doc_m["nome"]] = metricas(doc, texto, m, verificar(doc, texto))
+        avisos = verificar(doc, texto, m.palavras_referencia, paginas_com_imagem(pdf))
+        resultados[doc_m["nome"]] = metricas(doc, texto, m, avisos)
     return resultados, medidas, ausentes
 
 

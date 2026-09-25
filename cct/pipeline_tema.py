@@ -73,9 +73,14 @@ def _pdfs_da_pasta(pasta: Path) -> list[Path]:
 
 
 def _novidades_via_versoes(pasta_versoes: Path, pdf: Path, doc: dict,
-                           texto: str, problemas: list) -> set[str] | None:
+                           texto: str, problemas: list,
+                           sem_pasta: list | None = None) -> set[str] | None:
     """Encontra a subpasta de versões da convenção e devolve as novidades
-    do consolidado (cláusulas alteradas/novas face à versão anterior)."""
+    do consolidado (cláusulas alteradas/novas face à versão anterior).
+
+    Um documento sem subpasta vai para `sem_pasta`, quando é dada: a causa é
+    a mesma para todos, e o relatório di-la uma vez (`aviso_sem_pasta`).
+    """
     import re
     from .localizador import _colapsar
     from .diacronia import comparar_versoes, novidades_do_consolidado
@@ -87,8 +92,11 @@ def _novidades_via_versoes(pasta_versoes: Path, pdf: Path, doc: dict,
             pasta = d
             break
     if pasta is None:
-        problemas.append(f"{pdf.stem}: sem pasta de versões correspondente "
-                         "— consolidado fica todo na faixa CONSOLIDADO")
+        if sem_pasta is not None:
+            sem_pasta.append(pdf.stem)
+        else:
+            problemas.append(f"{pdf.stem}: sem pasta de versões correspondente "
+                             "— consolidado fica todo na faixa CONSOLIDADO")
         return None
     from .comparar import _ano
     # o ano do próprio documento não é «anterior». Estava fixo em 2025: numa
@@ -112,6 +120,26 @@ def _novidades_via_versoes(pasta_versoes: Path, pdf: Path, doc: dict,
     nov = novidades_do_consolidado(r, doc)
     print(f"    diacronia vs {nome_antigo}: {r['resumo']} → {len(nov)} novidades no consolidado")
     return nov
+
+
+def aviso_sem_pasta(pasta_versoes: Path, documentos: list[str]) -> str:
+    """Uma linha para todos os documentos sem subpasta de versões.
+
+    Na corrida de 2025 eram 39 linhas iguais, uma por documento. Não é um
+    defeito da extração: é o nome das subpastas que não bate com o do PDF,
+    ou a pasta não tem subpastas nenhumas, e então di-lo (corrida de
+    2026-09-25: a regra dos nomes levava a procurar um erro que não havia).
+    """
+    if not any(p.is_dir() for p in pasta_versoes.iterdir()):
+        return (f"{len(documentos)} documento(s) com texto consolidado e a pasta de "
+                f"versões {pasta_versoes} não tem subpastas: é preciso uma subpasta "
+                "por convenção, com as versões anteriores; sem ela, o consolidado "
+                "fica todo na faixa CONSOLIDADO — " + ", ".join(documentos))
+    return (f"{len(documentos)} documento(s) com texto consolidado sem pasta de "
+            f"versões correspondente em {pasta_versoes}: o nome de cada subpasta "
+            "tem de estar contido no nome do PDF (ex.: `ACIP_FESAHT` para "
+            "`25_PR_003_BTE_02_ACIP_FESAHT.pdf`); sem ela, o consolidado fica todo "
+            "na faixa CONSOLIDADO — " + ", ".join(documentos))
 
 
 def main():
@@ -263,6 +291,7 @@ def main():
 
     itens, problemas = [], []
     medidas = []
+    sem_pasta: list[str] = []
     for i, pdf in enumerate(pdfs, 1):
         try:
             v = None
@@ -276,7 +305,14 @@ def main():
             # rebenta, e o resultado vai para o diagnostico.md
             medidas.append(medir_pdf(pdf.stem, pdf, texto))
             validar_doc(doc)
-            for aviso in verificar_sanidade(doc, texto):
+            try:
+                from .auditoria import paginas_com_imagem
+                imagens = paginas_com_imagem(pdf)
+            except Exception:           # o auditor nunca custa o documento
+                imagens = []
+            for aviso in verificar_sanidade(doc, texto,
+                                            referencia=medidas[-1].palavras_referencia,
+                                            paginas_imagem=imagens):
                 problemas.append(f"{pdf.stem}: {aviso}")
             # auditoria cruzada de tabelas: o que um extrator vê e o outro
             # não — a perda silenciosa que motivou o guardião (2026-09-17).
@@ -332,7 +368,7 @@ def main():
                 # aviso, nunca a perda do documento já extraído e codificado
                 try:
                     novidades = _novidades_via_versoes(
-                        Path(args.pasta_versoes), pdf, doc, texto, problemas)
+                        Path(args.pasta_versoes), pdf, doc, texto, problemas, sem_pasta)
                 except Exception as e:
                     problemas.append(
                         f"{pdf.stem}: [diacronia] comparação com as versões "
@@ -353,6 +389,8 @@ def main():
                 medidas.append(Medida(pdf.stem, excluido=erro))
             print(f"[{i}/{len(pdfs)}] {pdf.stem}: ERRO {e}")
 
+    if sem_pasta:
+        problemas.append(aviso_sem_pasta(Path(args.pasta_versoes), sem_pasta))
     exportar_qdpx(itens, out / "projeto.qdpx", nome_projeto=args.nome, master=master)
     exportar_xlsx(itens, out / "sugestoes_peritas.xlsx", variaveis=variaveis)
 

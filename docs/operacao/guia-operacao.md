@@ -230,7 +230,7 @@ Sai um Excel com cada cláusula classificada: `=` / `alteracao` / `nova` /
 | Mensagem / sintoma | Causa provável | Solução |
 |---|---|---|
 | "Sem PDFs em …" | pasta errada ou vazia | confirmar o caminho em --pdfs |
-| "sem pasta de versões correspondente" | nome da subpasta não está contido no nome do PDF | renomear a subpasta (ex.: `ACIP_FESAHT`) |
+| "N documento(s) com texto consolidado sem pasta de versões correspondente" (uma linha com os nomes) | o nome da subpasta não está contido no nome do PDF | renomear a subpasta (ex.: `ACIP_FESAHT`); sem ela, o consolidado fica todo na faixa CONSOLIDADO |
 | "A pasta de versões anteriores não existe" | `--pasta-versoes` (ou o campo «Versões anteriores» da app) aponta para uma pasta que não existe | corrigir o caminho, ou retirar a opção: sem ela os consolidados ficam todos na faixa CONSOLIDADO. Antes, cada documento consolidado ficava fora do QDPX (corrida de 2025) |
 | "ERRO, documento fora do QDPX" / `EXCLUÍDO` no diagnostico.md | o documento foi extraído mas falhou num passo seguinte | enviar o `diagnostico.md`: diz o erro de cada documento excluído |
 | "a versão antiga parece parcial" | a base da comparação é uma revisão de 2-3 páginas | juntar à subpasta o último texto completo |

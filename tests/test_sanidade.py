@@ -278,3 +278,51 @@ def test_corpo_de_tabela_formula_ou_omitido_nao_e_truncado():
     doc, final = estruturar(texto, "t")
     assert clausulas_sem_corpo(doc, final) == [
         "Cláusula 39.ª - Parentalidade: corpo sem frase terminada em ponto"]
+
+
+def test_ordinal_abreviado_fecha_a_frase():
+    """Corrida de 2025: 80 dos 134 corpos «sem frase terminada em ponto»
+    acabavam numa remissão; a redação não põe outro ponto depois de «36.ª»."""
+    doc, final = estruturar(
+        "Cláusula 38.ª - Mapas de horário\nA instituição disponibiliza ao "
+        "sindicato os mapas de horário a que se referem as cláusulas 34.ª a 36.ª\n"
+        "Cláusula 66.ª - Poder disciplinar\nÉ o previsto nos artigos 328.º a 332.º\n"
+        "Cláusula 67.ª - Outra\nAplica-se o regime legal\n", "x")
+    assert clausulas_sem_corpo(doc, final) == [
+        "Cláusula 67.ª - Outra: corpo sem frase terminada em ponto"]
+
+
+def test_dois_pontos_antes_de_cabecalho_como_no_pdf_e_redacao():
+    """SETAAB de 2025: a «Parentalidade» acaba em «nomeadamente:» e, no PDF
+    também, a cláusula seguinte vem logo a seguir. É redação. A prova é local:
+    se o PDF tem alguma coisa entre os dois, o aviso fica, por pequena que
+    seja a perda no documento (revisão do PR #92)."""
+    from cct.completude import palavras
+    doc, final = estruturar(ALTERACAO.format(
+        setima="Cláusula 7.ª - Parentalidade\nSão assegurados os direitos "
+               "da lei, nomeadamente:\nCláusula 8.ª - Outra\nTexto final.\n"), "x")
+    aviso = ["Cláusula 7.ª - Parentalidade: corpo sem frase terminada em ponto"]
+    pdf_igual = palavras(final)
+    pdf_com_alineas = palavras(final.replace(
+        "nomeadamente:\n", "nomeadamente:\na) Licença parental inicial;\n"))
+    assert clausulas_sem_corpo(doc, final) == aviso
+    assert clausulas_sem_corpo(doc, final, pdf_igual) == []
+    assert clausulas_sem_corpo(doc, final, pdf_com_alineas) == aviso
+    # quatro palavras em mil: a cobertura do documento seria 99,6%
+    assert len(pdf_com_alineas) - len(pdf_igual) == 4
+
+def test_alteracao_salarial_so_com_numeros_e_tabelas_nao_tem_articulado():
+    """DHL de 2025: «- Alteração salarial e outras», números e uma tabela.
+    Zero cláusulas é o esperado; uma linha com forma de cláusula que o
+    extrator não reconheceu continua a dar o aviso de estrutura."""
+    from cct.sanidade import (AVISO_ALTERACAO_SALARIAL_SEM_ARTICULADO,
+                              AVISO_SEM_ESTRUTURA)
+    titulo = ("Acordo de empresa entre a DHL Aviation NV e o Sindicato - SITAVA - "
+              "Alteração salarial e outras\n")
+    corpo = ("Para efeitos do disposto no artigo 492.º, declara-se que são abrangidos 40 "
+             "trabalhadores.\n\x02TABELA\nCláusula | Designação | Valor\n"
+             "Grupo | Chefe de secção | 2 585,00 €\n\x03TABELA\n" + DEPOSITO + "\n")
+    doc, final = estruturar(titulo + corpo, "x")
+    assert AVISO_ALTERACAO_SALARIAL_SEM_ARTICULADO in verificar(doc, final)
+    doc, final = estruturar(titulo + "Cláusula nova - Ajudas de custo\n" + corpo, "x")
+    assert AVISO_SEM_ESTRUTURA in verificar(doc, final)

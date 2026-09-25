@@ -1,6 +1,6 @@
 # ISSUE-0024: tabelas salariais colapsadas no TXT do BTE 31/2026
 
-- **Estado:** Aberta
+- **Estado:** Resolvida no código (2026-09-25) — falta a importação no MaxQDA
 - **Data:** 2026-09-23
 - **GitHub:** [#84](https://github.com/calvicius-af/crl-app-cct/issues/84)
 - **Onde dói:** `cct/extractor.py`, `cct/extractor_docling.py`, `cct/auditoria.py`
@@ -26,3 +26,14 @@ Comparar as páginas originais com ambos os extratores antes de escolher
 uma correção; validar grelha, categoria/valor e offsets no QDPX e depois
 importar a amostra no MaxQDA. Critérios em
 [intervenção BTE 31/2026](../docs/validacao/intervencao-extracao-bte31-2026-09-23.md).
+
+**Atualização de 25-09-2026 (corrida de 2025):** as «linhas longas» que restavam não eram
+tabelas colapsadas: 177 eram linhas certas de tabelas com o conteúdo funcional numa
+célula (CARRIS, RTP, LAGOS em Forma) ou cabeçalhos de grelhas largas. A medida passa a
+não as contar quando a linha tem as mesmas células que a vizinha ou é longa só por uma
+célula de texto (358 → 10 nos 277 PDF). Os defeitos reais eram três, todos corrigidos com
+regra geral: letras que tocavam na fronteira entre zonas entravam nas duas, e a linha
+saía entrelaçada (INOVA, «1.080400,,0000 €€»); tabelas dentro de outras liam-se duas
+vezes (EPAL, 695 palavras a mais); camadas de texto recortadas ou fora da página
+misturavam-se com o visível (MaiaAmbiente, GESAMB). Registo:
+[avisos-2025-2026-09-25.md](../docs/validacao/avisos-2025-2026-09-25.md).

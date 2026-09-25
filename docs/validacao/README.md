@@ -26,6 +26,7 @@ Há duas formas de medir, e são complementares:
 | Docling | Docling sem modelos, texto rodado e peso da instalação em Windows | [docling-sem-modelos-2026-09-24.md](docling-sem-modelos-2026-09-24.md) |
 | Corpus | Primeiro corpus de regressão com PDF reais (BTE 31/2026): evolução da cobertura e defeitos corrigidos | [corpus-bte31-2026-09-24.md](corpus-bte31-2026-09-24.md) |
 | Corrida de 2025 | Os 277 PDF de 2025 em macOS: 39 documentos perdidos, causas e correções | [corrida-2025-macos-2026-09-24.md](corrida-2025-macos-2026-09-24.md) |
+| Avisos de 2025 | Os sete tipos de aviso da corrida de 2025, o TINITA (#42) e as grelhas (#84): causa, regra e medida antes/depois | [avisos-2025-2026-09-25.md](avisos-2025-2026-09-25.md) |
 
 A validação visual do QDPX Docling final no MaxQDA continua pendente na
 [ISSUE-0003](../../issues/0003-qdpx-perde-ganhos-do-docling.md). Testes automáticos e

@@ -71,12 +71,38 @@ def _juntar_hifenizacao(texto: str) -> str:
     return RE_HIFEN_FIM.sub("", texto).replace(HIFEN_PDFIUM, "-")
 
 
+def _sobretudo_numeros(texto: str) -> bool:
+    tokens = texto.split()
+    numeros = sum(1 for t in tokens if any(c.isdigit() for c in t))
+    return bool(tokens) and numeros / len(tokens) > 0.4
+
+
 def _parece_tabela(linha: str) -> bool:
     """Uma linha longa só é sinal de tabela colapsada se tiver células ou for
     sobretudo números: um parágrafo de 800 caracteres é normal numa cláusula."""
-    tokens = linha.split()
-    numeros = sum(1 for t in tokens if any(c.isdigit() for c in t))
-    return " | " in linha or (bool(tokens) and numeros / len(tokens) > 0.4)
+    return " | " in linha or _sobretudo_numeros(linha)
+
+
+# uma célula de texto corrido: a descrição de funções de uma categoria, a lista
+# de concelhos de uma zona. Tem palavras, e não números.
+MIN_PALAVRAS_PROSA = 10
+
+
+def _linha_de_tabela_inteira(linha: str, vizinhas: list[str]) -> bool:
+    """Uma linha longa com células que é uma linha da tabela, e não a tabela toda.
+
+    Na corrida de 2025, 177 das «linhas longas» (CARRIS, RTP, INOVA, LAGOS em
+    Forma) eram linhas certas: o conteúdo funcional de uma categoria numa
+    célula, ou o cabeçalho de uma grelha de 36 colunas. Uma tabela colapsada
+    tem as células de várias linhas numa só; uma linha inteira tem as mesmas
+    células que a linha ao lado, ou é longa só por uma célula de texto.
+    """
+    celulas = linha.split(" | ")
+    if any(v.count(" | ") + 1 == len(celulas) for v in vizinhas if " | " in v):
+        return True
+    curtas = [c for c in celulas
+              if len(c.split()) < MIN_PALAVRAS_PROSA or _sobretudo_numeros(c)]
+    return len(" | ".join(curtas)) <= LINHA_LONGA
 
 
 def invertidas_pela_forma(texto: str) -> list[str]:
@@ -106,19 +132,26 @@ def ler_referencia(pdf: Path) -> tuple[list[str], list[int]]:
     import pdfplumber
     import pypdfium2 as pdfium
 
+    from .extractor import normalizar_pagina
+    from .recorte import letras_escondidas, texto_visivel, tirar_escondidas
+
     documento = pdfium.PdfDocument(str(pdf))
     paginas, cegas = [], []
     try:
         with pdfplumber.open(pdf) as plumber:
             for i in range(len(documento)):
-                pagina = documento[i]
-                textpage = pagina.get_textpage()
-                try:
-                    texto = _normalizar(textpage.get_text_range())
-                finally:
-                    textpage.close()
-                    pagina.close()
                 pp = plumber.pages[i]
+                pagina = documento[i]
+                try:
+                    # só o que se vê: nem o texto recortado nem o que fica
+                    # fora da página, que o extrator também não lê. Dos dois
+                    # lados: comparar o PDFium visível com todas as letras do
+                    # pdfplumber dava a página como cega (MaiaAmbiente, p28)
+                    texto = _normalizar(texto_visivel(pagina))
+                    tirar_escondidas(pp, letras_escondidas(pagina))
+                finally:
+                    pagina.close()
+                normalizar_pagina(pp)
                 vistos = sum(1 for c in pp.chars if c["text"].strip())
                 lidos = sum(1 for c in texto if not c.isspace())
                 if vistos and lidos < PDFIUM_CEGO * vistos:
@@ -201,6 +234,10 @@ class Medida:
     # medida). Sem isto, os 39 documentos perdidos na corrida de 2025
     # apareciam como OK no diagnóstico.
     excluido: str | None = None
+    # as palavras do PDF, sem o mobiliário, pela ordem da referência: a
+    # sanidade vê nelas o que o PDF tem entre o fim de um corpo e o cabeçalho
+    # seguinte (cct/sanidade.py, `clausulas_sem_corpo`)
+    palavras_referencia: list[str] = field(default_factory=list)
 
     @property
     def cobertura(self) -> float:
@@ -247,6 +284,7 @@ def medir(documento: str, paginas_pdf: list[str], texto: str) -> Medida:
     texto = _juntar_hifenizacao(_normalizar(texto))
 
     ref_palavras = palavras(referencia)
+    m.palavras_referencia = ref_palavras
     txt_palavras = palavras(texto)
     m.palavras_pdf, m.palavras_texto = len(ref_palavras), len(txt_palavras)
     ref, txt = Counter(ref_palavras), Counter(txt_palavras)
@@ -293,6 +331,9 @@ def medir(documento: str, paginas_pdf: list[str], texto: str) -> Medida:
         if tem_mobiliario(linha):
             m.residuos.append((n, linha))
         if len(linha) > LINHA_LONGA and _parece_tabela(linha):
+            vizinhas = paragrafos[max(0, n - 2):n - 1] + paragrafos[n:n + 1]
+            if " | " in linha and _linha_de_tabela_inteira(linha, vizinhas):
+                continue
             m.linhas_longas.append((n, len(linha)))
 
     def classes(t: str) -> dict[str, int]:
@@ -381,7 +422,9 @@ def diagnostico(medidas: list[Medida], manifesto: dict | None = None,
                "ficaram no texto.",
                f"5. **Linhas longas:** linhas com mais de {LINHA_LONGA} "
                "caracteres com células « | » ou sobretudo números: uma tabela "
-               "colapsada. Parágrafos longos de texto não contam.",
+               "colapsada. Parágrafos longos de texto não contam, nem uma linha "
+               "com as mesmas células que a do lado ou longa só por uma célula "
+               "de texto.",
                "6. A referência é a leitura do PDFium, outro motor. Uma "
                "diferença pode vir dele; o contexto de cada palavra permite "
                "decidir.", ""]
