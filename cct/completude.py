@@ -32,7 +32,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .mobiliario import (RE_NUMERO_PAGINA, e_mobiliario, sem_cabecalho_com_data,
+from .mobiliario import (RE_NUMERO_PAGINA, RE_RODAPE_PARTIDO, e_mobiliario, sem_cabecalho_com_data,
                          sem_prefixo_de_cabecalho, tem_mobiliario)
 
 # ---------- limiares do veredicto (explicados no próprio diagnóstico) ----------
@@ -141,7 +141,8 @@ def sem_mobiliario(pagina: str) -> tuple[str, list[str]]:
     for i, linha in enumerate(linhas):
         limpa = linha.strip()
         mobiliario = (e_mobiliario(limpa)
-                      or (i in margens and RE_NUMERO_PAGINA.match(limpa)))
+                      or (i in margens and (RE_NUMERO_PAGINA.match(limpa)
+                                            or RE_RODAPE_PARTIDO.match(limpa))))
         if mobiliario:
             saem.append(linha)
             continue

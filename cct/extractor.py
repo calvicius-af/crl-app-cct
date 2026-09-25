@@ -876,8 +876,7 @@ def _faixas_de_colunas(pag, goteira: float) -> list[tuple[float, float, bool]] |
     for linha in cluster_objects(chars, "top", Y_TOLERANCIA):
         esquerda = [c for c in linha if (c["x0"] + c["x1"]) / 2 < goteira]
         direita = [c for c in linha if (c["x0"] + c["x1"]) / 2 >= goteira]
-        larga = bool(esquerda and direita) and (
-            min(c["x0"] for c in direita) - max(c["x1"] for c in esquerda) < GOTEIRA_MINIMA)
+        larga = bool(esquerda and direita) and _atravessa(esquerda, direita)
         linhas.append((min(c["top"] for c in linha), max(c["bottom"] for c in linha), larga))
     linhas.sort()
     if not any(larga for *_, larga in linhas):
@@ -891,6 +890,26 @@ def _faixas_de_colunas(pag, goteira: float) -> list[tuple[float, float, bool]] |
     # as fronteiras ficam a meio do espaço entre faixas; as pontas, na página
     limites = [pag.bbox[1]] + [(a[1] + b[0]) / 2 for a, b in zip(faixas, faixas[1:])] + [pag.bbox[3]]
     return [(limites[i], limites[i + 1], f[2]) for i, f in enumerate(faixas)]
+
+
+def _atravessa(esquerda: list, direita: list) -> bool:
+    """A linha continua de uma coluna para a outra, como texto corrido?
+
+    O espaço na goteira tem de ser um espaço entre palavras da própria linha:
+    não maior do que o maior desses espaços. Dois títulos lado a lado, um em
+    cada coluna, estão perto da goteira mas mais afastados do que as suas
+    palavras (Lusitânia-STAS de 2025: «ANEXO VI ANEXO VI Tabela de
+    correspondência … Tabela de correspondência …»).
+    """
+    salto = min(c["x0"] for c in direita) - max(c["x1"] for c in esquerda)
+    if salto >= GOTEIRA_MINIMA:
+        return False
+    espacos = []
+    for lado in (esquerda, direita):
+        ordenados = sorted(lado, key=lambda c: c["x0"])
+        espacos += [b["x0"] - a["x1"] for a, b in zip(ordenados, ordenados[1:])
+                    if b["x0"] - a["x1"] > 0.8]
+    return salto <= max(espacos, default=0) * 1.2 or salto <= 1
 
 
 def _extrair_em_colunas(pag, goteira: float) -> str:

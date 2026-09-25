@@ -554,3 +554,19 @@ def test_rodape_partido_nas_margens_sai():
                for n in range(1, 4)] + ["Texto.\nMais.\nOutra.\nFim.\nBTE | 23"]
     junto = "\n".join(_remover_cabecalhos_rodapes(paginas))
     assert "|" not in junto and junto.count("Fim") == 4
+
+
+def test_titulos_lado_a_lado_nao_atravessam_a_goteira(tmp_path):
+    """Lusitânia-STAS de 2025: duas tabelas lado a lado, cada uma com o seu
+    título perto da goteira. Lidos como uma linha só, os títulos misturavam-se
+    («ANEXO VI ANEXO VI Tabela de correspondência … Tabela de …»)."""
+    linhas = []
+    y = 760
+    for n in range(12):
+        linhas += [(72, y, f"Categoria da esquerda número {n}."),
+                   (320, y, f"Categoria da direita número {n}.")]
+        y -= 14
+    linhas += [(200, 790, "ANEXO VI - Esquerda"), (303, 790, "ANEXO VI - Direita")]
+    _doc, texto = extrair_pdf(escrever_pdf(tmp_path / "x.pdf", [linhas]))
+    assert "ANEXO VI - Esquerda\n" in texto
+    assert texto.index("esquerda número 11") < texto.index("ANEXO VI - Direita")

@@ -23,7 +23,8 @@ RE_CABECALHO = re.compile(
     r"^Boletim do Trabalho e Emprego,?\s*(?:n\.?\s*º\s*)?\d+"
     r"(?:,\s*\d{1,2}/\d{1,2}/\d{4})?$", re.IGNORECASE)
 RE_DATA = re.compile(rf"^\d{{1,2}}\s+(?:{MESES})\s+\d{{4}}$", re.IGNORECASE)
-RE_RODAPE = re.compile(r"^BTE\s+\d+(?:\s*\|\s*\d+)?$")
+# «BTE 31 | 34», «BTE 31» e, no BTE 38/2025, «BTE | 100» (sem o número do boletim)
+RE_RODAPE = re.compile(r"^BTE(?:\s+\d+(?:\s*\|\s*\d+)?|\s*\|\s*\d+)$")
 RE_NUMERO_PAGINA = re.compile(r"^\d{1,4}$")
 # o rodapé partido pela leitura em colunas: «6 | 110», «BTE | 23» (corrida de
 # 2025). Só nas margens da página: a meio, «6 | 110» pode ser conteúdo.

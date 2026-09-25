@@ -243,6 +243,13 @@ def test_cabecalho_datado_a_meio_da_linha_sai_da_referencia():
                     "Boletim do Trabalho e Emprego 5 8 fevereiro 202 5"]
 
 
+def test_rodape_sem_numero_do_boletim_sai_da_referencia():
+    """BTE 38/2025: o rodapé é «BTE | 100», sem o número do boletim. O
+    extrator tirava-o e a medição contava-o como texto em falta."""
+    limpa, saem = sem_mobiliario("Texto da página.\nMais texto.\nBTE | 100")
+    assert limpa == "Texto da página.\nMais texto." and saem == ["BTE | 100"]
+
+
 def test_citar_o_boletim_no_corpo_nao_e_mobiliario():
     """As menções ao BTE no articulado saíam da referência e contavam como
     resíduo: 5 «resíduos» falsos só no 377."""
