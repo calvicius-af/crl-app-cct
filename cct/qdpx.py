@@ -285,7 +285,7 @@ def verificar_offsets(doc: dict, texto: str) -> list[str]:
     selecoes = raiz.findall(f".//{{{NS}}}TextSource/{{{NS}}}PlainTextSelection")
     falhas = []
     for no, sel in zip(nos, selecoes):
-        ini, fim = int(sel.get("startPosition")), int(sel.get("endPosition"))
+        ini, fim = int(sel.get("startPosition", -1)), int(sel.get("endPosition", -1))
         recorte = "".join(c for i, c in enumerate(exportado[ini:fim], start=ini)
                           if i not in inseridos)
         if not (0 <= ini < fim <= len(exportado)) or \
