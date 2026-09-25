@@ -87,3 +87,38 @@ def test_segundo_clique_antes_do_arranque_nao_lanca_outra_corrida(app, app_mod, 
     app._lancar(["json.tool", "--help"])
     app._lancar(["json.tool", "--help"])
     assert len(lancadas) == 1
+
+
+# ---------- confirmação das siglas (#38) ----------
+
+PENDENTES = [
+    {"chave": "a", "doc_id": "D1", "titulo": "", "outros_avisos": [],
+     "siglas": [("Sindicato Nacional dos Motoristas", "Motoristas")]},
+    {"chave": "b", "doc_id": "D2", "titulo": "", "outros_avisos": ["2 outorgantes do lado sindical"],
+     "siglas": [("Empresa Metropolitana de Estacionamento da Maia, EM", "EmpresaMetropolitana")]},
+    {"chave": "c", "doc_id": "D3", "titulo": "", "outros_avisos": [], "siglas": []},
+]
+
+
+def test_decisoes_gravam_so_os_documentos_confirmados(app_mod):
+    siglas, chaves = app_mod.decisoes_confirmadas(
+        PENDENTES, {"a", "b"},
+        {("b", "Empresa Metropolitana de Estacionamento da Maia, EM"): " EMEM "})
+    assert chaves == ["a", "b"]
+    assert siglas == {"Sindicato Nacional dos Motoristas": "Motoristas",
+                      "Empresa Metropolitana de Estacionamento da Maia, EM": "EMEM"}
+
+
+def test_sigla_apagada_nao_confirma_o_documento(app_mod):
+    siglas, chaves = app_mod.decisoes_confirmadas(
+        PENDENTES, {"a", "c"}, {("a", "Sindicato Nacional dos Motoristas"): "  "})
+    assert chaves == ["c"] and siglas == {}
+
+
+def test_a_acao_do_fim_corre_na_thread_principal(app, app_mod):
+    """A janela das siglas abre-se quando a recolha acaba, na thread principal."""
+    chamadas = []
+    app._depois = lambda: chamadas.append(threading.current_thread())
+    app.fila.put(app_mod.FIM_DA_CORRIDA)
+    app._despejar_fila()
+    assert chamadas == [threading.main_thread()] and app._depois is None

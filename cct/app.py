@@ -28,6 +28,29 @@ RESULTADOS = RAIZ / "results"
 FIM_DA_CORRIDA = object()
 
 
+def decisoes_confirmadas(lista: list[dict], marcados: set[str],
+                         valores: dict[tuple[str, str], str]) -> tuple[dict[str, str], list[str]]:
+    """O que a janela de confirmação grava e que documentos manda nomear (#38).
+
+    `lista` vem de `nomeacao.pendentes`; `marcados` são as chaves dos
+    documentos que a pessoa confirmou; `valores[(chave, outorgante)]` é a sigla
+    escrita na janela (a sugerida, ou a corrigida). Devolve as siglas a gravar
+    no siglas.csv, `{outorgante: sigla}`, e as chaves a nomear.
+    """
+    siglas: dict[str, str] = {}
+    chaves = []
+    for p in lista:
+        if p["chave"] not in marcados:
+            continue
+        escritas = {nome: (valores.get((p["chave"], nome)) or sugerida).strip()
+                    for nome, sugerida in p["siglas"]}
+        if any(not s for s in escritas.values()):
+            continue                     # uma sigla apagada: não se confirma
+        siglas.update(escritas)
+        chaves.append(p["chave"])
+    return siglas, chaves
+
+
 class AppCCT(_JANELA):
     def __init__(self):
         super().__init__()
@@ -102,6 +125,8 @@ class AppCCT(_JANELA):
         self.b_correr.pack(side="left")
         ttk.Button(botoes, text="Recolher do BTE…",
                    command=self._recolher).pack(side="left", padx=8)
+        ttk.Button(botoes, text="Confirmar siglas…",
+                   command=self._confirmar_siglas).pack(side="left")
         ttk.Button(botoes, text="Comparar versões (pasta)…",
                    command=self._comparar).pack(side="left", padx=8)
         ttk.Button(botoes, text="Verificar instalação",
@@ -160,16 +185,21 @@ class AppCCT(_JANELA):
                 if mensagem is FIM_DA_CORRIDA:
                     self.em_curso = False
                     self.b_correr.configure(state="normal")
+                    # o que a ação pediu para fazer no fim, já na thread principal
+                    depois, self._depois = getattr(self, "_depois", None), None
+                    if depois:
+                        depois()
                 else:
                     self._escrever(mensagem)
         except queue.Empty:
             pass
         self.after(150, self._despejar_fila)
 
-    def _lancar(self, argumentos):
+    def _lancar(self, argumentos, depois=None):
         if self.em_curso:
             messagebox.showinfo("Em curso", "Já há uma corrida em curso.")
             return
+        self._depois = depois
         # marcado aqui, na thread principal, e não depois de o subprocesso
         # arrancar: um segundo clique nesse intervalo lançava outra corrida
         self.em_curso = True
@@ -244,7 +274,91 @@ class AppCCT(_JANELA):
                 "--destino", str(DADOS / "bte")]
         if autorizar:
             args += ["--confirmar-rede", "--aplicar"]
-        self._lancar(args)
+        # no fim, as siglas que ficaram por confirmar (#38)
+        self._lancar(args, depois=lambda: self._confirmar_siglas(aplicar=autorizar,
+                                                                 so_se_houver=True))
+
+    def _confirmar_siglas(self, aplicar: bool = True, so_se_houver: bool = False):
+        """A janela de confirmação das siglas adivinhadas, documento a documento (#38).
+
+        Mostra cada documento por confirmar, com a sigla sugerida de cada
+        outorgante, que se pode aceitar ou corrigir, e os outros avisos. As
+        siglas confirmadas ficam no siglas.csv da equipa, para não voltarem a
+        ser perguntadas; a seguir corre só a nomeação dos documentos
+        confirmados (offline, sem descarregar nada).
+        """
+        from cct.nomeacao import SIGLAS_EQUIPA, gravar_siglas, pendentes, tabela_de_siglas
+        from cct.recolha import REGISTO_OMISSAO, Registo
+
+        registo = Registo.carregar(REGISTO_OMISSAO)
+        lista = pendentes(registo, tabela_de_siglas([]))
+        if not lista:
+            if not so_se_houver:
+                messagebox.showinfo("Siglas", "Não há documentos por confirmar.")
+            return
+        janela = tk.Toplevel(self)
+        janela.title(f"Confirmar siglas — {len(lista)} documento(s)")
+        janela.geometry("820x520")
+        ttk.Label(janela, padding=8, wraplength=780, text=(
+            "Estas siglas foram adivinhadas a partir do nome do outorgante. "
+            "Confirmar cada documento, corrigindo a sigla se for preciso. As "
+            "siglas confirmadas ficam gravadas e não voltam a ser perguntadas; "
+            "com vários outorgantes do mesmo lado, o nome usa sempre o primeiro."
+        )).pack(fill="x")
+        # os botões antes da lista: o `pack` dá o espaço por ordem, e uma lista
+        # longa empurrava-os para fora da janela
+        botoes = ttk.Frame(janela, padding=8)
+        botoes.pack(side="bottom", fill="x")
+        tela = tk.Canvas(janela, highlightthickness=0)
+        barra = ttk.Scrollbar(janela, orient="vertical", command=tela.yview)
+        corpo = ttk.Frame(tela, padding=8)
+        corpo.bind("<Configure>", lambda _e: tela.configure(scrollregion=tela.bbox("all")))
+        tela.create_window((0, 0), window=corpo, anchor="nw")
+        tela.configure(yscrollcommand=barra.set)
+        tela.pack(side="left", fill="both", expand=True)
+        barra.pack(side="right", fill="y")
+
+        marcas: dict[str, tk.BooleanVar] = {}
+        campos: dict[tuple[str, str], tk.StringVar] = {}
+        for p in lista:
+            marcas[p["chave"]] = tk.BooleanVar(value=bool(p["siglas"]))
+            ttk.Checkbutton(corpo, variable=marcas[p["chave"]],
+                            text=f"{p['doc_id'] or p['chave']}").pack(anchor="w", pady=(8, 0))
+            ttk.Label(corpo, text=p["titulo"], foreground="gray",
+                      wraplength=740).pack(anchor="w", padx=24)
+            for nome, sugerida in p["siglas"]:
+                linha = ttk.Frame(corpo)
+                linha.pack(anchor="w", padx=24, fill="x")
+                campos[(p["chave"], nome)] = tk.StringVar(value=sugerida)
+                ttk.Entry(linha, width=18,
+                          textvariable=campos[(p["chave"], nome)]).pack(side="left")
+                ttk.Label(linha, text=nome[:90]).pack(side="left", padx=6)
+            for aviso in p["outros_avisos"]:
+                ttk.Label(corpo, text=f"• {aviso}", foreground="gray",
+                          wraplength=720).pack(anchor="w", padx=24)
+
+        def gravar():
+            siglas, chaves = decisoes_confirmadas(
+                lista, {c for c, v in marcas.items() if v.get()},
+                {k: v.get() for k, v in campos.items()})
+            if not chaves:
+                messagebox.showinfo("Siglas", "Nenhum documento confirmado.", parent=janela)
+                return
+            if siglas:
+                gravar_siglas(SIGLAS_EQUIPA, siglas)
+            janela.destroy()
+            if aplicar:
+                args = ["cct.nomeacao", "--aplicar"]
+                for chave in chaves:
+                    args += ["--confirmar", chave]
+                self._lancar(args)
+            else:
+                self._escrever(f"\nSiglas gravadas em {SIGLAS_EQUIPA}. A recolha foi "
+                               "uma simulação: os documentos são nomeados na próxima "
+                               "recolha com escrita.\n")
+
+        ttk.Button(botoes, text="Gravar e nomear", command=gravar).pack(side="right")
+        ttk.Button(botoes, text="Agora não", command=janela.destroy).pack(side="right", padx=8)
 
     def _comparar(self):
         pasta = filedialog.askdirectory(

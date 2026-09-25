@@ -328,3 +328,64 @@ def test_portarias_ficam_fora_da_pasta_que_o_pipeline_le(registo_com_recolha):
     pasta_pipeline = tmp_path / "bte" / "bte_2026"
     assert (pasta_pipeline / "extensoes" / "26_PE_001_BTE_31_ANX_SNY.pdf").exists()
     assert len(sorted(pasta_pipeline.glob("*.pdf"))) == 6   # o glob do pipeline
+
+
+# ---------------------------------------------- confirmação na app (#38)
+
+def test_pendentes_diz_a_sigla_sugerida_de_cada_outorgante(registo_com_recolha):
+    from cct.nomeacao import pendentes
+    registo, tmp_path = registo_com_recolha
+    nomear(registo, tmp_path / "bte", aplicar=False, esquema=ESQUEMA_2025)
+    lista = pendentes(registo, esquema=ESQUEMA_2025)
+    assert len(lista) == 3
+    for p in lista:
+        assert p["siglas"] or p["outros_avisos"], p
+        for nome, sugerida in p["siglas"]:
+            assert nome and sugerida
+
+
+def test_gravar_siglas_cria_acrescenta_e_atualiza_sem_substituir(tmp_path):
+    from cct.nomeacao import carregar_siglas, gravar_siglas
+    csv = tmp_path / "siglas.csv"
+    gravar_siglas(csv, {"Sindicato Nacional dos Motoristas": "SNMOT"})
+    gravar_siglas(csv, {"Empresa Metropolitana de Estacionamento da Maia, EM": "EMEM",
+                        "Sindicato Nacional dos Motoristas": "SNM"})
+    tabela = carregar_siglas(csv)
+    assert tabela["sindicato nacional dos motoristas"] == "SNM"
+    assert tabela["empresa metropolitana de estacionamento da maia, em"] == "EMEM"
+    assert len(csv.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_confirmar_nomeia_so_os_confirmados_e_a_sigla_fica_para_a_proxima(registo_com_recolha):
+    """A confirmação escreve só os documentos confirmados; a sigla gravada é
+    usada na corrida seguinte, e a mesma entidade não volta a ser perguntada."""
+    from cct.nomeacao import gravar_siglas, pendentes, tabela_de_siglas
+    registo, tmp_path = registo_com_recolha
+    nomear(registo, tmp_path / "bte", aplicar=False, esquema=ESQUEMA_2025)
+    lista = pendentes(registo, esquema=ESQUEMA_2025)
+    escolhido = next(p for p in lista if p["siglas"])
+    siglas = tmp_path / "siglas.csv"
+    gravar_siglas(siglas, {nome: sugerida for nome, sugerida in escolhido["siglas"]})
+    tabela = tabela_de_siglas([], equipa=siglas)
+
+    resumo = nomear(registo, tmp_path / "bte", aplicar=True, tabela=tabela,
+                    esquema=ESQUEMA_2025, confirmados={escolhido["chave"]})
+    assert resumo["por_estado"] == {"nomeado": 1}
+    estado = {e["chave"]: (e.get("nomeacao") or {}).get("estado")
+              for e in registo.entradas.values()}
+    assert estado[escolhido["chave"]] == "nomeado"
+    assert list(estado.values()).count("nomeado") == 1
+
+    # a sigla confirmada deixa de ser pergunta para essa entidade
+    assert all(nome not in [n for n, _ in p["siglas"]]
+               for p in pendentes(registo, tabela, esquema=ESQUEMA_2025)
+               for nome, _ in escolhido["siglas"])
+
+
+def test_tabela_de_siglas_da_equipa_ganha_e_nao_se_repete(tmp_path):
+    from cct.nomeacao import gravar_siglas, tabela_de_siglas
+    equipa = gravar_siglas(tmp_path / "siglas.csv", {"Entidade X": "EQUIPA"})
+    outro = gravar_siglas(tmp_path / "outro.csv", {"Entidade X": "OUTRO", "Entidade Y": "Y"})
+    tabela = tabela_de_siglas([outro, equipa], equipa=equipa)
+    assert tabela == {"entidade x": "EQUIPA", "entidade y": "Y"}
+    assert tabela_de_siglas([outro], equipa=tmp_path / "nao_existe.csv")["entidade x"] == "OUTRO"
