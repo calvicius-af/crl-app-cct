@@ -208,12 +208,29 @@ resultado mas pode faltar.
 **`--extrator docling`** (opcional): usa o docling em vez do pdfplumber na
 extração. Recupera tabelas de anexos (tabelas salariais, perfis de função)
 e layouts difíceis que o extrator clássico perde, ao custo de ser mais
-lento (~1-1,7 s/página) e de exigir instalação à parte:
+lento (1,7 s/página a quente e cerca de 4 GB de memória, medidos no corpus) e de exigir instalação à parte:
 `.venv/bin/python -m pip install docling`
 (Windows: `.venv\Scripts\python -m pip install docling`)
 (≈4 GB com PyTorch; em Mac Apple Silicon o Python tem de ser arm64 —
 `python3 -c "import platform; print(platform.machine())"` deve dizer
 `arm64`). A primeira corrida descarrega os modelos de layout.
+
+### Medir o desempenho dos extratores
+
+```
+.venv/bin/python -m cct.desempenho medir                      # pdfplumber, sobre data/corpus
+.venv/bin/python -m cct.desempenho medir --extrator docling   # o docling, com os modelos já em cache
+.venv/bin/python -m cct.desempenho medir --comparar           # falha acima da referência + 15% ou do orçamento
+```
+
+Mede cada PDF do corpus de regressão num processo à parte: o arranque, a extração a
+frio (com o carregamento dos modelos, no docling) e a quente, os segundos por página e a
+memória máxima. O resultado fica em `results/desempenho/`, com a máquina, o Python e as
+versões identificados. A referência e o orçamento estão em
+`tests/desempenho/referencia.json`, por ambiente; `--atualizar` grava a referência do
+ambiente em que se corre. Para medir o docling sem rede, com os modelos já descarregados:
+`HF_HUB_OFFLINE=1`. Registo das medidas:
+[desempenho-2026-09-26.md](../validacao/desempenho-2026-09-26.md).
 
 ### Comparar duas versões de uma convenção (avulso)
 ```
