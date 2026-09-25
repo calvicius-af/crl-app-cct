@@ -9,7 +9,8 @@ real: cada linha tem uma posição na página.
 Só usa a fonte Helvetica com a codificação WinAnsi, que cobre os acentos do
 português. Uma linha com um quarto elemento `"rodado"` (ou `"rodado_horario"`)
 é escrita a 90º, como as escalas laterais do TINITA e as tabelas dos
-CARRISTUR, numa página que não declara rotação; `grelha()` desenha os traços
+CARRISTUR, numa página que não declara rotação; `"virado"` escreve-a a 180º,
+como os esquemas das carreiras do CARRIS de 2025; `grelha()` desenha os traços
 de uma tabela.
 """
 from pathlib import Path
@@ -33,7 +34,8 @@ def _conteudo(linhas: list[tuple]) -> bytes:
             tracos.append(b"%.1f %.1f m %.1f %.1f l S" % (x0, y0, x1, y1))
             continue
         x, y, texto, *modo = item
-        matriz = {"rodado": b"0 1 -1 0", "rodado_horario": b"0 -1 1 0"}.get(
+        matriz = {"rodado": b"0 1 -1 0", "rodado_horario": b"0 -1 1 0",
+                  "virado": b"-1 0 0 -1"}.get(
             modo[0] if modo else "", b"1 0 0 1")
         partes.append(matriz + b" %.1f %.1f Tm (" % (x, y) + _escapar(texto) + b") Tj")
     partes.append(b"ET")

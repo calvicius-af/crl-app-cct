@@ -51,6 +51,7 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0022](0022-nomes-nao-seguem-esquema-rnc.md) | Os nomes dos ficheiros não seguem o esquema definido em docs/rnc/README.md | Resolvida |
 | [0023](0023-auditoria-anexos-artigos-falsos-positivos.md) | Auditoria de anexos e artigos sinaliza falsos positivos | Resolvida no código — falta confirmar na corrida |
 | [0024](0024-tabelas-salariais-colapsadas-bte31.md) | Tabelas salariais colapsadas no TXT do BTE 31/2026 | Aberta |
+| [0025](0025-avisos-estrutura-corrida-2025.md) | Avisos de estrutura que ficaram na corrida de 2025 | Aberta |
 
 ## Ronda de 2026-09-18: qualidade da extração (linting e renomeação)
 

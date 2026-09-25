@@ -32,8 +32,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .mobiliario import (RE_NUMERO_PAGINA, e_mobiliario, sem_prefixo_de_cabecalho,
-                         tem_mobiliario)
+from .mobiliario import (RE_NUMERO_PAGINA, RE_RODAPE_PARTIDO, e_mobiliario, sem_cabecalho_com_data,
+                         sem_prefixo_de_cabecalho, tem_mobiliario)
 
 # ---------- limiares do veredicto (explicados no próprio diagnóstico) ----------
 
@@ -141,17 +141,21 @@ def sem_mobiliario(pagina: str) -> tuple[str, list[str]]:
     for i, linha in enumerate(linhas):
         limpa = linha.strip()
         mobiliario = (e_mobiliario(limpa)
-                      or (i in margens and RE_NUMERO_PAGINA.match(limpa)))
+                      or (i in margens and (RE_NUMERO_PAGINA.match(limpa)
+                                            or RE_RODAPE_PARTIDO.match(limpa))))
         if mobiliario:
             saem.append(linha)
             continue
         resto = sem_prefixo_de_cabecalho(limpa)
         if resto != limpa:
             saem.append(limpa[:len(limpa) - len(resto)])
-            if resto:
-                ficam.append(resto)
-            continue
-        ficam.append(linha)
+            linha = resto
+        resto, colados = sem_cabecalho_com_data(linha)
+        if colados:
+            saem.extend(colados)
+            linha = resto
+        if linha.strip() or not limpa:
+            ficam.append(linha)
     return "\n".join(ficam), [l.strip() for l in saem if l.strip()]
 
 
@@ -193,6 +197,10 @@ class Medida:
     contexto_falta: dict[str, str] = field(default_factory=dict)
     contexto_mais: dict[str, str] = field(default_factory=dict)
     erro: str | None = None
+    # a extração correu, mas o documento ficou fora do QDPX (erro depois da
+    # medida). Sem isto, os 39 documentos perdidos na corrida de 2025
+    # apareciam como OK no diagnóstico.
+    excluido: str | None = None
 
     @property
     def cobertura(self) -> float:
@@ -208,6 +216,8 @@ class Medida:
 
     @property
     def veredicto(self) -> str:
+        if self.excluido:
+            return "EXCLUÍDO"
         if self.erro:
             return "SEM MEDIDA"
         if self.cobertura < COBERTURA_FALHA or len(self.invertidas) >= 5:
@@ -338,7 +348,8 @@ def diagnostico(medidas: list[Medida], manifesto: dict | None = None,
         f"Documentos: {len(medidas)}. OK: {contagem['OK']}. "
         f"Atenção: {contagem['ATENÇÃO']}. Falha: {contagem['FALHA']}. "
         f"Sem medida: {contagem['SEM MEDIDA']}. "
-        f"Cláusulas: {resumo.get('clausulas', '?')}. "
+        + (f"**Fora do QDPX: {contagem['EXCLUÍDO']}.** " if contagem["EXCLUÍDO"] else "")
+        + f"Cláusulas: {resumo.get('clausulas', '?')}. "
         f"Anotações: {resumo.get('anotacoes', '?')}.",
         "",
         "## Resumo por documento",
@@ -348,8 +359,8 @@ def diagnostico(medidas: list[Medida], manifesto: dict | None = None,
         "|---|---|---|---|---|---|---|---|---|",
     ]
     for m in medidas:
-        if m.erro:
-            linhas.append(f"| {m.documento} | SEM MEDIDA | | | | | | | |")
+        if m.erro or m.excluido:
+            linhas.append(f"| {m.documento} | {m.veredicto} | | | | | | | |")
             continue
         linhas.append(
             f"| {m.documento} | {m.veredicto} | {_pct(m.cobertura)} "
@@ -382,6 +393,9 @@ def diagnostico(medidas: list[Medida], manifesto: dict | None = None,
     for m in medidas:
         linhas.append(f"### {m.documento}: {m.veredicto}")
         linhas.append("")
+        if m.excluido:
+            linhas += [f"Extraído, mas fora do QDPX: {m.excluido}", ""]
+            continue
         if m.erro:
             linhas += [f"Não foi possível ler o PDF: {m.erro}", ""]
             continue

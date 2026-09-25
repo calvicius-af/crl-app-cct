@@ -34,6 +34,43 @@ def _venv_em_uso(venv: Path) -> bool:
             os.path.normcase(os.path.abspath(venv))
 
 
+def _solucao_tkinter() -> str:
+    """Como obter o Tk para o Python em uso, por sistema e origem do Python."""
+    versao = f"{sys.version_info.major}.{sys.version_info.minor}"
+    if sys.platform == "darwin":
+        base = sys.base_prefix
+        if "homebrew" in base.lower() or "/Cellar/" in base or base.startswith("/usr/local"):
+            return (f"o Python {versao} veio do Homebrew, que traz o Tk à parte: "
+                    f"brew install python-tk@{versao} (o .venv não precisa de ser refeito)")
+        if base.startswith(("/Library/Developer", "/Applications/Xcode")) or base == "/usr":
+            return ("é o Python da Apple (ferramentas de linha de comandos), com um Tk "
+                    "antigo: instalar o Python 3.11 ou superior de python.org, que traz "
+                    "o Tk 8.6, e refazer o .venv (scripts/instalar_offline.command)")
+        return ("instalar o Python 3.11 ou superior de python.org, que traz o Tk 8.6, "
+                "e refazer o .venv (scripts/instalar_offline.command)")
+    if os.name == "nt":
+        return "reinstalar o Python com a opção «tcl/tk and IDLE» ativa"
+    return "instalar o pacote do Tk do sistema (Debian/Ubuntu: sudo apt install python3-tk)"
+
+
+def problema_tkinter() -> str | None:
+    """O que impede a app gráfica de abrir neste Python, ou `None`.
+
+    Na corrida de 2025 em macOS a app não abriu e o terminal funcionou: é o
+    sintoma de um Python sem o Tk (Homebrew) ou com um Tk antigo (o da Apple).
+    """
+    try:
+        import tkinter
+    except ImportError as e:
+        return (f"o Python {sys.version.split()[0]} em {sys.executable} não tem o "
+                f"tkinter ({e}); a app gráfica não abre, o resto funciona. Solução: "
+                + _solucao_tkinter())
+    if float(tkinter.TkVersion) < 8.6:
+        return (f"o Tk {tkinter.TkVersion} deste Python é antigo e não abre janelas "
+                "nas versões recentes do macOS. Solução: " + _solucao_tkinter())
+    return None
+
+
 def verificar() -> int:
     problemas = 0
     dados_pendentes = 0
@@ -88,13 +125,13 @@ def verificar() -> int:
                       "scripts/instalar_offline.command (macOS) — instalação sem internet, "
                       "ver docs/institucional/instalacao-offline.md; "
                       f"com acesso à internet basta: python -m pip install {pacote}")
-    try:
-        import tkinter  # noqa: F401
-        ok("tkinter (app gráfica)")
-    except ImportError:
-        falha("tkinter indisponível (app gráfica não abre; o resto funciona)",
-              "Windows: reinstalar Python com a opção 'tcl/tk'; "
-              "Mac: brew install python-tk")
+    problema_tk = problema_tkinter()
+    if problema_tk is None:
+        import tkinter
+        ok(f"tkinter com Tk {tkinter.TkVersion} (app gráfica)")
+    else:
+        texto, _, solucao = problema_tk.partition(" Solução: ")
+        falha(texto, solucao)
 
     print("== Pastas e ficheiros")
     raiz = Path(__file__).resolve().parent.parent  # raiz do repositório

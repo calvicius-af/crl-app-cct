@@ -14,7 +14,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from .mobiliario import e_mobiliario, sem_prefixo_de_cabecalho
+from .mobiliario import RE_RODAPE_PARTIDO, e_mobiliario, sem_prefixo_de_cabecalho
 
 RE_CAPITULO = re.compile(r"^(?:CAP[IÍ]TULO|T[IÍ]TULO)\s+([IVXLCD]+|\d+)\b(.*)$")
 RE_SECCAO = re.compile(r"^SEC[ÇC][AÃ]O\s+([IVXLCD]+|\d+)\b(.*)$", re.IGNORECASE)
@@ -202,7 +202,18 @@ def _titulo_candidato(linha: str) -> bool:
     return (0 < len(linha) <= 90
             and not _e_cabecalho(linha)
             and not RE_MARCADOR_LISTA.match(linha)
-            and not RE_DATA_OUTORGA.match(linha))
+            and not RE_DATA_OUTORGA.match(linha)
+            and not _e_frase(linha))
+
+
+def _e_frase(linha: str) -> bool:
+    """Uma frase acabada, longa de mais para título: é o corpo.
+
+    «Artigo 7.º» numa linha e «Serão ainda sujeitos ao teste todos os
+    trabalhadores que o solicitem.» na seguinte: a frase virava o título e o
+    artigo ficava sem conteúdo (ADIPA, Caravela, RTP, corrida de 2025).
+    """
+    return bool(RE_FRASE_ACABADA.search(linha)) and len(linha.split()) >= MIN_PALAVRAS_FRASE
 
 
 def _normalizar_rotulo(tipo: str, m: re.Match, titulo_extra: str | None) -> str:
@@ -219,6 +230,56 @@ def _normalizar_rotulo(tipo: str, m: re.Match, titulo_extra: str | None) -> str:
     return rotulo
 
 
+# o que se segue ao número de uma cláusula numa remissão ou numa lista, e
+# nunca num cabeçalho: «Cláusula 44.ª, número 2 - Valor das despesas…» (tabela
+# de valores dos seguros), «Cláusula 28.ª - Deslocações em serviço - 16,55 €;»
+# (lista de valores de uma alteração salarial)
+RE_RESTO_DE_REMISSAO = re.compile(r"^\s*[,;]")
+RE_FIM_DE_ITEM = re.compile(r"[,;]\s*$")
+# um valor em euros no resto da linha: um título de cláusula nunca o traz
+# («Cláusula 29.ª - Viagens em serviço - 71,65 €.»)
+RE_VALOR_EM_EUROS = re.compile(r"\d,\d{2}\s*€|€\s*\d")
+# o corpo que vem na linha do cabeçalho: uma frase acabada, longa de mais para
+# ser um título, ou só «Revogada.»
+RE_FRASE_ACABADA = re.compile(r"""[.!?:][)\]»”"']*\s*$""")
+RE_REVOGADA = re.compile(r"^[(\[]?\s*revogad[oa]s?\s*\.?\s*[)\]]?$", re.IGNORECASE)
+MAX_TITULO = 90
+# uma frase acabada com estas palavras já não é um título: «As decisões dos
+# árbitros são tomadas por maioria.» (8), «Devem existir, em locais
+# apropriados, lavabos suficientes.» (7). O limite de 90 caracteres deixava
+# passar 13 artigos na corrida de 2025.
+MIN_PALAVRAS_FRASE = 7
+
+
+def _nao_e_cabecalho(tipo: str, linha: str, resto: str, na_tabela: bool,
+                     item_anterior: bool = False) -> bool:
+    """Uma linha com a forma de um cabeçalho que não o é.
+
+    Na corrida de 2025, linhas de tabelas e de listas com «Cláusula N.ª» à
+    cabeça viravam cláusulas vazias, e roubavam o texto à cláusula a que
+    pertenciam (seguros STAS e SINAPSA, GROQUIFAR, Caravela).
+
+    O último item de uma lista acaba em ponto, como um título pode acabar:
+    distingue-se por trazer um valor em euros, ou por vir logo a seguir a
+    outro item da mesma forma (`item_anterior`). Sem isto, «Cláusula 29.ª -
+    Viagens em serviço - 71,65 €.» abria uma cláusula falsa e separava o fim
+    da lista do artigo a que pertence (revisão do PR #90).
+    """
+    if na_tabela and " | " in linha:
+        return True       # uma linha de tabela com várias células
+    if tipo not in ("clausula", "artigo"):
+        return False
+    return bool(RE_RESTO_DE_REMISSAO.match(resto) or RE_FIM_DE_ITEM.search(linha)
+                or RE_VALOR_EM_EUROS.search(resto) or item_anterior)
+
+
+def _e_corpo(resto: str) -> bool:
+    """O resto da linha do cabeçalho é corpo, e não o título."""
+    resto = resto.strip(" -–—:")
+    return bool(RE_REVOGADA.match(resto) or _e_frase(resto)
+                or (len(resto) > MAX_TITULO and RE_FRASE_ACABADA.search(resto)))
+
+
 def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[dict, str]:
     """Constrói doc.json a partir do texto normalizado."""
     # "Artigo 1. º" → "Artigo 1.º": o espaço a mais partia o rótulo em
@@ -226,23 +287,44 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
     texto = RE_ORDINAL_SEPARADO.sub(r"\1.\2", texto)
     # "3São considerados…" → "3- São considerados…" (repõe o que o PDF tem)
     texto = RE_NUMERO_SEM_SEPARADOR.sub(r"\1- ", texto)
-    linhas = [l for l in juntar_linhas(texto).split("\n")
-              if l.strip() and l not in (MARCA_TABELA_INI, MARCA_TABELA_FIM)]
+    linhas: list[str] = []
+    em_tabela: set[int] = set()     # linhas que vêm de uma tabela
+    dentro = False
+    for linha in juntar_linhas(texto).split("\n"):
+        if linha in (MARCA_TABELA_INI, MARCA_TABELA_FIM):
+            dentro = linha == MARCA_TABELA_INI
+        elif linha.strip():
+            if dentro:
+                em_tabela.add(len(linhas))
+            linhas.append(linha)
 
     # 1.ª passagem: identificar cabeçalhos e fundir títulos na mesma linha
     eventos: list[tuple[str | None, str]] = []  # (tipo_cabecalho | None, linha)
     i = 0
+    item_anterior = False   # a linha anterior era um item de lista «Cláusula N.ª …;»
     while i < len(linhas):
         linha = linhas[i].strip()
         tipo_encontrado = None
         rotulo = linha
+        corpo_na_linha = None
+        e_item = False
         for tipo_cabecalho, rx in _RE_HEADINGS:
             m = rx.match(linha)
             if not m:
                 continue
-            tipo_encontrado = tipo_cabecalho
             resto = (m.group(2) if m.lastindex and m.lastindex >= 2 else "") or ""
+            if _nao_e_cabecalho(tipo_cabecalho, linha, resto, i in em_tabela, item_anterior):
+                e_item = tipo_cabecalho in ("clausula", "artigo") and i not in em_tabela
+                break
+            tipo_encontrado = tipo_cabecalho
             titulo_extra = None
+            if tipo_cabecalho in ("clausula", "artigo") and _e_corpo(resto):
+                # «Artigo 7.º Serão ainda sujeitos ao teste todos os
+                # trabalhadores que o solicitem.»: o corpo vem na linha do
+                # cabeçalho, e não é o título
+                corpo_na_linha = resto.strip(" -–—:")
+                rotulo = linha[:m.start(2)].strip(" -–—:")
+                break
             if not resto.strip(" -–—:"):
                 # título na(s) linha(s) seguinte(s)?
                 j = i + 1
@@ -254,6 +336,10 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
             rotulo = _normalizar_rotulo(tipo_cabecalho, m, titulo_extra)
             break
         eventos.append((tipo_encontrado, rotulo if tipo_encontrado else linhas[i]))
+        if corpo_na_linha:
+            eventos.append((None, corpo_na_linha))
+        # só a linha que fecha em vírgula ou ponto e vírgula anuncia outro item
+        item_anterior = e_item and bool(RE_FIM_DE_ITEM.search(linha))
         i += 1
 
     # 2.ª passagem: montar texto final e nós com offsets
@@ -527,12 +613,84 @@ def _linhas_rodadas(area, sentido: str) -> str:
         for linha in linhas)
 
 
+# Duas linhas a menos de 3 pt uma da outra (a tolerância do pdfplumber) e que
+# ocupam a mesma largura fundem-se numa só, letra a letra: «ECma vriggoors d
+# deesd» é «Em vigor desde» com «Cargos de Direção» (ANACOM, Lusitânia e GESAMB
+# na corrida de 2025). Acontece em cabeçalhos de tabela e em caixas de texto
+# sobrepostas. O PDFium lê-as bem, porque segue a ordem do conteúdo.
+Y_TOLERANCIA = 3
+MIN_SOBREPOSICOES = 3
+MIN_LETRAS_LINHA = 4
+
+
+def _tolerancia_vertical(area) -> float:
+    """A tolerância vertical que separa linhas entrelaçadas, ou a normal.
+
+    Numa linha a sério, as letras seguem-se sem se sobreporem; quando duas
+    linhas se fundem, letras de uma caem em cima de letras da outra, com
+    outra altura. A tolerância passa a metade da menor dessas distâncias.
+
+    Só conta quando, separadas, as letras formam linhas a sério (de
+    `MIN_LETRAS_LINHA` letras ou mais, com quase todas as letras). Letras
+    escritas em escada, uma a uma, também se sobrepõem com alturas
+    diferentes: nas escalas do TINITA, separá-las dava uma letra por linha e
+    baralhava as palavras (corrida de 2025 no ramo do PR #90).
+    """
+    from pdfplumber.utils import cluster_objects
+
+    chars = [c for c in area.chars if c["text"].strip() and c.get("upright", True)]
+    distancias = []
+    for linha in cluster_objects(chars, "top", Y_TOLERANCIA):
+        linha = sorted(linha, key=lambda c: c["x0"])
+        sobrepostas = [abs(b["top"] - a["top"]) for a, b in zip(linha, linha[1:])
+                       if a["x1"] - b["x0"] > 0.3 * min(a["width"], b["width"])
+                       and abs(b["top"] - a["top"]) > 0.3]
+        if len(sobrepostas) < MIN_SOBREPOSICOES:
+            continue
+        tolerancia = min(sobrepostas) / 2
+        partes = [len(p) for p in cluster_objects(linha, "top", tolerancia)]
+        cheias = [n for n in partes if n >= MIN_LETRAS_LINHA]
+        if len(cheias) >= 2 and sum(cheias) >= 0.8 * len(linha):
+            distancias.append(tolerancia)
+    return min(distancias) if distancias else Y_TOLERANCIA
+
+
+def _virado(o) -> bool:
+    """Carácter escrito de pernas para o ar (rodado 180º).
+
+    O pdfplumber dá-o como direito e lê-o da esquerda para a direita, ao
+    contrário da escrita: «oã etniuges lacse oa ossecA» é «Acesso ao escalão
+    seguinte» (CARRIS de 2025, esquemas das carreiras; grelhas da RTP).
+    """
+    if o.get("object_type") != "char":
+        return False
+    a, _b, _c, d = o["matrix"][:4]
+    return a < -0.1 and d < -0.1
+
+
+# a escrita de um texto virado: da direita para a esquerda, linhas de baixo
+# para cima; e o resultado escrito como qualquer outro texto
+OPCOES_VIRADO = {"char_dir": "rtl", "line_dir": "btt",
+                 "char_dir_render": "ltr", "line_dir_render": "ttb"}
+
+
+def _extrair_texto(area) -> str:
+    """`extract_text`, sem fundir linhas entrelaçadas e com o texto virado lido no sentido certo."""
+    if not any(_virado(c) for c in area.chars):
+        return area.extract_text(y_tolerance=_tolerancia_vertical(area)) or ""
+    direito = area.filter(lambda o: not _virado(o))
+    virado = area.filter(lambda o: o.get("object_type") != "char" or _virado(o))
+    partes = (direito.extract_text(y_tolerance=_tolerancia_vertical(direito)) or "",
+              virado.extract_text(**OPCOES_VIRADO) or "")
+    return "\n".join(t for t in partes if t.strip())
+
+
 def _texto(area, sentido: str | None) -> str:
     """O texto de uma área: direito como sempre, e o rodado à parte, no fim."""
     if sentido is None:
-        return area.extract_text() or ""
-    direito = area.filter(lambda o: o.get("object_type") != "char"
-                          or o.get("upright", True)).extract_text() or ""
+        return _extrair_texto(area)
+    direito = _extrair_texto(area.filter(lambda o: o.get("object_type") != "char"
+                                         or o.get("upright", True)))
     return "\n".join(t for t in (direito, _linhas_rodadas(area, sentido)) if t.strip())
 
 
@@ -556,7 +714,7 @@ def _celula(pag, cel, sentido: str | None) -> str:
     area = pag.filter(no_centro)
     if sentido and _rodada(area):
         return _texto_celula(_linhas_rodadas(area, sentido))
-    return _texto_celula(area.extract_text() or "")
+    return _texto_celula(_extrair_texto(area))
 
 
 def _dados_tabela(tab, sentido: str | None) -> list:
@@ -685,8 +843,8 @@ def _extrair_pagina_deitada(pag, sentido: str) -> str:
     tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[0], reverse=sentido == "ttb")
     # o texto direito da página (o cabeçalho do BTE, uma nota) lê-se de uma
     # vez: as faixas verticais partiam-no («Boletim do Trabalh» | «ho e …»)
-    direito = _fora_das_tabelas(pag, tabelas).filter(
-        lambda o: o.get("object_type") != "char" or o.get("upright", True)).extract_text() or ""
+    direito = _extrair_texto(_fora_das_tabelas(pag, tabelas).filter(
+        lambda o: o.get("object_type") != "char" or o.get("upright", True)))
     partes = [direito] if direito.strip() else []
 
     def juntar(area) -> None:
@@ -721,7 +879,86 @@ def _extrair_pagina_deitada(pag, sentido: str) -> str:
     return "\n".join(partes)
 
 
-def _extrair_pagina(pag) -> str:
+# Numa linha que atravessa a goteira, o espaço entre a última letra à esquerda
+# e a primeira à direita é o de uma palavra; entre duas colunas é bem maior.
+GOTEIRA_MINIMA = 8
+
+
+def _faixas_de_colunas(pag, goteira: float) -> list[tuple[float, float, bool]] | None:
+    """Faixas horizontais de uma página em colunas: (topo, fundo, larga).
+
+    Nas páginas finais de 2025 as assinaturas vêm em duas colunas, mas o fim
+    do texto e a nota de depósito ocupam a largura toda. Cortar a página
+    inteira ao meio partia essas linhas em duas metades, lidas em sítios
+    diferentes: «livro n.º 13, com o n.º 253/2025, nos termos do artigo …»
+    ficava depois da nota (74 avisos de «linhas depois da nota de depósito»).
+    Devolve `None` quando nenhuma linha atravessa a goteira: a página é toda
+    em colunas.
+    """
+    from pdfplumber.utils import cluster_objects
+
+    chars = [c for c in pag.chars if c["text"].strip() and c.get("upright", True)]
+    linhas = []
+    for linha in cluster_objects(chars, "top", Y_TOLERANCIA):
+        esquerda = [c for c in linha if (c["x0"] + c["x1"]) / 2 < goteira]
+        direita = [c for c in linha if (c["x0"] + c["x1"]) / 2 >= goteira]
+        larga = bool(esquerda and direita) and _atravessa(esquerda, direita)
+        linhas.append((min(c["top"] for c in linha), max(c["bottom"] for c in linha), larga))
+    linhas.sort()
+    if not any(larga for *_, larga in linhas):
+        return None
+    faixas: list[list] = []
+    for topo, fundo, larga in linhas:
+        if faixas and faixas[-1][2] == larga:
+            faixas[-1][1] = max(faixas[-1][1], fundo)
+        else:
+            faixas.append([topo, fundo, larga])
+    # as fronteiras ficam a meio do espaço entre faixas; as pontas, na página
+    limites = [pag.bbox[1]] + [(a[1] + b[0]) / 2 for a, b in zip(faixas, faixas[1:])] + [pag.bbox[3]]
+    return [(limites[i], limites[i + 1], f[2]) for i, f in enumerate(faixas)]
+
+
+def _atravessa(esquerda: list, direita: list) -> bool:
+    """A linha continua de uma coluna para a outra, como texto corrido?
+
+    O espaço na goteira tem de ser um espaço entre palavras da própria linha:
+    não maior do que o maior desses espaços. Dois títulos lado a lado, um em
+    cada coluna, estão perto da goteira mas mais afastados do que as suas
+    palavras (Lusitânia-STAS de 2025: «ANEXO VI ANEXO VI Tabela de
+    correspondência … Tabela de correspondência …»).
+    """
+    salto = min(c["x0"] for c in direita) - max(c["x1"] for c in esquerda)
+    if salto >= GOTEIRA_MINIMA:
+        return False
+    espacos = []
+    for lado in (esquerda, direita):
+        ordenados = sorted(lado, key=lambda c: c["x0"])
+        espacos += [b["x0"] - a["x1"] for a, b in zip(ordenados, ordenados[1:])
+                    if b["x0"] - a["x1"] > 0.8]
+    return salto <= max(espacos, default=0) * 1.2 or salto <= 1
+
+
+def _extrair_em_colunas(pag, goteira: float) -> str:
+    """Uma página em duas colunas, com as linhas de largura inteira no seu sítio.
+
+    O texto sai por faixas, de cima para baixo; numa faixa em colunas lê-se
+    a esquerda e depois a direita. A marca de coluna separa os segmentos, para
+    a remoção do mobiliário ver o topo e o fundo de cada um.
+    """
+    x0, _topo, x1, _fundo = pag.bbox
+    faixas = _faixas_de_colunas(pag, goteira) or [(pag.bbox[1], pag.bbox[3], False)]
+    segmentos: list[list[str]] = [[]]
+    for topo, fundo, larga in faixas:
+        if larga:
+            segmentos[-1].append(_extrair_pagina(pag.crop((x0, topo, x1, fundo)), colunas=False))
+            continue
+        segmentos[-1].append(_extrair_pagina(pag.crop((x0, topo, goteira, fundo)), colunas=False))
+        segmentos.append([_extrair_pagina(pag.crop((goteira, topo, x1, fundo)), colunas=False)])
+    return f"\n{MARCA_COLUNA}\n".join(
+        t for t in ("\n".join(p for p in seg if p.strip()) for seg in segmentos) if t.strip())
+
+
+def _extrair_pagina(pag, colunas: bool = True) -> str:
     """Extrai uma página intercalando bandas de texto e tabelas na ordem de leitura.
 
     O BTE é de coluna única: fatiamos a página em bandas horizontais entre
@@ -732,12 +969,9 @@ def _extrair_pagina(pag) -> str:
     sentido = _sentido_da_pagina(pag)
     if sentido and _rodada(pag):
         return _extrair_pagina_deitada(pag, sentido)
-    goteira = None if sentido else _duas_colunas(pag)
+    goteira = None if sentido or not colunas else _duas_colunas(pag)
     if goteira is not None:
-        esq = pag.crop((pag.bbox[0], pag.bbox[1], goteira, pag.bbox[3]))
-        dir_ = pag.crop((goteira, pag.bbox[1], pag.bbox[2], pag.bbox[3]))
-        return f"\n{MARCA_COLUNA}\n".join(
-            t for t in (_extrair_pagina(esq), _extrair_pagina(dir_)) if t.strip())
+        return _extrair_em_colunas(pag, goteira)
 
     tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[1])
     if not tabelas:
@@ -822,16 +1056,25 @@ def _remover_cabecalhos_rodapes(paginas: list[str]) -> list[str]:
     """Remove o mobiliário do BTE sem tocar no corpo nem nas tabelas.
 
     Mobiliário é o que se repete no topo ou no fundo das páginas: uma linha
-    de texto que aparece nas margens de pelo menos 30% das páginas, um
-    número de página sozinho nas margens, ou uma linha inteira de cabeçalho,
-    data ou rodapé do BTE em qualquer sítio (`cct/mobiliario.py`). A posição conta: antes, qualquer linha repetida em 30%
-    das páginas desaparecia, incluindo frases legítimas do corpo (issue #47).
+    de texto que aparece nas margens de metade das páginas (e de três, pelo
+    menos), um número de página sozinho nas margens, ou uma linha inteira de
+    cabeçalho, data ou rodapé do BTE em qualquer sítio (`cct/mobiliario.py`).
+    A posição conta: antes, qualquer linha repetida em 30% das páginas
+    desaparecia, incluindo frases legítimas do corpo (issue #47).
+
+    O limiar de repetição era 30% das páginas, com um mínimo de duas. Num
+    documento curto, duas páginas bastavam: no CIMPOR de 2025 (8 páginas) as
+    tabelas de cada ano, com o mesmo título e as mesmas notas, perdiam o
+    título e as notas na segunda e na terceira vez; no SCML-SDPGL (4
+    páginas), a assinatura do mesmo mandatário em dois blocos. O mobiliário
+    do BTE já se reconhece pelo conteúdo; a regra da repetição fica para o
+    que se repete em quase todas as páginas.
     """
     colunas = [_segmentos(pag) for pag in paginas]
     contagem: Counter[str] = Counter()
     for segmentos in colunas:
         contagem.update({seg[i].strip() for seg in segmentos for i in _nas_margens(seg)})
-    limiar = max(2, int(len(paginas) * 0.3))
+    limiar = max(3, -(-len(paginas) // 2))
     repetidas = {l for l, c in contagem.items() if c >= limiar}
     limpas = []
     for segmentos in colunas:
@@ -853,7 +1096,8 @@ def _remover_cabecalhos_rodapes(paginas: list[str]) -> list[str]:
                     if resto:
                         linhas.append(resto)
                     continue
-                if i in margens and (limpa in repetidas or re.fullmatch(r"\d+", limpa)):
+                if i in margens and (limpa in repetidas or re.fullmatch(r"\d+", limpa)
+                                     or RE_RODAPE_PARTIDO.match(limpa)):
                     continue
                 linhas.append(linha)
         limpas.append("\n".join(linhas))

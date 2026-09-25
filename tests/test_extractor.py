@@ -14,6 +14,7 @@ from cct.extractor import (MARCA_COLUNA, MARCA_TABELA_FIM, MARCA_TABELA_INI,
                            _remover_cabecalhos_rodapes, juntar_linhas,
                            estruturar, extrair_pdf)
 from cct.schemas import validar_doc
+from tests.pdf_sintetico import escrever_pdf
 
 PDF_BTE = Path(__file__).parent.parent / "data" / "raw" / "bte" / "bte2_2025.pdf"
 
@@ -92,6 +93,35 @@ def test_frase_repetida_no_corpo_nao_e_mobiliario():
     assert "BTE 31 |" not in junto
     assert not any(l.strip().isdigit() for l in junto.split("\n")), \
         "o número da página, sozinho no fundo, é mobiliário"
+
+
+def test_bloco_repetido_em_poucas_paginas_nao_e_mobiliario():
+    """CIMPOR de 2025 (8 páginas): as tabelas de cada ano têm o mesmo título
+    no topo da página e as mesmas notas no fundo. Com o limiar de duas
+    páginas, a segunda e a terceira tabelas perdiam o título e as notas."""
+    titulo = "ANEXO II-A\nTabela do enquadramento profissional e retribuições mínimas"
+    nota = "Os trabalhadores integrados na tabela II serão integrados na tabela I."
+    paginas = []
+    for n in range(1, 9):
+        corpo = [f"Texto próprio da página {n}.", f"Mais texto da página {n}.",
+                 f"Outra linha da página {n}.", f"Última linha da página {n}."]
+        if n in (2, 3, 5):
+            corpo = [titulo, *corpo, nota]
+        paginas.append(_pagina(n, "\n".join(corpo)))
+    junto = "\n".join(_remover_cabecalhos_rodapes(paginas))
+    assert junto.count("ANEXO II-A") == 3
+    assert junto.count("Tabela do enquadramento profissional") == 3
+    assert junto.count(nota) == 3
+    assert "BTE 31 |" not in junto
+
+
+def test_linha_repetida_em_quase_todas_as_paginas_e_mobiliario():
+    """O que o BTE não diz pelo conteúdo, diz pela repetição: um título
+    corrido no topo de todas as páginas continua a sair."""
+    paginas = [f"AE CIMPOR - Alteração salarial\nTexto {n}.\nMais {n}.\nOutra {n}.\nFim {n}."
+               for n in range(1, 7)]
+    junto = "\n".join(_remover_cabecalhos_rodapes(paginas))
+    assert "AE CIMPOR" not in junto and junto.count("Fim ") == 6
 
 
 def test_numero_sozinho_a_meio_da_pagina_fica():
@@ -386,3 +416,194 @@ def test_hifenizacao_dentro_das_celulas_junta_a_palavra():
         "Diretor | atividades de âmbito estratégico, define"
     assert _formatar_tabela([["Sub-\nCategoria", "A -\n B"]]) == "Sub- Categoria | A - B", \
         "hífen antes de maiúscula ou de espaço fica"
+
+
+@pytest.mark.parametrize("distancia", [2.5, 1.5])
+def test_linhas_entrelacadas_separam_se(tmp_path, distancia):
+    """ANACOM de 2025: «ECma vriggoors d deesd De i1r edçeã…» eram duas
+    linhas a menos de 3 pt, na mesma largura, fundidas letra a letra."""
+    pdf = escrever_pdf(tmp_path / "x.pdf", [[
+        (72, 700, "Em vigor desde 1 de janeiro de 2025"),
+        (80, 700 - distancia, "Cargos de Direção e Chefia"),
+        (72, 680, "Texto normal da linha seguinte.")]])
+    _doc, texto = extrair_pdf(pdf)
+    assert "Em vigor desde 1 de janeiro de 2025" in texto
+    assert "Cargos de Direção e Chefia" in texto
+
+
+def test_indice_colado_a_letra_nao_e_entrelacado(tmp_path):
+    """Um expoente ou uma nota (n.º, 1)) está mais alto, mas não em cima de
+    outras letras: a linha lê-se como sempre."""
+    pdf = escrever_pdf(tmp_path / "x.pdf", [[
+        (72, 700, "Cláusula 3.ª - Retribuição"), (212, 703, "1"),
+        (218, 700, "e outras prestações do trabalho.")]])
+    _doc, texto = extrair_pdf(pdf)
+    assert "Retribuição" in texto and "outras prestações" in texto
+
+
+def test_texto_virado_180_graus_le_se_no_sentido_certo(tmp_path):
+    """CARRIS de 2025: «oã etniuges lacse oa ossecA» era «Acesso ao escalão
+    seguinte», escrito de pernas para o ar num esquema de carreiras."""
+    from cct.completude import medir_pdf
+    pdf = escrever_pdf(tmp_path / "x.pdf", [[
+        (72, 700, "Texto direito normal da página."),
+        (400, 500, "Acesso ao escalão seguinte", "virado"),
+        (400, 486, "Legenda Progressão", "virado")]])
+    _doc, texto = extrair_pdf(pdf)
+    assert "Acesso ao escalão seguinte" in texto and "Legenda Progressão" in texto
+    assert "Texto direito normal da página." in texto
+    assert medir_pdf("x", pdf, texto).cobertura == 1.0
+
+
+def _rotulos(texto: str) -> list[str]:
+    doc, _ = estruturar(texto, "teste")
+    return [n["rotulo"] for n in doc["nos"] if n["tipo"] in ("clausula", "artigo")]
+
+
+def test_linhas_de_tabela_e_de_lista_nao_sao_clausulas():
+    """Corrida de 2025: «Cláusula 44.ª, número 2 - Valor… | 88,20 €» (uma
+    linha da tabela de valores) e «Cláusula 28.ª - Deslocações em serviço -
+    16,55 €;» (uma lista) viravam cláusulas vazias."""
+    texto = "\n".join([
+        "Cláusula 1.ª", "Âmbito", "O presente acordo aplica-se a todo o território.",
+        "Artigo 2.º", "Valores", "Os valores passam a ser os seguintes:",
+        "Cláusula 28.ª - Deslocações em serviço - 16,55 €;",
+        "Cláusula 29.ª - Viagens em serviço - 71,65 €.",
+        MARCA_TABELA_INI,
+        "Cláusula 44.ª, número 2 - Valor das despesas | 88,20 €",
+        "Cláusula 44.ª, número 5 - Valor por km | 0,40 €",
+        MARCA_TABELA_FIM,
+        "Cláusula 45.ª, número 1, passa a ter a redação seguinte."])
+    # o último item da lista acaba em ponto e continua a ser do artigo
+    # (revisão do PR #90: o teste esperava aqui uma cláusula falsa)
+    assert _rotulos(texto) == ["Cláusula 1.ª - Âmbito", "Artigo 2.º - Valores"]
+    doc, final = estruturar(texto, "teste")
+    artigo = next(n for n in doc["nos"] if n["rotulo"] == "Artigo 2.º - Valores")
+    corpo = final[artigo["char_start"]:artigo["char_end"]]
+    assert "16,55 €" in corpo and "71,65 €." in corpo
+    assert "Cláusula 45.ª, número 1" in corpo
+
+
+def test_ultimo_item_de_lista_sem_valores_nao_e_clausula():
+    """Uma lista de cláusulas revogadas, sem valores: o último item acaba em
+    ponto e vem logo a seguir a outro item. A cláusula real que se segue, com
+    o título na linha seguinte, continua a ser reconhecida."""
+    texto = "\n".join([
+        "Artigo 3.º", "Revogação", "São revogadas as cláusulas seguintes:",
+        "Cláusula 5.ª - Férias;", "Cláusula 6.ª - Feriados.",
+        "Cláusula 7.ª", "Faltas", "As faltas regem-se pela lei."])
+    assert _rotulos(texto) == ["Artigo 3.º - Revogação", "Cláusula 7.ª - Faltas"]
+    doc, final = estruturar(texto, "teste")
+    artigo = next(n for n in doc["nos"] if n["rotulo"] == "Artigo 3.º - Revogação")
+    assert "Cláusula 6.ª - Feriados." in final[artigo["char_start"]:artigo["char_end"]]
+
+
+def test_titulo_que_acaba_em_ponto_continua_a_ser_cabecalho():
+    """Sem valor em euros e sem item antes, a linha é um cabeçalho, mesmo
+    que o título acabe em ponto."""
+    texto = "\n".join(["Cláusula 9.ª - Deslocações.", "O trabalhador tem direito ao reembolso."])
+    assert _rotulos(texto) == ["Cláusula 9.ª - Deslocações."]
+
+
+def test_corpo_na_linha_do_cabecalho():
+    """«Artigo 7.º Serão ainda sujeitos ao teste…»: o corpo ficava no rótulo
+    e o artigo sem conteúdo."""
+    texto = "\n".join([
+        "Artigo 7.º Serão ainda sujeitos ao teste todos os trabalhadores que o "
+        "solicitem, nos termos do regulamento em vigor.",
+        "Cláusula 5.ª (Revogada.)",
+        "Artigo 2.º [Revogado.]",
+        "Artigo 17.º As decisões dos árbitros são tomadas por maioria.",
+        "Artigo 18.º - Disposições finais e transitórias",
+        "Aplica-se o regime legal em vigor.",
+        "Cláusula 6.ª - Férias", "O período de férias é de 22 dias úteis."])
+    doc, final = estruturar(texto, "teste")
+    assert _rotulos(texto) == ["Artigo 7.º", "Cláusula 5.ª", "Artigo 2.º", "Artigo 17.º",
+                               "Artigo 18.º - Disposições finais e transitórias",
+                               "Cláusula 6.ª - Férias"]
+    from cct.sanidade import clausulas_sem_corpo
+    assert clausulas_sem_corpo(doc, final) == []
+    assert "Serão ainda sujeitos ao teste" in final
+
+
+def test_letras_em_escada_nao_se_separam_uma_a_uma(tmp_path):
+    """TINITA de 2025: letras escritas em escada também se sobrepõem com
+    alturas diferentes. Separá-las como linhas entrelaçadas dava uma letra por
+    linha («F F S / o é e l r r …») e 929 palavras a mais."""
+    linhas = [(72, 760, "Texto normal da página antes da escala.")]
+    for j, palavra in enumerate(["Folgas", "Férias", "Serviço"]):
+        for i, letra in enumerate(palavra):
+            linhas.append((100 + j * 40 + i * 1.5, 700 - i * 2.0, letra))
+    _doc, texto = extrair_pdf(escrever_pdf(tmp_path / "x.pdf", [linhas]))
+    assert "Folgas Férias Serviço" in texto
+
+
+def test_pagina_final_com_assinaturas_em_colunas(tmp_path):
+    """Corrida de 2025: nas páginas finais, as assinaturas vêm em duas
+    colunas e o fim do texto e a nota de depósito ocupam a largura toda.
+    Cortar a página ao meio partia a nota: «livro n.º 13, com o n.º 45/2025,
+    nos…» ficava depois dela."""
+    linhas = [(72, 800, "Boletim do Trabalho e Emprego, n.º 6, 15/2/2025")]
+    y = 760
+    for t in ["O presente acordo produz efeitos a partir de 1 de janeiro de 2025, com exceção das",
+              "cláusulas de expressão pecuniária, que produzem efeitos a partir de 1 de março."]:
+        linhas.append((72, y, t))
+        y -= 14
+    y -= 10
+    esquerda = ["Pela Empresa X, SA:", "Maria Alves Pereira, na qualidade",
+                "de presidente do conselho de", "administração.",
+                "João Carlos Silva, vogal do", "conselho de administração."]
+    direita = ["Pelo Sindicato dos Trabalhadores", "da Administração Pública e de",
+               "Entidades com Fins Públicos - SINTAP:", "Carlos Miguel Dias Moreira, na",
+               "qualidade de mandatário.", "Ana Rita Costa, mandatária."]
+    for a, b in zip(esquerda, direita):
+        linhas += [(72, y, a), (320, y, b)]
+        y -= 14
+    y -= 10
+    for t in ["Depositado em 20 de fevereiro de 2025, a fl. 90 do livro n.º 13, com o n.º 45/2025, nos",
+              "termos do artigo 494.º do Código do Trabalho, aprovado pela Lei n.º 7/2009, de 12 de fevereiro."]:
+        linhas.append((72, y, t))
+        y -= 14
+    linhas.append((470, 40, "BTE 6 | 110"))
+    _doc, texto = extrair_pdf(escrever_pdf(tmp_path / "x.pdf", [linhas]))
+    from cct.sanidade import deposito_no_fim
+    assert deposito_no_fim(texto) is None, texto
+    assert "com exceção das cláusulas de expressão pecuniária" in texto
+    assert texto.index("Pela Empresa X") < texto.index("Pelo Sindicato") < texto.index("Depositado")
+    assert "110" not in texto
+
+
+def test_rodape_partido_nas_margens_sai():
+    paginas = [f"Texto {n}.\nMais texto {n}.\nOutra linha {n}.\nFim {n}.\n{n} | 1{n}"
+               for n in range(1, 4)] + ["Texto.\nMais.\nOutra.\nFim.\nBTE | 23"]
+    junto = "\n".join(_remover_cabecalhos_rodapes(paginas))
+    assert "|" not in junto and junto.count("Fim") == 4
+
+
+def test_titulos_lado_a_lado_nao_atravessam_a_goteira(tmp_path):
+    """Lusitânia-STAS de 2025: duas tabelas lado a lado, cada uma com o seu
+    título perto da goteira. Lidos como uma linha só, os títulos misturavam-se
+    («ANEXO VI ANEXO VI Tabela de correspondência … Tabela de …»)."""
+    linhas = []
+    y = 760
+    for n in range(12):
+        linhas += [(72, y, f"Categoria da esquerda número {n}."),
+                   (320, y, f"Categoria da direita número {n}.")]
+        y -= 14
+    linhas += [(200, 790, "ANEXO VI - Esquerda"), (303, 790, "ANEXO VI - Direita")]
+    _doc, texto = extrair_pdf(escrever_pdf(tmp_path / "x.pdf", [linhas]))
+    assert "ANEXO VI - Esquerda\n" in texto
+    assert texto.index("esquerda número 11") < texto.index("ANEXO VI - Direita")
+
+
+def test_frase_na_linha_seguinte_nao_e_titulo():
+    """ADIPA, Caravela e RTP de 2025: «Artigo 7.º» numa linha e a frase na
+    seguinte. A frase virava o título e o artigo ficava «sem conteúdo»."""
+    texto = "\n".join([
+        "Artigo 7.º", "Serão ainda sujeitos ao teste todos os trabalhadores que o solicitem.",
+        "Artigo 8.º", "Âmbito",
+        "O presente regulamento aplica-se a todos os trabalhadores."])
+    doc, final = estruturar(texto, "teste")
+    assert _rotulos(texto) == ["Artigo 7.º", "Artigo 8.º - Âmbito"]
+    from cct.sanidade import clausulas_sem_corpo
+    assert clausulas_sem_corpo(doc, final) == []

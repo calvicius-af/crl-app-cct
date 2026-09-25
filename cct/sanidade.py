@@ -56,10 +56,21 @@ def clausulas_sem_corpo(doc: dict, texto: str) -> list[str]:
         if not corpo:
             falhas.append(f"{no['rotulo']}: sem conteúdo")
         elif not any(RE_FRASE_FECHADA.search(l) for l in corpo.split("\n") if l.strip()):
-            if _anuncia_o_que_segue(no, corpo, comecos):
+            if _anuncia_o_que_segue(no, corpo, comecos) or _corpo_sem_frases(bruto):
                 continue
             falhas.append(f"{no['rotulo']}: corpo sem frase terminada em ponto")
     return falhas
+
+
+# um corpo que não se escreve em frases: uma tabela, uma fórmula, ou o texto
+# omitido de propósito numa alteração («(…)»). Na corrida de 2025, «Cálculo
+# da remuneração» (RH = …), «Mapas de horário» e «Cláusula transitória (…)»
+# davam o aviso de corpo sem frase terminada em ponto.
+RE_SEM_FRASES = re.compile(r" \| |\(\s*(?:\.\s*){3}\)|\(\s*…\s*\)|\[\s*(?:\.\s*){3}\]|[=×]")
+
+
+def _corpo_sem_frases(bruto: str) -> bool:
+    return bool(RE_SEM_FRASES.search(bruto))
 
 
 def _anuncia_o_que_segue(no: dict, corpo: str, comecos: dict) -> bool:
@@ -87,10 +98,20 @@ def deposito_no_fim(texto: str, e_retificacao: bool = False) -> str | None:
                      if RE_DEPOSITO.match(l) or RE_DEPOSITO_MID.match(l)), None)
     if posicao is None:
         return "sem nota de depósito (art. 494.º CT) — documento truncado?"
-    restantes = len(linhas) - posicao - 1
-    if restantes:
-        return (f"{restantes} linha(s) depois da nota de depósito "
-                f"— ordem de leitura suspeita")
+    # a nota pode continuar na linha seguinte, quando o PDF a parte num
+    # sítio que a junção de linhas não une; conta até fechar a frase
+    fim = posicao
+    while (fim + 1 < len(linhas) and fim - posicao < 2
+           and not RE_FRASE_FECHADA.search(linhas[fim])):
+        fim += 1
+    depois = linhas[fim + 1:]
+    if depois:
+        # a linha diz o que é: uma tabela que ficou para o fim, o título do
+        # documento seguinte, uma assinatura (corrida de 2025: 74 avisos que
+        # não diziam qual era a linha)
+        primeira = depois[0] if len(depois[0]) <= 80 else depois[0][:77] + "…"
+        return (f"{len(depois)} linha(s) depois da nota de depósito "
+                f"— ordem de leitura suspeita (a primeira: «{primeira}»)")
     return None
 
 
