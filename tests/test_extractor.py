@@ -474,11 +474,35 @@ def test_linhas_de_tabela_e_de_lista_nao_sao_clausulas():
         "Cláusula 44.ª, número 5 - Valor por km | 0,40 €",
         MARCA_TABELA_FIM,
         "Cláusula 45.ª, número 1, passa a ter a redação seguinte."])
-    assert _rotulos(texto) == ["Cláusula 1.ª - Âmbito", "Artigo 2.º - Valores",
-                               "Cláusula 29.ª - Viagens em serviço - 71,65 €."]
+    # o último item da lista acaba em ponto e continua a ser do artigo
+    # (revisão do PR #90: o teste esperava aqui uma cláusula falsa)
+    assert _rotulos(texto) == ["Cláusula 1.ª - Âmbito", "Artigo 2.º - Valores"]
     doc, final = estruturar(texto, "teste")
     artigo = next(n for n in doc["nos"] if n["rotulo"] == "Artigo 2.º - Valores")
-    assert "16,55 €" in final[artigo["char_start"]:artigo["char_end"]]
+    corpo = final[artigo["char_start"]:artigo["char_end"]]
+    assert "16,55 €" in corpo and "71,65 €." in corpo
+    assert "Cláusula 45.ª, número 1" in corpo
+
+
+def test_ultimo_item_de_lista_sem_valores_nao_e_clausula():
+    """Uma lista de cláusulas revogadas, sem valores: o último item acaba em
+    ponto e vem logo a seguir a outro item. A cláusula real que se segue, com
+    o título na linha seguinte, continua a ser reconhecida."""
+    texto = "\n".join([
+        "Artigo 3.º", "Revogação", "São revogadas as cláusulas seguintes:",
+        "Cláusula 5.ª - Férias;", "Cláusula 6.ª - Feriados.",
+        "Cláusula 7.ª", "Faltas", "As faltas regem-se pela lei."])
+    assert _rotulos(texto) == ["Artigo 3.º - Revogação", "Cláusula 7.ª - Faltas"]
+    doc, final = estruturar(texto, "teste")
+    artigo = next(n for n in doc["nos"] if n["rotulo"] == "Artigo 3.º - Revogação")
+    assert "Cláusula 6.ª - Feriados." in final[artigo["char_start"]:artigo["char_end"]]
+
+
+def test_titulo_que_acaba_em_ponto_continua_a_ser_cabecalho():
+    """Sem valor em euros e sem item antes, a linha é um cabeçalho, mesmo
+    que o título acabe em ponto."""
+    texto = "\n".join(["Cláusula 9.ª - Deslocações.", "O trabalhador tem direito ao reembolso."])
+    assert _rotulos(texto) == ["Cláusula 9.ª - Deslocações."]
 
 
 def test_corpo_na_linha_do_cabecalho():

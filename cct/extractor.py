@@ -236,6 +236,9 @@ def _normalizar_rotulo(tipo: str, m: re.Match, titulo_extra: str | None) -> str:
 # (lista de valores de uma alteração salarial)
 RE_RESTO_DE_REMISSAO = re.compile(r"^\s*[,;]")
 RE_FIM_DE_ITEM = re.compile(r"[,;]\s*$")
+# um valor em euros no resto da linha: um título de cláusula nunca o traz
+# («Cláusula 29.ª - Viagens em serviço - 71,65 €.»)
+RE_VALOR_EM_EUROS = re.compile(r"\d,\d{2}\s*€|€\s*\d")
 # o corpo que vem na linha do cabeçalho: uma frase acabada, longa de mais para
 # ser um título, ou só «Revogada.»
 RE_FRASE_ACABADA = re.compile(r"""[.!?:][)\]»”"']*\s*$""")
@@ -248,18 +251,26 @@ MAX_TITULO = 90
 MIN_PALAVRAS_FRASE = 7
 
 
-def _nao_e_cabecalho(tipo: str, linha: str, resto: str, na_tabela: bool) -> bool:
+def _nao_e_cabecalho(tipo: str, linha: str, resto: str, na_tabela: bool,
+                     item_anterior: bool = False) -> bool:
     """Uma linha com a forma de um cabeçalho que não o é.
 
     Na corrida de 2025, linhas de tabelas e de listas com «Cláusula N.ª» à
     cabeça viravam cláusulas vazias, e roubavam o texto à cláusula a que
     pertenciam (seguros STAS e SINAPSA, GROQUIFAR, Caravela).
+
+    O último item de uma lista acaba em ponto, como um título pode acabar:
+    distingue-se por trazer um valor em euros, ou por vir logo a seguir a
+    outro item da mesma forma (`item_anterior`). Sem isto, «Cláusula 29.ª -
+    Viagens em serviço - 71,65 €.» abria uma cláusula falsa e separava o fim
+    da lista do artigo a que pertence (revisão do PR #90).
     """
     if na_tabela and " | " in linha:
         return True       # uma linha de tabela com várias células
     if tipo not in ("clausula", "artigo"):
         return False
-    return bool(RE_RESTO_DE_REMISSAO.match(resto) or RE_FIM_DE_ITEM.search(linha))
+    return bool(RE_RESTO_DE_REMISSAO.match(resto) or RE_FIM_DE_ITEM.search(linha)
+                or RE_VALOR_EM_EUROS.search(resto) or item_anterior)
 
 
 def _e_corpo(resto: str) -> bool:
@@ -290,17 +301,20 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
     # 1.ª passagem: identificar cabeçalhos e fundir títulos na mesma linha
     eventos: list[tuple[str | None, str]] = []  # (tipo_cabecalho | None, linha)
     i = 0
+    item_anterior = False   # a linha anterior era um item de lista «Cláusula N.ª …;»
     while i < len(linhas):
         linha = linhas[i].strip()
         tipo_encontrado = None
         rotulo = linha
         corpo_na_linha = None
+        e_item = False
         for tipo_cabecalho, rx in _RE_HEADINGS:
             m = rx.match(linha)
             if not m:
                 continue
             resto = (m.group(2) if m.lastindex and m.lastindex >= 2 else "") or ""
-            if _nao_e_cabecalho(tipo_cabecalho, linha, resto, i in em_tabela):
+            if _nao_e_cabecalho(tipo_cabecalho, linha, resto, i in em_tabela, item_anterior):
+                e_item = tipo_cabecalho in ("clausula", "artigo") and i not in em_tabela
                 break
             tipo_encontrado = tipo_cabecalho
             titulo_extra = None
@@ -324,6 +338,8 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
         eventos.append((tipo_encontrado, rotulo if tipo_encontrado else linhas[i]))
         if corpo_na_linha:
             eventos.append((None, corpo_na_linha))
+        # só a linha que fecha em vírgula ou ponto e vírgula anuncia outro item
+        item_anterior = e_item and bool(RE_FIM_DE_ITEM.search(linha))
         i += 1
 
     # 2.ª passagem: montar texto final e nós com offsets
