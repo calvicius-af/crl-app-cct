@@ -15,9 +15,33 @@ Custo: ~1-1,7 s/página em CPU e download único dos modelos na primeira
 corrida — o extrator clássico continua a ser a via rápida.
 """
 import re
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, Protocol, runtime_checkable
 
 from .extractor import MARCA_TABELA_FIM, MARCA_TABELA_INI, estruturar
+
+
+# O que se consome dos objetos do docling, como contrato tipado (#27). O
+# docling é opcional: estes Protocol descrevem os atributos que o código lê,
+# sem importar o docling_core; os tipos reais satisfazem-nos, e um teste o
+# confirma quando o docling está instalado (tests/test_extractor_docling.py).
+@runtime_checkable
+class CelulaDocling(Protocol):
+    """Uma célula da grelha de uma tabela (docling_core TableCell)."""
+    text: str
+    start_col_offset_idx: int
+    start_row_offset_idx: int
+
+
+@runtime_checkable
+class CaixaDocling(Protocol):
+    """A caixa de um item (docling_core BoundingBox): l, t, r, b e a origem."""
+    l: float  # noqa: E741 — o nome é o do docling
+    t: float
+    r: float
+    b: float
+    coord_origin: Any
 
 # mobiliário do BTE que aparece no corpo da página
 RE_BTE_CABECALHO = re.compile(r"^Boletim do Trabalho e Emprego\b")
@@ -63,7 +87,8 @@ def limpar_texto_item(texto: str) -> str | None:
     return RE_HIFEN_SOLTO.sub(r"\1\2", texto)
 
 
-def celulas_da_linha(linha, indice_linha: int = 0) -> list[str]:
+def celulas_da_linha(linha: Sequence[CelulaDocling | None],
+                     indice_linha: int = 0) -> list[str]:
     """Uma célula por span, a partir de uma linha da grelha do docling.
 
     A grelha repete a mesma célula em todas as posições que o span
@@ -119,7 +144,7 @@ def _linhas_de_tabela(tabela) -> list[str]:
 ORIGEM_INFERIOR = "BOTTOMLEFT"
 
 
-def distancia_ao_topo(bbox, altura_pagina: float) -> float:
+def distancia_ao_topo(bbox: CaixaDocling, altura_pagina: float) -> float:
     """Topo do item medido a partir do topo da página (origem indiferente).
 
     Com origem no canto inferior esquerdo (o que o docling usa nos PDF),
@@ -133,16 +158,31 @@ def distancia_ao_topo(bbox, altura_pagina: float) -> float:
     return bbox.t
 
 
-def _duas_colunas(caixas, largura: float) -> bool:
+# Heurística das duas colunas sobre as caixas do docling (#27). As caixas são
+# blocos (parágrafos), e não palavras, por isso os limites são mais largos do
+# que os do extrator clássico (cct/extractor.py, `_duas_colunas`):
+# abaixo de 8 blocos, a página não tem texto que chegue para decidir
+MIN_CAIXAS_COLUNAS = 8
+# a goteira: 2% da largura para cada lado do meio
+GOTEIRA_FRACAO = 0.02
+# numa página em colunas, quase nenhum bloco atravessa a goteira (os títulos
+# centrados atravessam); acima de 5%, é uma página de coluna única
+MAX_CAIXAS_ATRAVESSAM = 0.05
+# e cada metade tem pelo menos um quarto dos blocos
+MIN_CAIXAS_POR_COLUNA = 0.25
+
+
+def _duas_colunas(caixas: Sequence[CaixaDocling], largura: float) -> bool:
     """Página em duas colunas? (BTE antigos; os de 2025 são coluna única)"""
-    if len(caixas) < 8:
+    if len(caixas) < MIN_CAIXAS_COLUNAS:
         return False
-    meio, tol = largura / 2, largura * 0.02
+    meio, tol = largura / 2, largura * GOTEIRA_FRACAO
     atravessam = sum(1 for b in caixas if b.l < meio - tol and b.r > meio + tol)
     esquerda = sum(1 for b in caixas if b.r <= meio + tol)
     direita = sum(1 for b in caixas if b.l >= meio - tol)
-    return (atravessam / len(caixas) < 0.05
-            and esquerda / len(caixas) > 0.25 and direita / len(caixas) > 0.25)
+    return (atravessam / len(caixas) < MAX_CAIXAS_ATRAVESSAM
+            and esquerda / len(caixas) > MIN_CAIXAS_POR_COLUNA
+            and direita / len(caixas) > MIN_CAIXAS_POR_COLUNA)
 
 
 def ordenar_por_leitura(itens: list) -> list:
@@ -169,7 +209,7 @@ def ordenar_por_leitura(itens: list) -> list:
             chaves.append((*ultima, indice))
             continue
         coluna = 0
-        if colunado.get(pagina) and bbox.l >= largura / 2 - largura * 0.02:
+        if colunado.get(pagina) and bbox.l >= largura / 2 - largura * GOTEIRA_FRACAO:
             coluna = 1
         ultima = (pagina, coluna, distancia_ao_topo(bbox, altura))
         chaves.append((*ultima, indice))

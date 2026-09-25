@@ -1,6 +1,6 @@
 # ISSUE-0002: quebras de linha nos blocos de título do início dos documentos
 
-- **Estado:** Aberta
+- **Estado:** Resolvida — 2026-09-26
 - **Data:** 2026-07-06
 - **GitHub:** #29 (sub-issue de #24)
 - **Onde dói:** `cct/extractor.py` (junção de linhas)
@@ -47,3 +47,28 @@ oficiais, mas não apresentou uma prova suficiente de que todos os títulos
 iniciais centrados e multilinha ficam unidos sem fundir títulos estruturais.
 O problema mantém-se aberto como #29, com casos de regressão explícitos para os
 dois comportamentos.
+
+## Resolução (2026-09-26)
+
+Medido nos 277 documentos de 2025, antes e depois (o título é o bloco entre
+«CONVENÇÕES COLETIVAS» e o subtipo oficial):
+
+| Título | Antes | Depois |
+|---|---|---|
+| Numa só linha, fechado pelo subtipo | 213 | 256 |
+| Partido em duas linhas | 15 | 0 |
+| Subtipo não reconhecido | 48 | 20 |
+
+Os 20 que ficam são primeiras convenções, cujo título não tem subtipo e sai numa linha,
+seguido do primeiro cabeçalho; e o MaiaAmbiente, cujo título sem subtipo se cola a
+«Considerando que:».
+
+Três regras, todas restritas ao cabeçalho do documento:
+
+1. o travessão que liga a sigla ao nome («… e Afins» / «- SETAAB - Revisão global») não
+   abre um item de lista quando a linha anterior não acaba em pontuação nem é um item;
+2. «- Alteração salarial e outra» (singular) e «- Alteração» sozinho fecham o título;
+3. uma linha só com um numeral romano é o número de um capítulo sem a palavra CAPÍTULO.
+
+As linhas protegidas como títulos de cabeçalhos estruturais continuam protegidas, e uma
+lista com travessões no corpo continua como está (`tests/test_extractor_nuances.py`).

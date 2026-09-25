@@ -11,7 +11,10 @@ import argparse
 import json
 import sys
 from collections import Counter
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -142,6 +145,188 @@ def aviso_sem_pasta(pasta_versoes: Path, documentos: list[str]) -> str:
             "na faixa CONSOLIDADO — " + ", ".join(documentos))
 
 
+REGISTO_OMISSAO = Path(__file__).resolve().parent.parent / "data" / "registo" / "registo_bte.jsonl"
+
+
+def carregar_tipos_do_registo(caminho: Path) -> dict[str, str]:
+    """O tipo IRCT (AE-ALT-RECT, …) de cada documento, pelo registo da recolha.
+
+    O subtipo pode vir das variáveis MaxQDA ou, em sua falta, do registo BTE:
+    é o que diz se um documento é uma retificação, e isso desliga o controlo da
+    nota de depósito. Sem registo (outra máquina), devolve um dicionário vazio.
+    """
+    tipos: dict[str, str] = {}
+    if not caminho.exists():
+        return tipos
+    for linha in caminho.read_text(encoding="utf-8").splitlines():
+        if not linha.strip():
+            continue
+        try:
+            entrada = json.loads(linha)
+        except ValueError:
+            continue
+        doc_id = (entrada.get("nomeacao") or {}).get("doc_id")
+        if doc_id and entrada.get("tipo"):
+            tipos.setdefault(doc_id, entrada["tipo"])
+    return tipos
+
+
+def subtipo_do(doc_id: str, das_variaveis: str | None,
+               tipos_do_registo: dict[str, str]) -> tuple[str, str]:
+    """Subtipo do schema; o tipo IRCT viaja no doc como 'tipo_registo'.
+
+    O tipo vem do registo da recolha e, sem ele, do próprio nome: os
+    esquemas RNC (ADR-0016 e ADR-0022) trazem-no. Sem isto, correr o
+    pipeline numa máquina sem o registo tratava uma retificação como
+    convenção e dava-a como truncada (ISSUE-0014).
+    """
+    tipo = tipos_do_registo.get(doc_id, "")
+    if not tipo:
+        meta = interpretar_nome_rnc(doc_id)
+        tipo = (meta or {}).get("tipo") or ""
+    if das_variaveis:
+        return das_variaveis, tipo
+    if RE_RETIFICACAO.search(tipo):
+        return "retificacao", tipo
+    return "desconhecido", tipo
+
+
+@dataclass
+class Contexto:
+    """O que é igual para todos os documentos de uma corrida."""
+    extrair: Callable
+    codebook: dict
+    extrator: str = "pdfplumber"
+    aptos: set = field(default_factory=set)
+    variaveis: Any = None
+    tipos_do_registo: dict[str, str] = field(default_factory=dict)
+    pasta_versoes: Path | None = None
+    semantica: bool = False
+    modelo: str = "google/gemma-4-e2b"
+    base_url: str = "http://127.0.0.1:1234"
+    max_lotes: int = 4
+    cache_llm: Path | None = None
+
+
+@dataclass
+class ResultadoDocumento:
+    """O que um documento dá: o item do QDPX, a medida e os problemas.
+
+    `item` é None quando o documento fica fora do QDPX; `erro` diz porquê, e a
+    medida (se já existia) fica marcada como excluída, para o diagnóstico.
+    """
+    item: tuple[dict, str, dict] | None = None
+    medida: Medida | None = None
+    problemas: list[str] = field(default_factory=list)
+    sem_pasta: bool = False
+    erro: str | None = None
+
+
+def _auditar_tabelas(pdf: Path, texto: str, extrator: str) -> list[str]:
+    """Auditoria cruzada de tabelas e tabelas rodadas: avisos, nunca erros.
+
+    O que um extrator vê e o outro não é a perda silenciosa que motivou o
+    guardião (2026-09-17); o canário de anexos sem tabela já vem na sanidade.
+    Com --extrator docling, o docling pode ter extraído bem um PDF que o
+    auditor pdfplumber não consegue abrir: uma falha aqui é um aviso, não a
+    exclusão do resultado válido do QDPX.
+    """
+    from .auditoria import (contar_blocos_tabela, contar_tabelas_pdfplumber,
+                            divergencias, tabelas_rodadas_pdfplumber)
+    avisos = []
+    try:
+        for aviso in divergencias(contar_tabelas_pdfplumber(pdf), contar_blocos_tabela(texto)):
+            avisos.append(f"{pdf.stem}: [auditoria] {aviso}")
+    except Exception as e:
+        avisos.append(f"{pdf.stem}: [auditoria] não foi possível verificar "
+                      f"as tabelas ({e}) — documento mantido")
+    # tabelas rodadas 90º (ISSUE-0020): o extrator lê hoje o texto rodado no
+    # sentido certo; o aviso só se dá quando o texto ainda traz palavras
+    # invertidas, sinal de uma rotação não reconhecida
+    if extrator != "docling" and invertidas_pela_forma(texto):
+        try:
+            for aviso in tabelas_rodadas_pdfplumber(pdf):
+                avisos.append(f"{pdf.stem}: [auditoria] {aviso}")
+        except Exception as e:
+            avisos.append(f"{pdf.stem}: [auditoria] não foi possível verificar "
+                          f"tabelas rodadas ({e}) — documento mantido")
+    return avisos
+
+
+def processar_documento(pdf: Path, ctx: Contexto) -> ResultadoDocumento:
+    """Um PDF, da extração à triagem, sem argumentos, manifesto nem exportação (#49).
+
+    A política de continuação está toda aqui:
+
+    * os passos essenciais (extração, validação, codificação, triagem) que
+      falham deixam este documento fora do QDPX, com o erro no relatório e a
+      medida marcada como excluída; a corrida continua com os outros;
+    * os passos acessórios (auditoria de tabelas, páginas com imagem,
+      diacronia) nunca custam o documento: uma falha é um aviso.
+    """
+    r = ResultadoDocumento()
+    try:
+        v = None
+        if ctx.variaveis:
+            from .variaveis import procurar
+            v = procurar(ctx.variaveis, pdf.stem)
+        subtipo, tipo_registo = subtipo_do(pdf.stem, (v or {}).get("subtipo"),
+                                           ctx.tipos_do_registo)
+        doc, texto = ctx.extrair(pdf, doc_id=pdf.stem, subtipo=subtipo)
+        doc["tipo_registo"] = tipo_registo  # fora do schema: meta para sanidade
+        # completude contra uma leitura independente do PDF: nunca rebenta, e
+        # o resultado vai para o diagnostico.md
+        r.medida = medir_pdf(pdf.stem, pdf, texto)
+        validar_doc(doc)
+        try:
+            from .auditoria import paginas_com_imagem
+            imagens = paginas_com_imagem(pdf)
+        except Exception:           # o auditor nunca custa o documento
+            imagens = []
+        r.problemas += [f"{pdf.stem}: {aviso}" for aviso in verificar_sanidade(
+            doc, texto, referencia=r.medida.palavras_referencia, paginas_imagem=imagens)]
+        r.problemas += _auditar_tabelas(pdf, texto, ctx.extrator)
+        anot = codificar(doc, texto, ctx.codebook)
+        if ctx.semantica:
+            from .semantico import backend_lmstudio, codificar_semantico
+            if ctx.cache_llm is None:
+                raise ValueError("a camada semântica precisa de uma pasta de cache (cache_llm)")
+            anotados = {a["no_id"] for a in anot["anotacoes"]}
+            sem = codificar_semantico(
+                doc, texto, ctx.codebook,
+                backend=lambda pr: backend_lmstudio(pr, modelo=ctx.modelo,
+                                                    base_url=ctx.base_url),
+                nos_ja_anotados=anotados, cache_dir=ctx.cache_llm,
+                max_lotes=ctx.max_lotes, max_chars=6000)
+            anot["anotacoes"].extend(sem["anotacoes"])
+            r.problemas += [f"{pdf.stem}: LLM {f}" for f in sem.get("falhas", [])]
+        validar_anotacoes({**anot, "anotacoes": [dict(a) for a in anot["anotacoes"]]})
+        novidades = None
+        if ctx.pasta_versoes and any(n.get("origem") == "consolidado" for n in doc["nos"]):
+            # a comparação diacrónica é um extra: uma falha aqui é um aviso,
+            # nunca a perda do documento já extraído e codificado
+            sem_pasta: list[str] = []
+            try:
+                novidades = _novidades_via_versoes(
+                    ctx.pasta_versoes, pdf, doc, texto, r.problemas, sem_pasta)
+            except Exception as e:
+                r.problemas.append(
+                    f"{pdf.stem}: [diacronia] comparação com as versões "
+                    f"anteriores falhou ({e}) — documento mantido, "
+                    "consolidado todo na faixa CONSOLIDADO")
+            r.sem_pasta = bool(sem_pasta)
+        r.item = (doc, texto, triar(anot, ctx.aptos, doc=doc, novidades=novidades))
+    except Exception as e:
+        r.erro = f"{type(e).__name__}: {e}"
+        r.problemas.append(f"{pdf.stem}: ERRO, documento fora do QDPX: {r.erro}")
+        # o diagnóstico tem de dizer que este documento não chegou ao QDPX
+        if r.medida is None:
+            r.medida = Medida(pdf.stem)
+        r.medida.excluido = r.erro
+        r.item = None
+    return r
+
+
 def main():
     inicio_utc = agora_utc()
     p = argparse.ArgumentParser()
@@ -251,143 +436,31 @@ def main():
         from .extractor_docling import extrair_pdf_docling
         extrair = extrair_pdf_docling
 
-    # o subtipo pode vir das variáveis MaxQDA ou, em sua falta, do registo
-    # BTE — é o que diz se um documento é uma retificação (AE-ALT-RECT),
-    # e isso desliga o controlo da nota de depósito. O tipo do registo
-    # (código IRCT) traduz-se no subtipo do schema; o que não encaixa
-    # fica "desconhecido" e o tipo original viaja no doc para a sanidade.
-    tipo_do_registo: dict[str, str] = {}
-    REGISTO_OMISSAO = Path(__file__).resolve().parent.parent / "data" / "registo" / "registo_bte.jsonl"
-    if REGISTO_OMISSAO.exists():
-        import json as _json
-        for _linha in REGISTO_OMISSAO.read_text(encoding="utf-8").splitlines():
-            if not _linha.strip():
-                continue
-            try:
-                _e = _json.loads(_linha)
-                _doc = (_e.get("nomeacao") or {}).get("doc_id")
-                if _doc and _e.get("tipo"):
-                    tipo_do_registo.setdefault(_doc, _e["tipo"])
-            except ValueError:
-                continue
-
-    def _subtipo_do(doc_id: str, das_variaveis: str | None) -> tuple[str, str]:
-        """Subtipo do schema; o tipo IRCT viaja no doc como 'tipo_registo'.
-
-        O tipo vem do registo da recolha e, sem ele, do próprio nome: os
-        esquemas RNC (ADR-0016 e ADR-0022) trazem-no. Sem isto, correr o
-        pipeline numa máquina sem o registo tratava uma retificação como
-        convenção e dava-a como truncada (ISSUE-0014).
-        """
-        tipo = tipo_do_registo.get(doc_id, "")
-        if not tipo:
-            meta = interpretar_nome_rnc(doc_id)
-            tipo = (meta or {}).get("tipo") or ""
-        if das_variaveis:
-            return das_variaveis, tipo
-        if RE_RETIFICACAO.search(tipo):
-            return "retificacao", tipo
-        return "desconhecido", tipo
+    contexto = Contexto(
+        extrair=extrair, extrator=args.extrator, codebook=codebook, aptos=aptos,
+        variaveis=variaveis, tipos_do_registo=carregar_tipos_do_registo(REGISTO_OMISSAO),
+        pasta_versoes=Path(args.pasta_versoes) if args.pasta_versoes else None,
+        semantica=args.semantica, modelo=args.modelo, base_url=args.base_url,
+        max_lotes=args.max_lotes, cache_llm=out / "cache_llm")
 
     itens, problemas = [], []
     medidas = []
     sem_pasta: list[str] = []
     for i, pdf in enumerate(pdfs, 1):
-        try:
-            v = None
-            if variaveis:
-                from .variaveis import procurar
-                v = procurar(variaveis, pdf.stem)
-            subtipo, tipo_registo = _subtipo_do(pdf.stem, (v or {}).get("subtipo"))
-            doc, texto = extrair(pdf, doc_id=pdf.stem, subtipo=subtipo)
-            doc["tipo_registo"] = tipo_registo  # fora do schema: meta para sanidade
-            # completude contra uma leitura independente do PDF: nunca
-            # rebenta, e o resultado vai para o diagnostico.md
-            medidas.append(medir_pdf(pdf.stem, pdf, texto))
-            validar_doc(doc)
-            try:
-                from .auditoria import paginas_com_imagem
-                imagens = paginas_com_imagem(pdf)
-            except Exception:           # o auditor nunca custa o documento
-                imagens = []
-            for aviso in verificar_sanidade(doc, texto,
-                                            referencia=medidas[-1].palavras_referencia,
-                                            paginas_imagem=imagens):
-                problemas.append(f"{pdf.stem}: {aviso}")
-            # auditoria cruzada de tabelas: o que um extrator vê e o outro
-            # não — a perda silenciosa que motivou o guardião (2026-09-17).
-            # O canário de anexos sem tabela já vem na sanidade.
-            # A auditoria é OPCIONAL e nunca pode custar o documento: com
-            # --extrator docling, o docling pode ter extraído bem um PDF
-            # que o auditor pdfplumber não consegue abrir — uma falha aqui
-            # é um aviso, não a exclusão do resultado válido do QDPX.
-            try:
-                from .auditoria import (contar_blocos_tabela,
-                                       contar_tabelas_pdfplumber, divergencias)
-                n_texto = contar_blocos_tabela(texto)
-                n_pp = contar_tabelas_pdfplumber(pdf)
-                for aviso in divergencias(n_pp, n_texto):
-                    problemas.append(f"{pdf.stem}: [auditoria] {aviso}")
-            except Exception as e:
-                problemas.append(
-                    f"{pdf.stem}: [auditoria] não foi possível verificar "
-                    f"as tabelas ({e}) — documento mantido")
-            # tabelas rodadas 90º (ISSUE-0020): o extrator lê hoje o texto
-            # rodado no sentido certo; o aviso só se dá quando o texto ainda
-            # traz palavras invertidas, sinal de uma rotação não reconhecida.
-            # Sem essa condição, dizia que estava errado o que já estava certo.
-            if args.extrator != "docling" and invertidas_pela_forma(texto):
-                try:
-                    from .auditoria import tabelas_rodadas_pdfplumber
-                    for aviso in tabelas_rodadas_pdfplumber(pdf):
-                        problemas.append(f"{pdf.stem}: [auditoria] {aviso}")
-                except Exception as e:
-                    problemas.append(
-                        f"{pdf.stem}: [auditoria] não foi possível verificar "
-                        f"tabelas rodadas ({e}) — documento mantido")
-            anot = codificar(doc, texto, codebook)
-            if args.semantica:
-                from .semantico import codificar_semantico, backend_lmstudio
-                anotados = {a["no_id"] for a in anot["anotacoes"]}
-                sem = codificar_semantico(
-                    doc, texto, codebook,
-                    backend=lambda pr: backend_lmstudio(pr, modelo=args.modelo,
-                                                        base_url=args.base_url),
-                    nos_ja_anotados=anotados,
-                    cache_dir=out / "cache_llm",
-                    max_lotes=args.max_lotes, max_chars=6000)
-                anot["anotacoes"].extend(sem["anotacoes"])
-                for f in sem.get("falhas", []):
-                    problemas.append(f"{pdf.stem}: LLM {f}")
-            validar_anotacoes({**anot, "anotacoes": [
-                {k: v for k, v in a.items()} for a in anot["anotacoes"]]})
-            novidades = None
-            if args.pasta_versoes and any(
-                    n.get("origem") == "consolidado" for n in doc["nos"]):
-                # a comparação diacrónica é um extra: uma falha aqui é um
-                # aviso, nunca a perda do documento já extraído e codificado
-                try:
-                    novidades = _novidades_via_versoes(
-                        Path(args.pasta_versoes), pdf, doc, texto, problemas, sem_pasta)
-                except Exception as e:
-                    problemas.append(
-                        f"{pdf.stem}: [diacronia] comparação com as versões "
-                        f"anteriores falhou ({e}) — documento mantido, "
-                        "consolidado todo na faixa CONSOLIDADO")
-            itens.append((doc, texto, triar(anot, aptos, doc=doc,
-                                            novidades=novidades)))
-            n_cl = sum(1 for n in doc["nos"] if n["tipo"] == "clausula")
-            print(f"[{i}/{len(pdfs)}] {pdf.stem}: {n_cl} cláusulas, "
-                  f"{len(anot['anotacoes'])} anotações")
-        except Exception as e:
-            erro = f"{type(e).__name__}: {e}"
-            problemas.append(f"{pdf.stem}: ERRO, documento fora do QDPX: {erro}")
-            # o diagnóstico tem de dizer que este documento não chegou ao QDPX
-            if medidas and medidas[-1].documento == pdf.stem:
-                medidas[-1].excluido = erro
-            else:
-                medidas.append(Medida(pdf.stem, excluido=erro))
-            print(f"[{i}/{len(pdfs)}] {pdf.stem}: ERRO {e}")
+        r = processar_documento(pdf, contexto)
+        problemas.extend(r.problemas)
+        if r.medida is not None:
+            medidas.append(r.medida)
+        if r.sem_pasta:
+            sem_pasta.append(pdf.stem)
+        if r.item is None:
+            print(f"[{i}/{len(pdfs)}] {pdf.stem}: ERRO {r.erro}")
+            continue
+        itens.append(r.item)
+        doc, _texto, anot = r.item
+        n_cl = sum(1 for n in doc["nos"] if n["tipo"] == "clausula")
+        print(f"[{i}/{len(pdfs)}] {pdf.stem}: {n_cl} cláusulas, "
+              f"{len(anot['anotacoes'])} anotações")
 
     if sem_pasta:
         problemas.append(aviso_sem_pasta(Path(args.pasta_versoes), sem_pasta))

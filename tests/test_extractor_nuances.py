@@ -399,3 +399,47 @@ def test_texto_omitido_colado_ao_titulo_e_corpo():
                             "Cláusula 38.ª - Outra\nTexto.\n", "t")
     nos = {n["rotulo"]: final[n["char_start"]:n["char_end"]] for n in doc["nos"]}
     assert nos["Cláusula 37.ª - Cláusula transitória (Anterior cláusula 35.ª)"].endswith("\n(...)\n")
+
+
+# ---------- #29: títulos e preâmbulos partidos no cabeçalho ----------
+
+CABECALHO = "PRIVADO\nREGULAMENTAÇÃO DO TRABALHO\nCONVENÇÕES COLETIVAS\n"
+
+
+def test_titulo_partido_antes_do_travessao_da_sigla_junta_se():
+    """AARibatejo, AGERE, APICER, CTT Expresso de 2025: o título parte-se
+    antes do travessão que liga a sigla ao nome («… e Afins» / «- SETAAB -
+    Revisão global»), e o travessão no início da linha mantinha a quebra."""
+    texto = juntar_linhas(CABECALHO + "Contrato coletivo entre a AARibatejo e o Sindicato "
+                          "Nacional dos Trabalhadores da Agricultura, Bebidas e Afins\n"
+                          "- SETAAB - Revisão global\nCláusula 1.ª - Âmbito\n")
+    assert ("Bebidas e Afins - SETAAB - Revisão global\nCláusula 1.ª" in texto), texto
+
+
+def test_subtipo_alteracao_salarial_e_outra_fecha_o_titulo():
+    """AHP, UMP e CTT Expresso de 2025: «- Alteração salarial e outra», no
+    singular, não fechava o título, que se colava ao preâmbulo."""
+    texto = juntar_linhas(CABECALHO + "Contrato coletivo entre a AHP e o SITESE - "
+                          "Alteração salarial e outra\nA Associação da Hotelaria e o "
+                          "Sindicato acordam a revisão parcial.\n")
+    assert "Alteração salarial e outra\nA Associação" in texto, texto
+
+
+def test_lista_com_travessoes_nao_se_junta():
+    """A regra do travessão vale só no cabeçalho, depois de uma linha sem
+    pontuação que não é ela própria um item: as listas ficam como estão."""
+    texto = juntar_linhas("Cláusula 5.ª - Direitos\nOs trabalhadores têm direito a:\n"
+                          "- Férias\n- Subsídio de Natal\n")
+    assert "a:\n- Férias\n- Subsídio de Natal" in texto
+
+
+def test_subtipo_alteracao_sozinho_e_capitulo_so_com_o_numero():
+    """CARRIS, APDL, EMAS Beja e VIMAGUA de 2025 fecham o título em «-
+    Alteração», sem mais; e o ULSAS numera o capítulo só com «I», sem a
+    palavra CAPÍTULO. Os dois colavam o título ao que vinha a seguir."""
+    texto = juntar_linhas(CABECALHO + "Acordo coletivo entre a APDL e a FECTRANS - Alteração\n"
+                          "A presente revisão altera a convenção publicada.\n")
+    assert "FECTRANS - Alteração\nA presente revisão" in texto, texto
+    texto = juntar_linhas(CABECALHO + "Acordo de empresa entre a ULS e o Sindicato - STMO\n"
+                          "I\nÁrea, âmbito, vigência, denúncia e revisão\n")
+    assert "- STMO\nI" in texto, texto
