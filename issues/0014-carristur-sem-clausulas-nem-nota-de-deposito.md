@@ -1,6 +1,6 @@
 # ISSUE-0014: quatro documentos CARRISTUR produzem zero cláusulas
 
-- **Estado:** Resolvida no código — 2026-09-23; falta confirmar na próxima corrida sobre o BTE 31/2026
+- **Estado:** Resolvida — 2026-09-26; confirmada nos PDF reais do corpus de regressão
 - **Data:** 2026-09-17
 - **GitHub:** #64 (sub-issue de #24)
 - **Onde dói:** extração e validação (`cct/extractor*.py`, deteção da nota de depósito)
@@ -107,3 +107,10 @@ nem do registo. Teste com esse nome em `tests/test_sanidade.py`, que falha sem a
 a deteção pelo título no texto extraído. O sintoma de `Artigo 1.º: corpo sem frase
 terminada em ponto` (26_PR_008 e 26_PR_009) não é tratado aqui e continua registado nas
 notas acima.
+
+## Confirmação (2026-09-26)
+
+Os quatro PDF (387 a 390 do BTE 31/2026) estão no corpus de regressão, medido no CI. São
+retificações (hipótese 1): título «… - Retificação», zero cláusulas, cobertura de 100%, e a
+sanidade diz «retificação sem articulado próprio: zero cláusulas é o esperado», sem sugerir
+truncagem.

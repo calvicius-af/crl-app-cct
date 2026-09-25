@@ -1,6 +1,6 @@
 # ISSUE-0024: tabelas salariais colapsadas no TXT do BTE 31/2026
 
-- **Estado:** Resolvida no código (2026-09-25) — falta a importação no MaxQDA
+- **Estado:** Resolvida — 2026-09-26
 - **Data:** 2026-09-23
 - **GitHub:** [#84](https://github.com/calvicius-af/crl-app-cct/issues/84)
 - **Onde dói:** `cct/extractor.py`, `cct/extractor_docling.py`, `cct/auditoria.py`
@@ -37,3 +37,10 @@ saía entrelaçada (INOVA, «1.080400,,0000 €€»); tabelas dentro de outras 
 vezes (EPAL, 695 palavras a mais); camadas de texto recortadas ou fora da página
 misturavam-se com o visível (MaiaAmbiente, GESAMB). Registo:
 [avisos-2025-2026-09-25.md](../docs/validacao/avisos-2025-2026-09-25.md).
+
+**Confirmação de 26-09-2026:** as grelhas largas do 384/385 saem inteiras, com as cinco
+colunas (o corte em duas colunas das pp. 4–5 já não acontece). Os offsets do QDPX passam a
+ser verificados no próprio QDPX, relido do zip como o MaxQDA o lê, com uma seleção por nó,
+antes, dentro e depois das tabelas (`cct.qdpx.verificar_offsets`): 0 falhas nos 14 PDF do
+corpus (1776 nós) e nos 277 de 2025 (84 844 nós). A métrica `offsets_qdpx` entra no corpus
+de regressão, e o CI falha se uma seleção deixar de bater.

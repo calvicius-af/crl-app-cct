@@ -110,13 +110,22 @@ RE_NUMERO_SEM_SEPARADOR = re.compile(r"(?m)^(\d+(?:\.\d+)?)(?=[A-ZÀ-Ú])")
 # subtipo oficial, e o que vier a seguir já é o corpo do documento
 RE_FIM_TITULO_CONVENCAO = re.compile(
     r"(?:revis[ãa]o\s+(?:global|parcial)"
-    r"|altera[çc][ãa]o\s+salarial(?:\s+e\s+outras)?"
+    r"|altera[çc][ãa]o\s+salarial(?:\s+e\s+outras?)?"
+    # «- Alteração» sozinho (CARRIS, APDL, EMAS Beja, VIMAGUA de 2025), só
+    # com o travessão antes: uma frase que acabe em «alteração» não conta
+    r"|[-–—]\s*altera[çc][ãa]o"
     r"|(?:e\s+)?texto\s+consolidado"
     r"|acordo\s+de\s+ades[ãa]o"
     r"|1\.?[ªa]\s+conven[çc][ãa]o)\s*$", re.IGNORECASE)
 # o bloco de título vive no cabeçalho do documento; a regra acima só lá
 # se aplica, para não partir frases do corpo que acabem nas mesmas palavras
 LINHAS_DO_CABECALHO = 20
+RE_TRAVESSAO_INICIAL = re.compile(r"^\s*[-–—]\s*\S")
+# uma linha só com um numeral romano é o número de um capítulo sem a palavra
+# CAPÍTULO («… - STMO» / «I» / «Área, âmbito, vigência…», ULSAS de 2025): não se
+# cola à linha anterior
+RE_SO_ROMANO = re.compile(r"^\s*[IVXLC]{1,5}\s*$")
+RE_PONTUACAO_FINAL = re.compile(r"[.:;,!?][)\]»”\"']*\s*$")
 # continuação de enumeração de alíneas partida pelo PDF: "b) e c) do número…"
 # (minúscula ou conjunção após o parêntesis — uma alínea real começa por maiúscula)
 RE_ALINEA_CONTINUACAO = re.compile(r"^[a-z]\)\s+(?:e\b|ou\b|[a-zà-ú])")
@@ -193,12 +202,25 @@ def juntar_linhas(texto: str) -> str:
         # título, o que vier a seguir é o preâmbulo (memo 21/23)
         fim_do_titulo = (len(resultado) <= LINHAS_DO_CABECALHO
                          and RE_FIM_TITULO_CONVENCAO.search(anterior))
+        # #29: no cabeçalho do documento, o título e o preâmbulo partem-se
+        # antes do travessão que liga a sigla ao nome («… Afins» / «- SETAAB -
+        # Revisão global», «… e o SINDETELCO» / «- Sindicato Democrático…»).
+        # O travessão aí não abre um item de lista: a linha anterior não acaba
+        # em pontuação nem é ela própria um item. No corpo, as listas com
+        # travessão ficam como estão.
+        continuacao_titulo = (len(resultado) <= LINHAS_DO_CABECALHO
+                              and RE_TRAVESSAO_INICIAL.match(atual)
+                              and not RE_PONTUACAO_FINAL.search(anterior)
+                              and not RE_MARCADOR_LISTA.match(anterior)
+                              and not _e_cabecalho(anterior))
         manter = (
             not atual
             or RE_PONTUACAO_FORTE.search(anterior)
             or _e_cabecalho(anterior)
             or _e_cabecalho(atual)
-            or (RE_MARCADOR.match(atual) and not continuacao_alinea)
+            or RE_SO_ROMANO.match(atual)
+            or (RE_MARCADOR.match(atual) and not continuacao_alinea
+                and not continuacao_titulo)
             or anterior.isupper()
             or fim_do_titulo
             or (len(resultado) - 1) in protegidas
@@ -1023,6 +1045,20 @@ def _grelha_atravessa(pag, meio: float) -> bool:
     return cruzam >= 2
 
 
+# Heurística das duas colunas (#27), sobre as palavras da página:
+# abaixo de 40 palavras (uma página de assinaturas, um anexo curto) não há
+# texto que chegue para decidir, e a página lê-se inteira
+MIN_PALAVRAS_COLUNAS = 40
+# a goteira: 5 pt para cada lado do meio da página
+GOTEIRA_PT = 5
+# numa página em colunas, quase nenhuma palavra atravessa a goteira; os
+# títulos centrados atravessam, e são poucos: acima de 2%, é coluna única
+MAX_ATRAVESSAM_GOTEIRA = 0.02
+# e cada metade tem pelo menos um quarto das palavras: uma tabela encostada à
+# esquerda, com a direita vazia, não é uma página em colunas
+MIN_PALAVRAS_POR_COLUNA = 0.25
+
+
 def _duas_colunas(pag) -> float | None:
     """Devolve o x da goteira se a página estiver em duas colunas (BTE antigo).
 
@@ -1030,15 +1066,17 @@ def _duas_colunas(pag) -> float | None:
     metades têm texto substancial e nenhuma grelha de tabela cruza o meio.
     """
     palavras = pag.extract_words()
-    if len(palavras) < 40:
+    if len(palavras) < MIN_PALAVRAS_COLUNAS:
         return None
     meio = (pag.bbox[0] + pag.bbox[2]) / 2
-    atravessam = sum(1 for w in palavras if w["x0"] < meio - 5 < meio + 5 < w["x1"])
+    atravessam = sum(1 for w in palavras
+                     if w["x0"] < meio - GOTEIRA_PT < meio + GOTEIRA_PT < w["x1"])
     esquerda = sum(1 for w in palavras if w["x1"] <= meio)
     direita = sum(1 for w in palavras if w["x0"] >= meio)
     total = len(palavras)
-    if (atravessam / total < 0.02
-            and esquerda / total > 0.25 and direita / total > 0.25
+    if (atravessam / total < MAX_ATRAVESSAM_GOTEIRA
+            and esquerda / total > MIN_PALAVRAS_POR_COLUNA
+            and direita / total > MIN_PALAVRAS_POR_COLUNA
             and not _grelha_atravessa(pag, meio)
             and not _tabela_atravessa(pag, meio)):
         return meio

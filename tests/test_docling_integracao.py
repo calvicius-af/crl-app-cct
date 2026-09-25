@@ -105,3 +105,12 @@ def test_alinea_fundida_ao_paragrafo_anterior_recupera_quebra():
     assert documento_para_texto(_documento([item])) == (
         "Tem havido um trabalho de extremo relevo na empresa;\n"
         "n) O presente acordo cumpre as regras de igualdade de género.\n")
+
+
+def test_tipos_reais_satisfazem_os_protocolos_do_extrator():
+    """#27: os Protocol de cct/extractor_docling.py descrevem o que o código
+    lê do docling; os tipos reais têm de os satisfazer."""
+    from cct.extractor_docling import CaixaDocling, CelulaDocling
+    assert isinstance(_celula("A", 0, 1, 0, 1), CelulaDocling)
+    caixa = BoundingBox(l=10, t=700, r=200, b=680, coord_origin=CoordOrigin.BOTTOMLEFT)
+    assert isinstance(caixa, CaixaDocling)

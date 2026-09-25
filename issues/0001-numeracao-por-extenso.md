@@ -1,6 +1,6 @@
 # ISSUE-0001: normalizar cláusulas com numeração por extenso
 
-- **Estado:** Em curso — normalização implementada a 2026-09-23 (`cct/numeracao.py`); falta o gate com uma convenção real
+- **Estado:** Resolvida — 2026-09-26; gate com a convenção real LPFP/SJPF (BTE 29/2025)
 - **Data:** 2026-07-07
 - **GitHub:** #28 (sub-issue de #24)
 - **Onde dói:** `cct/diacronia.py` e representação canónica do número
@@ -77,3 +77,11 @@ anterior.
 segunda», normalizadas para `cl1` e `cl2`. Não há versão anterior local desta convenção,
 pelo que o emparelhamento diacrónico com dados reais continua por testar. Falta: uma
 versão anterior da LPFP/SJPF, ou outro par real, para fechar o critério do #28.
+
+## Resolução (2026-09-26)
+
+Gate com uma convenção real: a alteração LPFP/SJPF do BTE 29/2025 numera as cláusulas por
+extenso e sem título («Cláusula primeira», «Cláusula segunda»). Com o texto como o extrator
+o dá, as chaves são `cl1` e `cl2`, e emparelham com as mesmas cláusulas em algarismos
+(`test_gate_convencao_real_lpfp_2025`). Nos 277 documentos de 2025 há 49 cabeçalhos sem
+algarismos (extenso, «única», «prévia», romanos por capítulo, «de revisão»): todos têm chave.

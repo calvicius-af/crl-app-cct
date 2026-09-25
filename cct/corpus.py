@@ -32,6 +32,7 @@ from pathlib import Path
 
 from .completude import Medida, diagnostico, medir_pdf
 from .numeracao import chave_numero
+from .qdpx import verificar_offsets
 
 RAIZ = Path(__file__).resolve().parent.parent
 MANIFESTO = RAIZ / "tests" / "corpus" / "manifesto.json"
@@ -51,6 +52,8 @@ METRICAS = {
     "linhas_longas": ("-", 0),
     "saltos_numeracao": ("-", 0),
     "avisos_sanidade": ("-", 0),
+    # seleções do QDPX que não recortam o texto do nó (issue #84)
+    "offsets_qdpx": ("-", 0),
     "clausulas": ("=", 0),
     "anexos": ("=", 0),
     "linhas_tabela": ("=", 0),
@@ -166,6 +169,7 @@ def metricas(doc: dict, texto: str, m: Medida, avisos: list[str]) -> dict:
         "linhas_longas": len(m.linhas_longas),
         "saltos_numeracao": saltos,
         "avisos_sanidade": len(avisos),
+        "offsets_qdpx": len(verificar_offsets(doc, texto)),
         "clausulas": len(clausulas),
         "anexos": sum(1 for n in doc["nos"] if n["tipo"] == "anexo"),
         "linhas_tabela": sum(1 for l in texto.split("\n") if " | " in l),

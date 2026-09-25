@@ -130,3 +130,23 @@ def test_designador_logo_a_seguir_ao_numero_e_o_titulo():
                         "parcialmente o anteriormente acordado pelas partes.\n", "x")
     assert [n["rotulo"] for n in doc["nos"] if n["tipo"] == "artigo"] == [
         "Artigo 1.º - Artigo de revisão"]
+
+
+def test_gate_convencao_real_lpfp_2025():
+    """Gate do #28 com uma convenção real: a alteração LPFP/SJPF (BTE 29/2025)
+    numera as cláusulas por extenso, sem título («Cláusula primeira»,
+    «Cláusula segunda»). Com o texto como o extrator o dá, cada uma tem a chave
+    do número e emparelha com a mesma cláusula escrita em algarismos."""
+    lpfp = ("Cláusula primeira\nPelo presente instrumento, no que diz respeito ao "
+            "regime contributivo transitório, as partes acordam alterar o teor do "
+            "artigo 32.º-A, que passará a ter a seguinte redação:\n"
+            "Cláusula segunda\nA presente alteração entra em vigor no dia seguinte "
+            "ao da sua publicação no Boletim do Trabalho e Emprego.\n")
+    doc, _ = estruturar(lpfp, "25_PR_194_BTE_29_LPFP_SJPfutebol")
+    assert [chave_numero(n["rotulo"]) for n in doc["nos"] if n["tipo"] == "clausula"] \
+        == ["cl1", "cl2"]
+    algarismos = lpfp.replace("Cláusula primeira", "Cláusula 1.ª").replace(
+        "Cláusula segunda", "Cláusula 2.ª")
+    pares = _comparar(lpfp, algarismos)
+    assert [(c["rotulo_antigo"], c["rotulo_novo"]) for c in pares] == [
+        ("Cláusula primeira", "Cláusula 1.ª"), ("Cláusula segunda", "Cláusula 2.ª")]

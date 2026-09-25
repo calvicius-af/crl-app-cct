@@ -75,16 +75,17 @@ Novas sub-issues:
 | #8 matriz Python e avisos | fechada no GitHub (2026-09-24) | — |
 | #25 isolar e limitar o Docling | aberta | não tratado nesta ronda |
 | #26 desempenho dos extratores | aberta | precisa de um corpus autorizado de PDF para medir |
-| #27 gates estáticos | em curso | feito: Ruff, mypy no pacote `cct`, `git diff --check`; falta: tipos para os objetos do Docling, heurísticas de colunas nomeadas, testes de propriedades dos offsets, cobertura mínima |
-| #28 numeração por extenso | resolvida no código | normalização confirmada num PDF real (LPFP/SJPF, BTE 29/2025); falta um par de versões reais para o emparelhamento (ISSUE-0001) |
-| #29 títulos multilinha | aberta | confirmado na revisão do PR #88: o título inicial da TINITA continua dividido; precisa dos casos reais como fixtures |
+| #27 gates estáticos | resolvida (2026-09-26) | Ruff, mypy, `git diff --check`; `Protocol` para os objetos do Docling, confirmados com os tipos reais; heurísticas de colunas nomeadas, com testes de fronteira; testes de propriedades (`tests/test_propriedades.py`). Não se adotam, com fundamento no issue: cobertura mínima em percentagem e formatação automática |
+| #28 numeração por extenso | resolvida (2026-09-26) | gate com a convenção real LPFP/SJPF (BTE 29/2025); os 49 cabeçalhos sem algarismos de 2025 têm chave (ISSUE-0001) |
+| #29 títulos multilinha | resolvida (2026-09-26) | nos 277 títulos de 2025: um só título partido em duas linhas passou a zero; regras do travessão no cabeçalho, do subtipo «Alteração» e do capítulo só com o número (ISSUE-0002) |
 | #30 cadeia de fornecimento | fechada no GitHub | — |
 | #31 validação no MaxQDA | aberta | validação humana no MaxQDA |
 | #56 acesso à partilha do pacote | aberta | configuração pelo Instituto de Informática, fora do repositório |
 | #58 gate de instalação Windows | resolvida no código | ISSUE-0009 a 0013 verificadas; falta repetir o gate numa estação do CRL (ISSUE-0009) |
 | #45 Tkinter fora da thread principal | resolvida no código (2026-09-24) | a thread de trabalho só escreve na fila; confirmar na estação que a app termina as corridas sem erros |
 | #47 linhas repetidas removidas | resolvida no código (2026-09-24) | a remoção olha só para o topo e o fundo de cada página ou coluna; confirmar comparando o TXT de uma corrida real antes e depois |
-| #64 CARRISTUR sem cláusulas | resolvida no código | confirmado na corrida real com nomes RNC; falta repetir com os nomes de 2025, agora cobertos pelo título (ISSUE-0014) |
+| #64 CARRISTUR sem cláusulas | resolvida (2026-09-26) | os quatro PDF estão no corpus de regressão e dizem «retificação sem articulado próprio» (ISSUE-0014) |
+| #49 processamento de um documento | resolvida (2026-09-26) | `processar_documento` e `ResultadoDocumento` em `cct/pipeline_tema.py`, com a política de continuação num só sítio; artefactos iguais nos 14 PDF do corpus |
 
 «Resolvida no código» quer dizer que o defeito está corrigido e coberto por testes, mas
 que o issue tem um critério que só se confirma com pessoas, dados reais ou configuração
