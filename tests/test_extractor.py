@@ -570,3 +570,16 @@ def test_titulos_lado_a_lado_nao_atravessam_a_goteira(tmp_path):
     _doc, texto = extrair_pdf(escrever_pdf(tmp_path / "x.pdf", [linhas]))
     assert "ANEXO VI - Esquerda\n" in texto
     assert texto.index("esquerda número 11") < texto.index("ANEXO VI - Direita")
+
+
+def test_frase_na_linha_seguinte_nao_e_titulo():
+    """ADIPA, Caravela e RTP de 2025: «Artigo 7.º» numa linha e a frase na
+    seguinte. A frase virava o título e o artigo ficava «sem conteúdo»."""
+    texto = "\n".join([
+        "Artigo 7.º", "Serão ainda sujeitos ao teste todos os trabalhadores que o solicitem.",
+        "Artigo 8.º", "Âmbito",
+        "O presente regulamento aplica-se a todos os trabalhadores."])
+    doc, final = estruturar(texto, "teste")
+    assert _rotulos(texto) == ["Artigo 7.º", "Artigo 8.º - Âmbito"]
+    from cct.sanidade import clausulas_sem_corpo
+    assert clausulas_sem_corpo(doc, final) == []

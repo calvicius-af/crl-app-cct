@@ -202,7 +202,18 @@ def _titulo_candidato(linha: str) -> bool:
     return (0 < len(linha) <= 90
             and not _e_cabecalho(linha)
             and not RE_MARCADOR_LISTA.match(linha)
-            and not RE_DATA_OUTORGA.match(linha))
+            and not RE_DATA_OUTORGA.match(linha)
+            and not _e_frase(linha))
+
+
+def _e_frase(linha: str) -> bool:
+    """Uma frase acabada, longa de mais para título: é o corpo.
+
+    «Artigo 7.º» numa linha e «Serão ainda sujeitos ao teste todos os
+    trabalhadores que o solicitem.» na seguinte: a frase virava o título e o
+    artigo ficava sem conteúdo (ADIPA, Caravela, RTP, corrida de 2025).
+    """
+    return bool(RE_FRASE_ACABADA.search(linha)) and len(linha.split()) >= MIN_PALAVRAS_FRASE
 
 
 def _normalizar_rotulo(tipo: str, m: re.Match, titulo_extra: str | None) -> str:
@@ -254,9 +265,8 @@ def _nao_e_cabecalho(tipo: str, linha: str, resto: str, na_tabela: bool) -> bool
 def _e_corpo(resto: str) -> bool:
     """O resto da linha do cabeçalho é corpo, e não o título."""
     resto = resto.strip(" -–—:")
-    return bool(RE_REVOGADA.match(resto)
-                or (RE_FRASE_ACABADA.search(resto)
-                    and (len(resto) > MAX_TITULO or len(resto.split()) >= MIN_PALAVRAS_FRASE)))
+    return bool(RE_REVOGADA.match(resto) or _e_frase(resto)
+                or (len(resto) > MAX_TITULO and RE_FRASE_ACABADA.search(resto)))
 
 
 def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[dict, str]:
