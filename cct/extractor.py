@@ -1410,8 +1410,12 @@ def extrair_pdf(pdf_path: Path, paginas: tuple[int, int] | None = None,
 
     from .recorte import letras_escondidas, tirar_escondidas
 
+    from .limites import verificar_pdf
+
     pdf_path = Path(pdf_path)
     textos = []
+    # corrompido, protegido ou excessivo: falha já, com o que fazer (#25)
+    verificar_pdf(pdf_path)
     documento = pdfium.PdfDocument(str(pdf_path))
     try:
         with pdfplumber.open(pdf_path) as pdf:

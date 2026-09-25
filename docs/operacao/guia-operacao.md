@@ -215,6 +215,33 @@ lento (1,7 s/página a quente e cerca de 4 GB de memória, medidos no corpus) e 
 `python3 -c "import platform; print(platform.machine())"` deve dizer
 `arm64`). A primeira corrida descarrega os modelos de layout.
 
+### Docling sem rede: modelos na partilha
+
+Os modelos do docling descarregam-se uma vez, numa máquina com internet, e verificam-se
+pelo SHA-256 antes de cada uso. Depois, a extração corre sem rede e sem nenhum serviço
+remoto: o conteúdo dos documentos nunca sai da máquina.
+
+```
+# numa máquina com internet
+.venv/bin/python -m cct.modelos_docling descarregar --destino modelos_docling
+# copiar a pasta modelos_docling para a partilha; na estação:
+.venv/bin/python -m cct.modelos_docling verificar --pasta L:/partilha/modelos_docling
+CCT_DOCLING_MODELOS=L:/partilha/modelos_docling .venv/bin/python -m cct.pipeline_tema --extrator docling ...
+```
+
+Em Windows (PowerShell), a variável define-se antes do comando:
+`$env:CCT_DOCLING_MODELOS = "L:\partilha\modelos_docling"`.
+
+Com a pasta dos modelos, o OCR fica desligado (os PDF do BTE têm texto). Para o ligar,
+`CCT_DOCLING_OCR=1`, com os modelos do OCR completos na pasta.
+
+**Limites.** Antes de extrair, o PDF é aberto com o PDFium. Um PDF corrompido, protegido
+por palavra-passe, com mais de 500 páginas (`CCT_MAX_PAGINAS`) ou mais de 100 MB
+(`CCT_MAX_MB`) é recusado com uma mensagem que diz o que fazer, e a corrida continua com
+os outros documentos. No docling, cada documento tem um tempo máximo de 900 s
+(`CCT_DOCLING_TEMPO_MAX_S`). Uma conversão que não acabe é um erro, e não um texto com
+buracos. Registo: [docling-isolado-2026-09-26.md](../validacao/docling-isolado-2026-09-26.md).
+
 ### Medir o desempenho dos extratores
 
 ```
