@@ -6,10 +6,13 @@ ordem de leitura, o mobiliário, a remoção de linhas) só aparecia na estaçã
 Estes PDF são pequenos, mas passam pelo pdfplumber e pelo PDFium como um PDF
 real: cada linha tem uma posição na página.
 
-Só usa a fonte Helvetica com a codificação WinAnsi, que cobre os acentos do
+Usa a fonte Helvetica (e a Times, numa linha com o modo `"times"`) com a
+codificação WinAnsi, que cobre os acentos do
 português. Uma linha com um quarto elemento `"rodado"` (ou `"rodado_horario"`)
 é escrita a 90º, como as escalas laterais do TINITA e as tabelas dos
-CARRISTUR, numa página que não declara rotação; `"virado"` escreve-a a 180º,
+CARRISTUR, numa página que não declara rotação; `"quase_rodado"` também, mas
+com a matriz desviada uns centésimos, como metade das páginas do TINITA de
+2025; `"virado"` escreve-a a 180º,
 como os esquemas das carreiras do CARRIS de 2025; `grelha()` desenha os traços
 de uma tabela.
 """
@@ -25,35 +28,59 @@ def _escapar(texto: str) -> bytes:
 
 
 def _conteudo(linhas: list[tuple]) -> bytes:
-    """Texto e traços. Um item ("traco", x0, y0, x1, y1) desenha uma linha."""
+    """Texto e traços. Um item ("traco", x0, y0, x1, y1) desenha uma linha;
+    ("imagem", x, y, largura, altura), uma imagem cinzenta (uma tabela
+    publicada como imagem, como as do INCM de 2025); ("recortado", x, y,
+    texto, (x0, y0, x1, y1)), texto com uma área de recorte que não o
+    contém, e que por isso não se vê (GESAMB de 2025)."""
     tracos = [b"0.5 w"]
     partes = [b"BT /F1 10 Tf"]
+    blocos = []
     for item in linhas:
+        if item[0] == "recortado":
+            _, x, y, texto, (x0, y0, x1, y1) = item
+            blocos.append(b"q %.1f %.1f %.1f %.1f re W n BT /F1 10 Tf 1 0 0 1 %.1f %.1f Tm ("
+                          % (x0, y0, x1 - x0, y1 - y0, x, y) + _escapar(texto) + b") Tj ET Q")
+            continue
+        if item[0] == "imagem":
+            _, x, y, w, h = item
+            tracos.append(b"q %.1f 0 0 %.1f %.1f %.1f cm BI /W 1 /H 1 /CS /G /BPC 8 ID \x80 EI Q"
+                          % (w, h, x, y))
+            continue
         if item[0] == "traco":
             _, x0, y0, x1, y1 = item
-            tracos.append(b"%.1f %.1f m %.1f %.1f l S" % (x0, y0, x1, y1))
+            tracos.append(b"%.2f %.2f m %.2f %.2f l S" % (x0, y0, x1, y1))
             continue
         x, y, texto, *modo = item
+        if modo and modo[0] == "times":
+            partes.append(b"/F2 10 Tf 1 0 0 1 %.1f %.1f Tm (" % (x, y) + _escapar(texto)
+                          + b") Tj /F1 10 Tf")
+            continue
         matriz = {"rodado": b"0 1 -1 0", "rodado_horario": b"0 -1 1 0",
-                  "virado": b"-1 0 0 -1"}.get(
+                  "quase_rodado": b"0.001 1 -1 0.001", "virado": b"-1 0 0 -1"}.get(
             modo[0] if modo else "", b"1 0 0 1")
         partes.append(matriz + b" %.1f %.1f Tm (" % (x, y) + _escapar(texto) + b") Tj")
     partes.append(b"ET")
-    return b"\n".join(tracos + partes)
+    return b"\n".join(tracos + partes + blocos)
 
 
-def grelha(x0: float, y0: float, larguras: list[float], alturas: list[float]) -> list[tuple]:
-    """Traços de uma grelha com o canto inferior esquerdo em (x0, y0)."""
+def grelha(x0: float, y0: float, larguras: list[float], alturas: list[float],
+           desvio: float = 0.0) -> list[tuple]:
+    """Traços de uma grelha com o canto inferior esquerdo em (x0, y0).
+
+    Com `desvio`, cada traço fica torto por essa distância de uma ponta à
+    outra, como os da grelha de uma página quase rodada (TINITA de 2025).
+    """
     x1, y1 = x0 + sum(larguras), y0 + sum(alturas)
     tracos = []
     y = y0
     for h in [0.0, *alturas]:
         y += h
-        tracos.append(("traco", x0, y, x1, y))
+        tracos.append(("traco", x0, y, x1, y + desvio))
     x = x0
     for w in [0.0, *larguras]:
         x += w
-        tracos.append(("traco", x, y0, x, y1))
+        tracos.append(("traco", x, y0, x + desvio, y1))
     return tracos
 
 
@@ -67,6 +94,8 @@ def escrever_pdf(destino: Path, paginas: list[list[tuple]]) -> Path:
 
     catalogo = novo(b"")                     # preenchidos no fim
     arvore = novo(b"")
+    times = novo(b"<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman "
+                 b"/Encoding /WinAnsiEncoding >>")
     fonte = novo(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
                  b"/Encoding /WinAnsiEncoding >>")
     folhas = []
@@ -76,8 +105,8 @@ def escrever_pdf(destino: Path, paginas: list[list[tuple]]) -> Path:
                      + b"\nendstream")
         folhas.append(novo(
             b"<< /Type /Page /Parent %d 0 R /MediaBox [0 0 %d %d] "
-            b"/Resources << /Font << /F1 %d 0 R >> >> /Contents %d 0 R >>"
-            % (arvore, LARGURA, ALTURA, fonte, fluxo)))
+            b"/Resources << /Font << /F1 %d 0 R /F2 %d 0 R >> >> /Contents %d 0 R >>"
+            % (arvore, LARGURA, ALTURA, fonte, times, fluxo)))
     objetos[catalogo - 1] = b"<< /Type /Catalog /Pages %d 0 R >>" % arvore
     objetos[arvore - 1] = (b"<< /Type /Pages /Kids [%s] /Count %d >>"
                            % (b" ".join(b"%d 0 R" % f for f in folhas), len(folhas)))

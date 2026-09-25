@@ -294,3 +294,98 @@ def test_declaracao_continua_a_juntar_o_que_vem_a_seguir():
     texto = "Declaração A FESAHT representa também os seguintes\nsindicatos:\n"
     assert juntar_linhas(texto) == \
         "Declaração A FESAHT representa também os seguintes sindicatos:\n"
+
+
+# ---------- corrida de 2025: corpo, título e assinaturas ----------
+
+def test_prosa_com_pelo_e_dois_pontos_nao_e_assinatura():
+    """LPFP de 2025: «Pelo presente instrumento, […] passará a ter a seguinte
+    redação:» abria o bloco das assinaturas e a cláusula ficava vazia."""
+    texto = ("Cláusula primeira\nPelo presente instrumento, no que diz respeito ao "
+             "regime contributivo transitório, as partes acordam alterar o teor do "
+             "artigo 32.º-A, que passará a ter a seguinte redação:\n"
+             "Artigo 32.º-A - Disposição transitória\n1- O jogador tem direito.\n"
+             "Lisboa, 3 de julho de 2025.\nPela Liga Portuguesa de Futebol Profissional:\n"
+             "Fulano de Tal, presidente.\nPelos outorgantes:\nBeltrano.\n")
+    doc, final = estruturar(texto, "t")
+    rotulos = [n["rotulo"] for n in doc["nos"]]
+    assert rotulos.count("ASSINATURAS") == 1, rotulos
+    primeira = next(n for n in doc["nos"] if n["rotulo"] == "Cláusula primeira")
+    assert "Pelo presente instrumento" in final[primeira["char_start"]:primeira["char_end"]]
+    assimaturas = next(n for n in doc["nos"] if n["rotulo"] == "ASSINATURAS")
+    assert "Pelos outorgantes:" in final[assimaturas["char_start"]:assimaturas["char_end"]]
+
+
+def test_seccao_em_minusculas_nao_e_cabecalho():
+    """FNOP de 2025: «… subsecção XI da» e, na linha seguinte, «secção II do
+    capítulo II do Código do Trabalho.» abria uma secção falsa."""
+    doc, final = estruturar(
+        "Cláusula 51.ª - Faltas\nEm matéria de faltas aplica-se o previsto na "
+        "legislação, designadamente, o previsto na subsecção XI da\nsecção II "
+        "do capítulo II do Código do Trabalho.\n", "t")
+    assert not [n for n in doc["nos"] if n["tipo"] == "seccao"]
+    assert "subsecção XI da secção II do capítulo II" in final
+
+
+def test_revogado_e_texto_omitido_sao_corpo_e_nao_titulo():
+    """LPFP e APDL de 2025: «[Revogado.]» na linha a seguir ao número e
+    «(...)» no fim da linha do cabeçalho viravam título, e o artigo ficava
+    sem conteúdo."""
+    doc, final = estruturar(
+        "Artigo 2.º\n[Revogado.]\n"
+        "Cláusula 37.ª - Cláusula transitória (Anterior cláusula 35.ª) (...)\n"
+        "Cláusula 38.ª - Outra\nTexto.\n", "t")
+    nos = {n["rotulo"]: final[n["char_start"]:n["char_end"]] for n in doc["nos"]}
+    assert nos["Artigo 2.º"] == "Artigo 2.º\n[Revogado.]\n"
+    assert nos["Cláusula 37.ª - Cláusula transitória (Anterior cláusula 35.ª)"].endswith("\n(...)\n")
+
+
+# ---------- anexos: numeração com letra, partes e regulamentos ----------
+
+def test_anexo_com_letra_nao_perde_a_palavra_anexo():
+    """NAV e Autoridade de Seguros de 2025: em «ANEXO A» o rótulo partia-se no
+    primeiro «A» e a palavra ANEXO saía do texto (« - A»)."""
+    doc, final = estruturar("ANEXO A\nDescrição global de funções\nTexto.\n"
+                            "ANEXO II-A\nClassificação profissional\nTexto.\n", "t")
+    rotulos = [n["rotulo"] for n in doc["nos"] if n["tipo"] == "anexo"]
+    assert rotulos == ["ANEXO A - Descrição global de funções",
+                       "ANEXO II-A - Classificação profissional"]
+    assert final.startswith("ANEXO A - Descrição")
+
+
+def test_partes_de_um_anexo_ficam_dentro_dele():
+    """INATEL de 2025: a tabela salarial vinha no «ANEXO I - (A)», irmão do
+    «ANEXO I - Tabela salarial», e a auditoria dava-a fora do nó."""
+    doc, _ = estruturar("ANEXO I - Tabela salarial\nPressupostos.\n"
+                        "ANEXO I - (A)\nTabela.\nANEXO II-A\nOutro.\nANEXO II-B\nMais.\n", "t")
+    anexos = {n["rotulo"]: n for n in doc["nos"] if n["tipo"] == "anexo"}
+    assert anexos["ANEXO I - (A)"]["pai"] == anexos["ANEXO I - Tabela salarial"]["id"]
+    # sem um «ANEXO II» aberto, II-A e II-B são irmãos
+    assert anexos["ANEXO II-A - Outro."]["pai"] is None
+    assert anexos["ANEXO II-B - Mais."]["pai"] is None
+
+
+def test_regulamento_em_anexo_guarda_os_seus_capitulos():
+    """NAV, CARRIS, INOVA de 2025: o anexo que abre com um capítulo é um
+    texto articulado, e os capítulos, secções e artigos são dele."""
+    doc, _ = estruturar(
+        "Cláusula 1.ª - Âmbito\nTexto.\n"
+        "ANEXO VII - Regulamento de Carreiras Profissionais\n"
+        "CAPÍTULO I - Objeto\nArtigo 1.º - Objeto\nTexto do artigo.\n"
+        "CAPÍTULO II - Carreiras\nArtigo 2.º - Níveis\nTexto do artigo.\n"
+        "ANEXO VIII - Tabela\nTexto.\n", "t")
+    nos = {n["rotulo"]: n for n in doc["nos"]}
+    anexo = nos["ANEXO VII - Regulamento de Carreiras Profissionais"]["id"]
+    assert nos["CAPÍTULO I - Objeto"]["pai"] == anexo
+    assert nos["CAPÍTULO II - Carreiras"]["pai"] == anexo
+    assert nos["Artigo 2.º - Níveis"]["pai"] == nos["CAPÍTULO II - Carreiras"]["id"]
+    assert nos["ANEXO VIII - Tabela"]["pai"] is None
+
+
+def test_capitulo_depois_do_corpo_de_um_anexo_fecha_o_anexo():
+    """O capítulo que vem depois de um anexo com corpo (a republicação que
+    começa depois dos anexos da alteração) não é do anexo."""
+    doc, _ = estruturar("ANEXO I - Tabela\nNível | Valor\n"
+                        "CAPÍTULO I - Disposições gerais\nCláusula 1.ª - Âmbito\nTexto.\n", "t")
+    nos = {n["rotulo"]: n for n in doc["nos"]}
+    assert nos["CAPÍTULO I - Disposições gerais"]["pai"] is None

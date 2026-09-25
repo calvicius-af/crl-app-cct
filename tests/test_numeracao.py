@@ -44,7 +44,12 @@ def test_nao_sao_ordinais(texto):
     ("Artigo único - Âmbito", "arunico"),
     ("Cláusula única", "clunico"),
     ("Cláusula prévia - Âmbito da revisão", "clprevia"),
+    ("Cláusula de revisão", "clrevisao"),
     ("Cláusula geral e transitória", None),
+    ("Cláusula VII-8 - Ajudas de custo", "clVII-8"),
+    ("CLÁUSULA XIII-11 - Refeitórios", "clXIII-11"),
+    ("Artigo IV - Âmbito", "arIV"),
+    ("Cláusula civil", None),
     ("PREÂMBULO", None),
     ("CAPÍTULO I - Disposições gerais", None),
 ])
@@ -97,3 +102,31 @@ def test_clausula_inserida_nao_rouba_o_numero_da_original():
     assert inserida["classificacao"] == "="
     assert any(c["rotulo_antigo"] == "Cláusula 16.ª - Férias"
                and c["classificacao"] == "removida" for c in resultado)
+
+
+def test_numeracao_em_romanos_por_capitulo():
+    """EPAL de 2025: as cláusulas vêm numeradas por capítulo («Cláusula VII-8
+    Ajudas de custo») e nenhuma era reconhecida; o documento ficava sem
+    articulado. Os romanos têm de ser maiúsculos e acabar a palavra."""
+    doc, _ = estruturar("Cláusula VII-8 Ajudas de custo\n1- Texto da cláusula.\n"
+                        "Cláusula XIII-11 Refeitórios\n1- Outro texto.\n"
+                        "Cláusula civil de responsabilidade\n", "x")
+    rotulos = [n["rotulo"] for n in doc["nos"] if n["tipo"] == "clausula"]
+    assert rotulos == ["Cláusula VII-8 - Ajudas de custo", "Cláusula XIII-11 - Refeitórios"]
+
+
+def test_clausula_de_revisao_e_um_cabecalho():
+    """EMPORDEF de 2025: a única cláusula da revisão, «Cláusula de revisão»,
+    não era reconhecida e o documento ficava sem articulado."""
+    doc, _ = estruturar("Cláusula de revisão\n1- A presente revisão altera o acordo.\n"
+                        "Cláusula de revisão prevista no acordo anterior, que se mantém.\n", "x")
+    assert [n["rotulo"] for n in doc["nos"] if n["tipo"] == "clausula"] == ["Cláusula de revisão"]
+
+
+def test_designador_logo_a_seguir_ao_numero_e_o_titulo():
+    """AEVP e APHP de 2025: «Artigo 1.º» e, na linha seguinte, «Artigo de
+    revisão», o título. Não é outro artigo, e o 1.º não fica vazio."""
+    doc, _ = estruturar("Artigo 1.º\nArtigo de revisão\nO presente contrato revê "
+                        "parcialmente o anteriormente acordado pelas partes.\n", "x")
+    assert [n["rotulo"] for n in doc["nos"] if n["tipo"] == "artigo"] == [
+        "Artigo 1.º - Artigo de revisão"]

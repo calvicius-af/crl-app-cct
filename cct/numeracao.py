@@ -10,6 +10,8 @@ está no documento; esta função dá-lhe uma chave estável para comparar vers�
     Cláusula 16.ª-A - Férias            → cl16A
     Artigo único - Âmbito               → arunico
     Cláusula prévia - Âmbito da revisão → clprevia
+    Cláusula de revisão                 → clrevisao
+    Cláusula VII-8 - Ajudas de custo    → clVII-8
 
 A letra de inserção faz parte da chave: a 16.ª-A é uma cláusula nova, inserida
 por uma revisão, e não a 16.ª. Sem ela, as duas disputavam o mesmo número na
@@ -32,6 +34,7 @@ _ORDINAIS = (
 _RE_ROTULO = re.compile(r"^\s*(clausula|artigo)\s+(.+?)\s*(?:\s-\s.*)?$")
 _RE_ALGARISMOS = re.compile(r"^(\d+)\s*\.?\s*[ªº]?(?:\s*-\s*([a-z]))?\b")
 _RE_PALAVRA = re.compile(r"[a-z]+")
+_RE_ROMANO = re.compile(r"^([IVXLC]+)(?:\s*-\s*(\d+))?(?![A-Za-z])")
 
 
 def _sem_acentos(texto: str) -> str:
@@ -64,7 +67,8 @@ def ordinal_por_extenso(texto: str) -> int | None:
 
 def chave_numero(rotulo: str) -> str | None:
     """Chave canónica da cláusula ou artigo (`cl12`, `cl16A`, `arunico`)."""
-    m = _RE_ROTULO.match(_sem_acentos(rotulo or "").lower())
+    original = _sem_acentos(rotulo or "")
+    m = _RE_ROTULO.match(original.lower())
     if not m:
         return None
     tipo, numeracao = m.group(1)[:2], m.group(2)
@@ -75,6 +79,14 @@ def chave_numero(rotulo: str) -> str | None:
         return f"{tipo}unico"
     if re.match(r"^(previ[oa]|preliminar)\b", numeracao):
         return f"{tipo}previa"
+    if re.match(r"^de\s+revisao\b", numeracao):
+        return f"{tipo}revisao"
+    # «Cláusula VII-8»: número dentro do capítulo, em romanos (EPAL de 2025)
+    # (maiúsculos no rótulo, como no extrator: «Cláusula civil» não é número)
+    romano = _RE_ROMANO.match(original[m.start(2):m.end(2)])
+    if romano:
+        return f"{tipo}{romano.group(1)}" + (
+            f"-{int(romano.group(2))}" if romano.group(2) else "")
     # por extenso: no máximo três palavras (o extrator aceita duas; «centésima
     # vigésima primeira» cabe), e só se todas forem ordinais
     palavras = numeracao.split()

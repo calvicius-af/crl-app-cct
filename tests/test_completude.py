@@ -79,6 +79,20 @@ def test_tabela_colapsada_numa_linha():
     assert m.linhas_longas and m.veredicto == "ATENÇÃO"
 
 
+def test_linha_inteira_de_tabela_nao_e_tabela_colapsada():
+    """#84, corrida de 2025: o conteúdo funcional numa célula (CARRIS, RTP) e o
+    cabeçalho de uma grelha larga, com as mesmas células que as linhas de
+    baixo, contavam como tabelas colapsadas."""
+    funcoes = "É o trabalhador que realiza tarefas de montagem e manutenção. " * 12
+    descricao = f"5 | E | 151 | Mestre | {funcoes.strip()}"
+    cabecalho = " | ".join(f"Categoria profissional {i}" for i in range(30))
+    valores = " | ".join(f"{900 + i},50" for i in range(30))
+    colapsada = " | ".join(f"Nível {i} | {1000 + i},00" for i in range(40))
+    texto = "\n".join([descricao, "Texto.", cabecalho, valores, "Texto.", colapsada])
+    m = medir("x", [texto.replace(" | ", "\n")], texto)
+    assert [n for n, _ in m.linhas_longas] == [6], m.linhas_longas
+
+
 def test_blocos_trocados_baixam_a_ordem():
     a = " ".join(f"alfa{i}" for i in range(200))
     b = " ".join(f"beta{i}" for i in range(200))

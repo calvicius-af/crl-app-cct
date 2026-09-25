@@ -25,10 +25,12 @@ def contar_tabelas_pdfplumber(pdf_path: Path) -> int:
     estruturar: é um auditor, não um segundo extrator.
     """
     import pdfplumber
+    from .extractor import normalizar_pagina
 
     total = 0
     with pdfplumber.open(pdf_path) as pdf:
         for pag in pdf.pages:
+            normalizar_pagina(pag)
             total += len(pag.find_tables())
     return total
 
@@ -62,15 +64,42 @@ def tabelas_rodadas_pdfplumber(pdf_path: Path) -> list[str]:
     uma rotação que o extrator não reconheceu.
     """
     import pdfplumber
+    from .extractor import normalizar_pagina
 
     avisos = []
     with pdfplumber.open(pdf_path) as pdf:
         for i, pag in enumerate(pdf.pages, 1):
+            normalizar_pagina(pag)
             for tab in pag.find_tables():
                 aviso = _aviso_tabela_rodada(i, tab.bbox)
                 if aviso:
                     avisos.append(aviso)
     return avisos
+
+
+# uma imagem com esta fração da página, ou mais, é conteúdo (uma tabela, um
+# quadro), e não o logótipo do BTE; a tabela salarial estreita do Portway de
+# 2025 ocupa 8% da página, o logótipo menos de 1%
+FRACAO_IMAGEM = 0.03
+
+
+def paginas_com_imagem(pdf_path: Path) -> list[int]:
+    """Páginas com uma imagem grande: conteúdo que o texto não pode ter.
+
+    Na corrida de 2025, as tabelas salariais do INCM (três documentos), do
+    Portway e do SUPERBOOK eram imagens. O extrator não as lê (não há OCR), e
+    o aviso de anexo sem tabela sugeria uma perda na extração.
+    """
+    import pdfplumber
+
+    paginas = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for i, pag in enumerate(pdf.pages, 1):
+            area = (pag.bbox[2] - pag.bbox[0]) * (pag.bbox[3] - pag.bbox[1])
+            if any((im["x1"] - im["x0"]) * (im["bottom"] - im["top"]) >= FRACAO_IMAGEM * area
+                   for im in pag.images):
+                paginas.append(i)
+    return paginas
 
 
 def contar_blocos_tabela(texto: str) -> int:
@@ -152,6 +181,10 @@ _RE_ANEXO_DE_VALORES = re.compile(
 _RE_VALOR = re.compile(r"\d(?:[\d .]*\d)?,\d{2}\b")
 MIN_VALORES = 3
 MIN_LINHAS_TEXTO = 3
+# um enquadramento (as categorias de cada nível) sem grelha, lido como texto:
+# «Nível I Director de serviços; Director de serviços clínicos; … Nível II …»
+# (CNIS, ACIP e AHRESP de 2025)
+_RE_NIVEL = re.compile(r"\b(?:N[íi]vel|Grupo|Grau|Escal[ãa]o)\s+(?:[IVXLCD]+|\d+)\b")
 
 
 def _descendentes(no: dict, nos: list[dict]) -> list[dict]:
@@ -159,7 +192,8 @@ def _descendentes(no: dict, nos: list[dict]) -> list[dict]:
     return [d for f in filhos for d in (f, *_descendentes(f, nos))]
 
 
-def tabelas_esperadas(doc: dict, texto: str) -> list[str]:
+def tabelas_esperadas(doc: dict, texto: str,
+                      paginas_imagem: list[int] | None = None) -> list[str]:
     """Anexos que pela natureza deviam ter tabela e não têm nenhuma.
 
     Um anexo cujo rótulo menciona remuneração/salários/mapa/escalões sem
@@ -174,6 +208,10 @@ def tabelas_esperadas(doc: dict, texto: str) -> list[str]:
       ficam ancoradas ao anexo a que pertencem.
 
     Aviso conservador: só anexos, só quando o rótulo o diz.
+
+    `paginas_imagem` são as páginas do PDF com uma imagem grande
+    (`paginas_com_imagem`). Sem tabela no texto e com uma imagem no PDF, a
+    tabela é a imagem: diz-se isso, e onde, em vez de sugerir uma perda.
     """
     avisos = []
     doc_tem_tabelas = " | " in texto
@@ -193,16 +231,25 @@ def tabelas_esperadas(doc: dict, texto: str) -> list[str]:
         if " | " not in bruto:
             # Na corrida de 2025, 40 avisos «fora do nó» eram anexos de texto:
             # regulamentos de carreiras, descrições de funções, regras de
-            # progressão. Não se avisa quando o anexo tem os valores (a tabela
-            # lida como texto) ou quando é um texto e o rótulo não promete
-            # uma tabela de valores.
+            # progressão. Não se avisa quando o anexo tem os valores ou os
+            # níveis (a tabela lida como texto) ou quando é um texto e o
+            # rótulo não promete uma tabela de valores.
             corpo = [l for l in bruto.split("\n")[1:] if l.strip()]
-            if len(_RE_VALOR.findall(bruto)) >= MIN_VALORES:
+            if (len(_RE_VALOR.findall(bruto)) >= MIN_VALORES
+                    or len(_RE_NIVEL.findall(bruto)) >= MIN_VALORES):
                 continue
             if (len(corpo) >= MIN_LINHAS_TEXTO
                     and not _RE_ANEXO_DE_VALORES.search(rotulo)):
                 continue
-            if doc_tem_tabelas:
+            if paginas_imagem:
+                # a imagem explica a falta mesmo quando o documento tem outras
+                # tabelas (LAGOS em Forma de 2025: o anexo I é uma imagem)
+                paginas = ", ".join(f"p{p}" for p in paginas_imagem)
+                avisos.append(
+                    f"{rotulo}: anexo de remuneração/mapa sem tabela no texto — "
+                    f"o PDF tem tabelas em imagem ({paginas}), que o texto não "
+                    f"pode ter; ver no PDF")
+            elif doc_tem_tabelas:
                 avisos.append(
                     f"{rotulo}: anexo de remuneração/mapa com a tabela fora "
                     f"do corpo do nó — as linhas existem no documento mas "

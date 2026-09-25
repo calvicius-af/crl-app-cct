@@ -275,3 +275,29 @@ def test_tabela_salarial_sem_valores_continua_a_dar_aviso():
         tabela_fora="Nível | Escalão\nI | 1 000,00")
     [aviso] = tabelas_esperadas(doc, texto)
     assert "fora do corpo do nó" in aviso
+
+
+def test_tabela_numa_imagem_diz_a_pagina(tmp_path):
+    """Corrida de 2025: as tabelas salariais do INCM, do Portway e do
+    SUPERBOOK eram imagens. O aviso diz onde está a imagem, em vez de sugerir
+    uma perda na extração; o logótipo do BTE, pequeno, não conta."""
+    from cct.auditoria import paginas_com_imagem
+    from tests.pdf_sintetico import escrever_pdf
+    pdf = escrever_pdf(tmp_path / "x.pdf", [
+        [(72, 780, "Texto."), ("imagem", 280, 790, 30, 30)],
+        [(72, 780, "ANEXO III"), ("imagem", 80, 300, 430, 240)]])
+    assert paginas_com_imagem(pdf) == [2]
+    doc, texto = estruturar("ANEXO III - Tabela salarial\n1- Tabela salarial\n", "x")
+    [aviso] = tabelas_esperadas(doc, texto, paginas_imagem=[2])
+    assert "em imagem (p2)" in aviso and "perdida" not in aviso
+
+
+def test_enquadramento_sem_grelha_lido_como_texto_nao_da_aviso():
+    """CNIS e ACIP de 2025: as categorias de cada nível, numa tabela sem
+    grelha, saem como texto («Nível I Director de serviços; …»). A tabela está
+    lá; não está fora do nó nem perdida."""
+    doc, texto = _doc_com_anexo(
+        "ANEXO IV - Enquadramento das profissões em níveis de remuneração",
+        "Nível I Director de serviços;\nSecretário-geral.\n"
+        "Nível II Chefe de divisão;\nPsicólogo principal.\nNível III Técnico.")
+    assert tabelas_esperadas(doc, texto + "\nx | y") == []

@@ -24,8 +24,11 @@ RE_DEPOSITO_MID = re.compile(
 RE_RETIFICACAO = re.compile(
     r"\bRECT\b|[-–]RECT$|retifica", re.IGNORECASE)
 # "( Revogado. )" fecha a frase tanto como "Revogado." — o fecho pode
-# vir separado por espaços
-RE_FRASE_FECHADA = re.compile(r"[.!?][\s)\]»”\"']*$")
+# vir separado por espaços. Um ordinal abreviado também fecha: a redação
+# não põe outro ponto depois de «34.ª» ou «4.º» («… a que se referem as
+# cláusulas 34.ª a 36.ª»). Na corrida de 2025 eram 80 dos 134 corpos «sem
+# frase terminada em ponto».
+RE_FRASE_FECHADA = re.compile(r"(?:[.!?]|\d\.?\s?[ªº])[\s)\]»”\"']*$")
 _TIPOS_COM_CORPO = ("clausula", "artigo")
 # Um artigo de alteração apresenta as cláusulas que se seguem: «As cláusulas
 # 5.ª e 7.ª passam a ter a redação seguinte:». Termina em dois pontos porque
@@ -35,7 +38,7 @@ RE_ANUNCIO = re.compile(
     r"|aditad[oa]s?|republicad[oa]s?)\b[^:]*:$", re.IGNORECASE)
 
 
-def clausulas_sem_corpo(doc: dict, texto: str) -> list[str]:
+def clausulas_sem_corpo(doc: dict, texto: str, sem_perda: bool = False) -> list[str]:
     """Cláusulas e artigos cujo corpo não tem uma única frase terminada.
 
     Um cabeçalho seguido logo de outro cabeçalho é o sintoma clássico de
@@ -44,6 +47,12 @@ def clausulas_sem_corpo(doc: dict, texto: str) -> list[str]:
     («passam a ter a redação seguinte:») e é seguido por elas (issue #83). Uma
     enumeração que acaba em dois pontos sem nada a seguir continua a contar:
     é o caso típico das alíneas perdidas.
+
+    `sem_perda` diz que a medida independente da completude não encontrou
+    texto do PDF em falta. Nesse caso, um corpo que acaba em dois pontos e é
+    seguido logo por um cabeçalho está como foi publicado: a família SETAAB
+    de 2025 fecha a «Parentalidade» em «nomeadamente:» e passa à cláusula
+    seguinte, e a AHP anuncia a tabela («passam a ser:») antes do anexo.
     """
     comecos = {no["char_start"]: no for no in doc.get("nos", [])}
     falhas = []
@@ -56,7 +65,8 @@ def clausulas_sem_corpo(doc: dict, texto: str) -> list[str]:
         if not corpo:
             falhas.append(f"{no['rotulo']}: sem conteúdo")
         elif not any(RE_FRASE_FECHADA.search(l) for l in corpo.split("\n") if l.strip()):
-            if _anuncia_o_que_segue(no, corpo, comecos) or _corpo_sem_frases(bruto):
+            if (_anuncia_o_que_segue(no, corpo, comecos) or _corpo_sem_frases(bruto)
+                    or (sem_perda and _dois_pontos_antes_de_cabecalho(no, corpo, comecos))):
                 continue
             falhas.append(f"{no['rotulo']}: corpo sem frase terminada em ponto")
     return falhas
@@ -71,6 +81,15 @@ RE_SEM_FRASES = re.compile(r" \| |\(\s*(?:\.\s*){3}\)|\(\s*…\s*\)|\[\s*(?:\.\s
 
 def _corpo_sem_frases(bruto: str) -> bool:
     return bool(RE_SEM_FRASES.search(bruto))
+
+
+_TIPOS_CABECALHO = ("clausula", "artigo", "anexo", "capitulo", "seccao")
+
+
+def _dois_pontos_antes_de_cabecalho(no: dict, corpo: str, comecos: dict) -> bool:
+    seguinte = comecos.get(no["char_end"])
+    return (corpo.rstrip().endswith(":") and seguinte is not None
+            and seguinte.get("tipo") in _TIPOS_CABECALHO)
 
 
 def _anuncia_o_que_segue(no: dict, corpo: str, comecos: dict) -> bool:
@@ -120,6 +139,9 @@ AVISO_RETIFICACAO_SEM_ARTICULADO = (
 AVISO_SEM_ESTRUTURA = (
     "nenhuma cláusula ou artigo reconhecido: estrutura não reconhecida pelo "
     "extrator, ou documento sem articulado — verificar o PDF")
+AVISO_ALTERACAO_SALARIAL_SEM_ARTICULADO = (
+    "alteração salarial sem articulado: o texto tem só números e tabelas, sem "
+    "nenhuma linha com a forma de cláusula ou artigo — zero cláusulas é o esperado")
 
 
 # O título do BTE fecha com o subtipo depois de um travessão: «Acordo de
@@ -127,13 +149,18 @@ AVISO_SEM_ESTRUTURA = (
 # bloco do título, antes do primeiro cabeçalho estrutural, para que uma
 # menção a «retificação» no corpo de uma convenção não conte.
 RE_TITULO_RETIFICACAO = re.compile(r"\s[-–—]\s*re(?:c)?tifica[çc][ãa]o\b", re.IGNORECASE)
+RE_TITULO_ALTERACAO_SALARIAL = re.compile(r"\s[-–—]\s*altera[çc][ãa]o\s+salarial\b",
+                                          re.IGNORECASE)
+# uma linha que começa como um cabeçalho de cláusula ou artigo, e que o
+# extrator não reconheceu (fora das tabelas, onde «Cláusula | Designação» é
+# o cabeçalho das tabelas de valores)
+RE_FORMA_DE_CABECALHO = re.compile(r"^(?:Cl[aá]usula|CL[AÁ]USULA|Artigo|ARTIGO)\s")
 RE_CABECALHO_ESTRUTURAL = re.compile(
     r"^(?:Cl[aá]usula|CL[AÁ]USULA|Artigo|ARTIGO|CAP[IÍ]TULO|T[IÍ]TULO)\b")
 MAX_LINHAS_TITULO = 8
 
 
-def titulo_de_retificacao(texto: str) -> bool:
-    """O título do documento diz «- Retificação»?"""
+def _linhas_do_titulo(texto: str) -> list[str]:
     linhas: list[str] = []
     for linha in texto.split("\n"):
         linha = linha.strip()
@@ -142,7 +169,25 @@ def titulo_de_retificacao(texto: str) -> bool:
         if RE_CABECALHO_ESTRUTURAL.match(linha) or len(linhas) >= MAX_LINHAS_TITULO:
             break
         linhas.append(linha)
-    return any(RE_TITULO_RETIFICACAO.search(l) for l in linhas)
+    return linhas
+
+
+def titulo_de_retificacao(texto: str) -> bool:
+    """O título do documento diz «- Retificação»?"""
+    return any(RE_TITULO_RETIFICACAO.search(l) for l in _linhas_do_titulo(texto))
+
+
+def alteracao_salarial_sem_articulado(texto: str) -> bool:
+    """Uma alteração salarial que não tem nenhuma linha com forma de cabeçalho.
+
+    DHL de 2025: o título diz «- Alteração salarial e outras» e o texto são
+    números e uma tabela. Sem nenhuma linha que comece por «Cláusula» ou
+    «Artigo» fora das tabelas, não há cabeçalho que o extrator tenha deixado
+    escapar.
+    """
+    return (any(RE_TITULO_ALTERACAO_SALARIAL.search(l) for l in _linhas_do_titulo(texto))
+            and not any(RE_FORMA_DE_CABECALHO.match(l) and " | " not in l
+                        for l in texto.split("\n")))
 
 
 def e_retificacao(doc: dict, texto: str = "") -> bool:
@@ -169,12 +214,21 @@ def sem_articulado(doc: dict, texto: str = "") -> str | None:
     """
     if any(no.get("tipo") in _TIPOS_COM_CORPO for no in doc.get("nos", [])):
         return None
-    return (AVISO_RETIFICACAO_SEM_ARTICULADO if e_retificacao(doc, texto)
-            else AVISO_SEM_ESTRUTURA)
+    if e_retificacao(doc, texto):
+        return AVISO_RETIFICACAO_SEM_ARTICULADO
+    if alteracao_salarial_sem_articulado(texto):
+        return AVISO_ALTERACAO_SALARIAL_SEM_ARTICULADO
+    return AVISO_SEM_ESTRUTURA
 
 
-def verificar(doc: dict, texto: str) -> list[str]:
-    """Todos os controlos; devolve a lista de avisos (vazia = tudo bem)."""
+def verificar(doc: dict, texto: str, sem_perda: bool = False,
+              paginas_imagem: list[int] | None = None) -> list[str]:
+    """Todos os controlos; devolve a lista de avisos (vazia = tudo bem).
+
+    `sem_perda`: a completude, medida contra o PDF, não encontrou texto em
+    falta (ver `clausulas_sem_corpo`). `paginas_imagem`: as páginas do PDF com
+    uma imagem grande (ver `auditoria.tabelas_esperadas`).
+    """
     from .auditoria import tabelas_esperadas
 
     avisos = []
@@ -184,12 +238,12 @@ def verificar(doc: dict, texto: str) -> list[str]:
     aviso = deposito_no_fim(texto, e_retificacao=e_retificacao(doc, texto))
     if aviso:
         avisos.append(aviso)
-    vazias = clausulas_sem_corpo(doc, texto)
+    vazias = clausulas_sem_corpo(doc, texto, sem_perda)
     if vazias:
         avisos.append(f"{len(vazias)} cláusula(s)/artigo(s) sem corpo válido: "
                       + "; ".join(vazias[:5])
                       + (" …" if len(vazias) > 5 else ""))
-    sem_tabela = tabelas_esperadas(doc, texto)
+    sem_tabela = tabelas_esperadas(doc, texto, paginas_imagem)
     if sem_tabela:
         avisos.extend(sem_tabela[:5]
                       + (["…"] if len(sem_tabela) > 5 else []))

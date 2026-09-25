@@ -17,8 +17,15 @@ from pathlib import Path
 from .mobiliario import RE_RODAPE_PARTIDO, e_mobiliario, sem_prefixo_de_cabecalho
 
 RE_CAPITULO = re.compile(r"^(?:CAP[IÍ]TULO|T[IÍ]TULO)\s+([IVXLCD]+|\d+)\b(.*)$")
-RE_SECCAO = re.compile(r"^SEC[ÇC][AÃ]O\s+([IVXLCD]+|\d+)\b(.*)$", re.IGNORECASE)
-RE_ANEXO = re.compile(r"^ANEXO\s+([IVXLCD]+|\d+)?\b(.*)$")
+# «SECÇÃO» ou «Secção», nunca em minúsculas: uma remissão partida pelo PDF
+# («… o previsto na subsecção XI da\nsecção II do capítulo II do Código do
+# Trabalho.») abria uma secção falsa e deixava a cláusula a meio (FNOP de 2025)
+RE_SECCAO = re.compile(r"^(?:SEC[ÇC][AÃ]O|Sec[çc][ãa]o)\s+([IVXLCD]+|\d+)\b(.*)$")
+# «ANEXO III», «ANEXO 2», e com letra: «ANEXO A» (NAV), «ANEXO II-A» (Autoridade
+# de Seguros de 2025). A letra é uma só, seguida de fim de palavra: «ANEXO
+# Tabela…» não tem número.
+RE_ANEXO = re.compile(
+    r"^ANEXO\s+((?:[IVXLCD]+|\d+)(?:\s*-\s*[A-Z](?![\wÀ-ÿ]))?|[A-Z](?![\wÀ-ÿ]))?\b(.*)$")
 # numeração por extenso: só designadores a sério. Qualquer palavra servia
 # antes, o que transformava o título do CAPÍTULO XV do AguasNorte
 # ("Cláusula geral e transitória") numa cláusula vazia — mas restringir só
@@ -38,9 +45,15 @@ _UNICO = r"[úu]nic[oa]"
 # cláusula): sem ele, "previa" sem acento é a forma verbal de "prever" e uma
 # linha de prosa passaria a cabeçalho. O (?-i:…) é preciso porque o grupo da
 # numeração é aplicado dentro de (?i:…), que tornaria [A-ZÀ-Ú] inútil
-_DESIGNADOR = r"(?:pr[ée]vi[oa]|preliminar)(?=\s*$|\s+(?-i:[A-ZÀ-Ú«(]))"
-# "12.ª", "16.ª-A", "décima segunda", "único", "prévia"
-_NUMERACAO = (rf"\d+\.?[ªº]?(?:-[A-Z])?|{_UNICO}|{_DESIGNADOR}"
+# «Cláusula de revisão» (EMPORDEF de 2025) é da mesma família: a cláusula de
+# uma revisão parcial nomeada pela função, sozinha na linha
+_DESIGNADOR = r"(?:pr[ée]vi[oa]|preliminar|de\s+revis[ãa]o)(?=\s*$|\s+(?-i:[A-ZÀ-Ú«(]))"
+# numeração em romanos, só ou com o número dentro do capítulo: a EPAL numera
+# as cláusulas por capítulo («Cláusula VII-8 Ajudas de custo»). Os romanos são
+# maiúsculos e acabam a palavra, para que «Cláusula civil» não passe.
+_ROMANO = r"(?-i:[IVXLC]+)(?:-\d+)?(?![\wÀ-ÿ])"
+# "12.ª", "16.ª-A", "décima segunda", "único", "prévia", "VII-8"
+_NUMERACAO = (rf"\d+\.?[ªº]?(?:-[A-Z])?|{_UNICO}|{_DESIGNADOR}|{_ROMANO}"
               rf"|{_ORDINAL}(?:\s+{_ORDINAL})?")
 # a palavra-chave tem de vir capitalizada: no BTE os cabeçalhos são
 # "Cláusula 1.ª" ou "CLÁUSULA 1.ª", nunca minúsculos. Com IGNORECASE, uma
@@ -50,6 +63,11 @@ _NUMERACAO = (rf"\d+\.?[ªº]?(?:-[A-Z])?|{_UNICO}|{_DESIGNADOR}"
 # A numeração continua indiferente a maiúsculas (grupo com (?i:…)).
 RE_CLAUSULA = re.compile(
     rf"^(?:Cl[aá]usula|CL[AÁ]USULA)\s+((?i:{_NUMERACAO}))\s*(.*)$")
+# um cabeçalho só com o designador, sem número nem título: «Artigo de
+# revisão». Logo a seguir a «Artigo 1.º», é o título dele (AEVP e APHP de
+# 2025), e não outro artigo
+RE_SO_DESIGNADOR = re.compile(
+    rf"^(?:Cl[aá]usula|CL[AÁ]USULA|Artigo|ARTIGO)\s+(?i:{_DESIGNADOR})\s*$")
 RE_ARTIGO = re.compile(
     rf"^(?:Artigo|ARTIGO)\s+((?i:{_NUMERACAO}))\s*(.*)$")
 
@@ -66,8 +84,12 @@ _MARCADOR_LISTA = r"\d+\s*[-–—.)]|[a-z]\)|[ivxl]+\)|[-–—•§]\s?"
 # "Declaração" (ISSUE-0015, ponto 3): quando uma parte assina em representação
 # de outras, o PDF traz uma declaração própria a identificá-las — sem isto,
 # cola-se ao nome do signatário anterior, como se fosse o mesmo bloco
-_MARCADOR_ESTRUTURAL = (r"Cl[aá]usula\s|Artigo\s|CAP[IÍ]TULO\s|SEC[ÇC][AÃ]O\s"
-                        r"|ANEXO\b|NOTA\b|Declara[çc][ãa]o\b")
+# Com maiúscula, como os cabeçalhos: em minúsculas, é uma remissão que o PDF
+# partiu («… o previsto na subsecção XI da\nsecção II do capítulo II do Código
+# do Trabalho.», FNOP de 2025), e a linha junta-se à anterior.
+_MARCADOR_ESTRUTURAL = (r"(?-i:Cl[aá]usula\s|CL[AÁ]USULA\s|Artigo\s|ARTIGO\s"
+                        r"|CAP[IÍ]TULO\s|Cap[ií]tulo\s|SEC[ÇC][AÃ]O\s|Sec[çc][ãa]o\s"
+                        r"|ANEXO\b|Anexo\b|NOTA\b|Nota\b|DECLARA[ÇC][ÃA]O\b|Declara[çc][ãa]o\b)")
 RE_MARCADOR = re.compile(
     rf"^(?:{_MARCADOR_LISTA}|{_MARCADOR_ESTRUTURAL})", re.IGNORECASE)
 # só os de lista: uma linha que comece por "Cláusula" mas não seja um
@@ -203,6 +225,8 @@ def _titulo_candidato(linha: str) -> bool:
             and not _e_cabecalho(linha)
             and not RE_MARCADOR_LISTA.match(linha)
             and not RE_DATA_OUTORGA.match(linha)
+            and not RE_REVOGADA.match(linha)
+            and not RE_OMISSAO.match(linha)
             and not _e_frase(linha))
 
 
@@ -221,7 +245,11 @@ def _normalizar_rotulo(tipo: str, m: re.Match, titulo_extra: str | None) -> str:
     resto = (m.group(2) if m.lastindex and m.lastindex >= 2 else "") or ""
     resto = resto.strip(" -–—:")
     if resto:
-        base = linha.split(resto)[0].strip(" -–—:")
+        # o que vem antes do resto, pela posição: `linha.split(resto)` partia
+        # no primeiro sítio onde o resto aparece, e em «ANEXO A» o «A» é a
+        # primeira letra de «ANEXO» — o rótulo ficava « - A», e a palavra
+        # ANEXO saía do texto (NAV e Autoridade de Seguros de 2025)
+        base = m.group(0)[:m.start(2) - m.start(0)].strip(" -–—:")
         rotulo = f"{base} - {resto}"
     elif titulo_extra:
         rotulo = f"{linha.strip(' -–—:')} - {titulo_extra.strip()}"
@@ -243,6 +271,12 @@ RE_VALOR_EM_EUROS = re.compile(r"\d,\d{2}\s*€|€\s*\d")
 # ser um título, ou só «Revogada.»
 RE_FRASE_ACABADA = re.compile(r"""[.!?:][)\]»”"']*\s*$""")
 RE_REVOGADA = re.compile(r"^[(\[]?\s*revogad[oa]s?\s*\.?\s*[)\]]?$", re.IGNORECASE)
+# o texto omitido de uma alteração: «(...)», «[…]». No fim da linha do
+# cabeçalho, é o corpo: «Cláusula 37.ª - Cláusula transitória (Anterior
+# cláusula 35.ª) (...)» (APDL de 2025) ficava sem conteúdo
+_OMISSAO = r"[(\[]\s*(?:(?:\.\s*){3}|…)\s*[)\]]"
+RE_OMISSAO = re.compile(rf"^{_OMISSAO}\s*\.?$")
+RE_OMISSAO_FIM = re.compile(rf"\s*{_OMISSAO}\s*\.?$")
 MAX_TITULO = 90
 # uma frase acabada com estas palavras já não é um título: «As decisões dos
 # árbitros são tomadas por maioria.» (8), «Devem existir, em locais
@@ -276,7 +310,7 @@ def _nao_e_cabecalho(tipo: str, linha: str, resto: str, na_tabela: bool,
 def _e_corpo(resto: str) -> bool:
     """O resto da linha do cabeçalho é corpo, e não o título."""
     resto = resto.strip(" -–—:")
-    return bool(RE_REVOGADA.match(resto) or _e_frase(resto)
+    return bool(RE_REVOGADA.match(resto) or RE_OMISSAO.match(resto) or _e_frase(resto)
                 or (len(resto) > MAX_TITULO and RE_FRASE_ACABADA.search(resto)))
 
 
@@ -325,12 +359,23 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
                 corpo_na_linha = resto.strip(" -–—:")
                 rotulo = linha[:m.start(2)].strip(" -–—:")
                 break
+            omissao = RE_OMISSAO_FIM.search(resto)
+            if tipo_cabecalho in ("clausula", "artigo") and omissao:
+                # o título e, a seguir, o texto omitido
+                corpo_na_linha = omissao.group(0).strip()
+                titulo = resto[:omissao.start()].strip(" -–—:")
+                base = linha[:m.start(2)].strip(" -–—:")
+                rotulo = f"{base} - {titulo}" if titulo else base
+                break
             if not resto.strip(" -–—:"):
                 # título na(s) linha(s) seguinte(s)?
                 j = i + 1
                 while j < len(linhas) and not linhas[j].strip():
                     j += 1
-                if j < len(linhas) and _titulo_candidato(linhas[j]):
+                if j < len(linhas) and (
+                        _titulo_candidato(linhas[j])
+                        or (tipo_cabecalho in ("clausula", "artigo")
+                            and RE_SO_DESIGNADOR.match(linhas[j].strip()))):
                     titulo_extra = linhas[j].strip()
                     i = j  # consome a linha do título
             rotulo = _normalizar_rotulo(tipo_cabecalho, m, titulo_extra)
@@ -347,6 +392,9 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
     partes: list[str] = []
     pos = 0
     contexto = {"capitulo": None, "seccao": None, "anexo": None}
+    # o anexo aberto: o número, e se é um texto articulado (abre com um
+    # capítulo, como os regulamentos de carreiras em anexo)
+    anexo_aberto: dict = {"numero": None, "articulado": False}
     no_aberto: dict | None = None
 
     def emitir(segmento: str):
@@ -384,6 +432,7 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
             # (memo 19 — o GENERALI é revisão global com texto consolidado)
             if not em_consolidado and RE_MARCA_CONSOLIDADO.match(linha.strip()):
                 em_consolidado = True
+                contexto.update(capitulo=None, seccao=None, anexo=None)
                 abrir_no("bloco", "TEXTO CONSOLIDADO", None)
             emitir(linha + "\n")
             continue
@@ -398,25 +447,55 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
                     and tipo == "capitulo"
                     and ha_artigo):
                 em_consolidado = True
+                contexto.update(anexo=None)
             if tipo == "capitulo":
-                contexto.update(capitulo=None, seccao=None, anexo=None)
-                pai = None
+                # Um anexo que abre logo com um capítulo é um texto articulado
+                # (o regulamento de carreiras da NAV, dos CARRIS, do INOVA):
+                # os capítulos são dele. Sem isto, ficavam soltos, o anexo
+                # vazio, e a auditoria dava a tabela do regulamento «fora do
+                # nó» (corrida de 2025). Um capítulo depois do corpo de um
+                # anexo continua a fechá-lo.
+                anexo_vazio = (contexto["anexo"] is not None and no_aberto is not None
+                               and no_aberto["pai"] == contexto["anexo"]
+                               and no_aberto["char_start"] == pos)
+                if contexto["anexo"] and (anexo_vazio or anexo_aberto["articulado"]):
+                    anexo_aberto["articulado"] = True
+                    contexto.update(capitulo=None, seccao=None)
+                    pai = contexto["anexo"]
+                else:
+                    contexto.update(capitulo=None, seccao=None, anexo=None)
+                    pai = None
             elif tipo == "seccao":
                 contexto["seccao"] = None
                 pai = contexto["capitulo"] or contexto["anexo"]
             else:
-                contexto.update(capitulo=None, seccao=None, anexo=None)
-                pai = None
+                # «ANEXO I - (A)» com o «ANEXO I» aberto é uma parte dele
+                # (INATEL de 2025: a tabela salarial vinha em I-(A) e I-(B))
+                m_anexo = RE_ANEXO.match(linha)
+                numero = re.sub(r"\s", "", m_anexo.group(1) or "") if m_anexo else ""
+                # «ANEXO II-A» e «ANEXO II-B» são partes do «ANEXO II», se
+                # estiver aberto; sem ele, são anexos irmãos
+                if (contexto["anexo"] and numero
+                        and numero.split("-")[0] == anexo_aberto["numero"]):
+                    pai = contexto["anexo"]
+                    contexto.update(capitulo=None, seccao=None)
+                else:
+                    contexto.update(capitulo=None, seccao=None, anexo=None)
+                    anexo_aberto.update(numero=numero, articulado=False)
+                    pai = None
             abrir_no(tipo, linha, pai)
             emitir(linha + "\n")
             fechar_no()
-            contexto[tipo] = nos[-1]["id"]
+            if not (tipo == "anexo" and pai is not None):
+                contexto[tipo] = nos[-1]["id"]
             # nó "bloco" absorve conteúdo até ao próximo cabeçalho
             # (ex.: anexos sem cláusulas/artigos — não pode ficar órfão)
             abrir_no("bloco", f"Corpo de {linha}", nos[-1]["id"])
         else:  # clausula | artigo
-            pai = (contexto["seccao"] or contexto["anexo"]
-                   or contexto["capitulo"])
+            # o capítulo antes do anexo: num anexo articulado, o capítulo é
+            # do anexo e o artigo é do capítulo
+            pai = (contexto["seccao"] or contexto["capitulo"]
+                   or contexto["anexo"])
             abrir_no(tipo, linha, pai)
             emitir(linha + "\n")
     fechar_no()
@@ -437,11 +516,31 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
     return doc, texto_final
 
 
+# palavras de ligação que um nome de entidade traz em minúsculas
+_LIGACAO = {"a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em", "na",
+            "no", "nas", "nos", "para", "por", "com", "à", "ao", "aos", "às"}
+# uma assinatura nomeia a entidade com maiúsculas; mesmo «Pelos outorgantes:»
+# ou «Pela entidade empregadora:» têm poucas palavras em minúsculas
+MAX_MINUSCULAS_ASSINATURA = 3
+RE_PALAVRA_MINUSCULA = re.compile(r"(?<![\w-])[a-zà-ÿ][\wà-ÿ]*")
+
+
 def _e_linha_assinatura(linha: str) -> bool:
+    """«Pela Generali Seguros, SA:», «Pelo Sindicato … - SITEMAQ:».
+
+    Curta ou terminada em dois pontos, e a nomear uma entidade. «Pelo presente
+    instrumento, […] as partes acordam alterar o teor do artigo 32.º-A, que
+    passará a ter a seguinte redação:» também acaba em dois pontos, mas é uma
+    frase: abria o bloco das assinaturas a meio da cláusula (LPFP de 2025).
+    """
     linha = linha.strip()
-    # "Pela Generali Seguros, SA:" — curto ou terminado em dois pontos,
-    # para não confundir com prosa que comece por "Pelo presente acordo…"
-    return bool(RE_ASSINATURA.match(linha)) and (linha.endswith(":") or len(linha) < 60)
+    if not RE_ASSINATURA.match(linha):
+        return False
+    if linha.startswith("Depositad"):
+        return True
+    minusculas = [p for p in RE_PALAVRA_MINUSCULA.findall(linha) if p not in _LIGACAO]
+    return ((linha.endswith(":") or len(linha) < 60)
+            and len(minusculas) <= MAX_MINUSCULAS_ASSINATURA)
 
 
 def _inicio_assinaturas(linhas: list[str]) -> int | None:
@@ -562,14 +661,105 @@ def _formatar_tabela(linhas_tabela: list[list[str | None]]) -> str:
     return "\n".join(linhas)
 
 
+# ---------- geometria quase direita (#42) ----------
+#
+# Uma página desenhada com uma rotação de 90º que não é exata (matriz
+# (0,01; 8; -8; 0,01) em vez de (0; 8; -8; 0)) engana o pdfplumber em duas
+# coisas. As letras contam como direitas, porque a flag `upright` só olha ao
+# sinal dos termos da matriz, e são lidas ao contrário e partidas («F ol g a
+# s»). Os traços da grelha ficam uns centésimos de ponto tortos, deixam de
+# ser horizontais ou verticais, e a tabela não é detetada. Nas escalas do
+# TINITA de 2025, metade das páginas era assim. A regra: o sentido de uma
+# letra é o eixo dominante da matriz; um traço quase direito é direito.
+TRACO_QUASE_DIREITO = 0.5
+
+
+def _direita(c) -> bool:
+    """A letra está escrita na horizontal (direita ou virada 180º)?"""
+    a, b, c_, d = c["matrix"][:4]
+    return abs(a) + abs(d) >= abs(b) + abs(c_)
+
+
+MESMA_LINHA_DE_BASE = 1.0
+
+
+def _horizontal(c) -> bool:
+    """Escrita na horizontal e direita (nem rodada nem virada)."""
+    a, b, c_, d = c["matrix"][:4]
+    return a > 0 and d > 0 and abs(b) + abs(c_) < abs(a) + abs(d)
+
+
+def _sem_espacos_sobre_letras(letras: list[dict]) -> list[dict]:
+    """Um espaço de outra fonte desenhado por cima de uma letra não separa palavras.
+
+    Sobra de uma camada de texto escondida (GESAMB de 2025: um espaço de outra
+    fonte por cima do «o» de «obrigam» dava «o brigam»). Conta quando mais de
+    metade da largura do espaço cai sobre a letra e os dois estão na mesma
+    linha de base: duas linhas entrelaçadas têm linhas de base diferentes, e
+    os espaços de uma caem sobre as letras da outra. A fonte tem de ser outra:
+    no texto justificado, o espaço da própria linha é desenhado mais largo do
+    que o avanço e cai sobre a letra seguinte («A suspensão» ficava
+    «Asuspensão», ADIPA de 2025). Só no texto na horizontal:
+    no texto rodado, a linha corre na vertical, e os espaços entre algarismos
+    das grelhas deitadas do CARRIS saíam («1 220,00» ficava «1220,00»).
+    """
+    from collections import defaultdict
+
+    faixas = defaultdict(list)
+    for c in letras:
+        if not c["text"].isspace() and _horizontal(c):
+            faixas[int(c["top"] // 4)].append(c)
+
+    def sobre_letra(e) -> bool:
+        largura = e["x1"] - e["x0"]
+        if largura <= 0 or not _horizontal(e):
+            return False
+        faixa = int(e["top"] // 4)
+        return any(c["fontname"] != e["fontname"]
+                   and min(e["x1"], c["x1"]) - max(e["x0"], c["x0"]) > largura / 2
+                   and abs(e["matrix"][5] - c["matrix"][5]) < MESMA_LINHA_DE_BASE
+                   for f in (faixa - 1, faixa, faixa + 1) for c in faixas[f])
+    return [c for c in letras if not (c["text"].isspace() and sobre_letra(c))]
+
+
+def normalizar_pagina(pag) -> None:
+    """Corrige, na própria página, o sentido das letras e os traços quase direitos.
+
+    Mexe nos objetos de que derivam todas as vistas da página (`crop`,
+    `filter`, `dedupe_chars`), e por isso tem de correr antes delas. Tira
+    também as letras que estão todas fora da página: não se veem (GESAMB e
+    MaiaAmbiente de 2025, ver cct/recorte.py).
+    """
+    x0, topo, x1, fundo = pag.bbox
+    letras = [c for c in pag.objects.get("char", [])
+              if c["x1"] > x0 and c["x0"] < x1 and c["bottom"] > topo and c["top"] < fundo]
+    pag.objects["char"] = _sem_espacos_sobre_letras(letras)
+    for c in pag.objects["char"]:
+        c["upright"] = _direita(c)
+    for traco in pag.objects.get("line", []):
+        largura, altura = traco["x1"] - traco["x0"], traco["bottom"] - traco["top"]
+        if 0 < altura <= TRACO_QUASE_DIREITO < largura:
+            meio = (traco["top"] + traco["bottom"]) / 2
+            traco["doctop"] += meio - traco["top"]
+            traco["y0"] = traco["y1"] = (traco["y0"] + traco["y1"]) / 2
+            traco["top"] = traco["bottom"] = meio
+            traco["height"] = 0
+        elif 0 < largura <= TRACO_QUASE_DIREITO < altura:
+            meio = (traco["x0"] + traco["x1"]) / 2
+            traco["x0"] = traco["x1"] = meio
+            traco["width"] = 0
+
+
 # ---------- texto rodado (ISSUE-0020, #42) ----------
 #
 # Tabelas e escalas desenhadas a 90º numa página que não declara rotação: o
 # pdfplumber, por omissão, lê cada palavra ao contrário («sagloF»). Desde a
 # 0.11 sabe lê-las no sentido certo (`char_dir_rotated`); falta agrupar as
 # palavras em linhas e pôr as tabelas de pé. Só se ativa numa página com texto
-# rodado suficiente: as outras seguem o caminho de sempre.
-MIN_CARACTERES_RODADOS = 10
+# rodado: as outras seguem o caminho de sempre. Basta uma palavra: nas grelhas
+# de carreiras da AGEAS de 2025, a única palavra rodada da página é a célula
+# vertical «Gestão» (6 letras), e o mínimo de 10 deixava-a em «oãtseG».
+MIN_CARACTERES_RODADOS = 3
 
 
 def _sentido_rodado(obj) -> str | None:
@@ -580,12 +770,17 @@ def _sentido_rodado(obj) -> str | None:
     return "btt" if b > 0 else "ttb"
 
 
-def _sentido_da_pagina(pag) -> str | None:
+# uma página só deixa de se cortar em colunas com texto rodado a sério; uma
+# palavra vertical numa célula não conta
+MIN_RODADOS_SEM_COLUNAS = 10
+
+
+def _sentido_da_pagina(pag, minimo: int = MIN_CARACTERES_RODADOS) -> str | None:
     sentidos = Counter(
         s for c in pag.chars
         if not c.get("upright", True) and c["text"].strip()
         and (s := _sentido_rodado(c)))
-    if sum(sentidos.values()) < MIN_CARACTERES_RODADOS:
+    if sum(sentidos.values()) < minimo:
         return None
     return sentidos.most_common(1)[0][0]
 
@@ -699,18 +894,21 @@ def _texto(area, sentido: str | None) -> str:
 TABELA_RODADA = 0.8
 
 
-def _celula(pag, cel, sentido: str | None) -> str:
+def _celula(pag, cel, sentido: str | None, fora: tuple = ()) -> str:
     """O texto de uma célula, no sentido em que ela está escrita.
 
     Um carácter pertence à célula pelo seu centro, como no Table.extract do
-    pdfplumber: o within_bbox perdia os que tocam no traço da grelha.
+    pdfplumber: o within_bbox perdia os que tocam no traço da grelha. Os que
+    caem numa das caixas `fora` (tabelas dentro desta) não são dela.
     """
     a, b, c, d = cel
 
     def no_centro(o) -> bool:
         if o.get("object_type") != "char":
             return False
-        return (a <= (o["x0"] + o["x1"]) / 2 < c) and (b <= (o["top"] + o["bottom"]) / 2 < d)
+        cx, cy = (o["x0"] + o["x1"]) / 2, (o["top"] + o["bottom"]) / 2
+        return (a <= cx < c and b <= cy < d
+                and not any(x0 <= cx <= x1 and y0 <= cy <= y1 for x0, y0, x1, y1 in fora))
     area = pag.filter(no_centro)
     if sentido and _rodada(area):
         return _texto_celula(_linhas_rodadas(area, sentido))
@@ -724,13 +922,14 @@ def _dados_tabela(tab, sentido: str | None) -> list:
     Rodada no sentido «btt», o cabeçalho está à esquerda da página e a
     primeira coluna em baixo; no sentido «ttb», à direita e em cima.
     """
-    if sentido is None:
+    interiores = tuple(getattr(tab, "interiores", ()))
+    if sentido is None and not interiores:
         return tab.extract()
     x0, t0, x1, t1 = tab.bbox
     dentro = [c for c in tab.page.chars
               if x0 <= c["x0"] <= x1 and t0 <= c["top"] <= t1 and c["text"].strip()]
     rodados = sum(1 for c in dentro if not c.get("upright", True))
-    celulas = [[None if cel is None else _celula(tab.page, cel, sentido)
+    celulas = [[None if cel is None else _celula(tab.page, cel, sentido, interiores)
                 for cel in linha.cells] for linha in tab.rows]
     if not celulas or rodados < TABELA_RODADA * len(dentro):
         return celulas
@@ -747,6 +946,25 @@ def _rodada(area) -> bool:
     """A maior parte dos caracteres da área está rodada."""
     chars = [c for c in area.chars if c["text"].strip()]
     return bool(chars) and sum(1 for c in chars if not c.get("upright", True)) * 2 > len(chars)
+
+
+def _zona(pag, bbox):
+    """As letras de uma zona da página, cada uma pelo seu centro.
+
+    O `crop` apanha todas as letras que tocam na zona. Entre duas tabelas, ou
+    entre uma tabela e o texto, a fronteira passa rente a uma linha, e as
+    letras dela entravam nas duas zonas: nas grelhas deitadas do INOVA de
+    2025, a linha de valores «1.080,00 €» saía outra vez, entrelaçada com a
+    linha seguinte («1.080400,,0000 €€»). Como nas células, uma letra
+    pertence a uma zona só, a do seu centro.
+    """
+    a, b, c, d = bbox
+
+    def dentro(o) -> bool:
+        if o.get("object_type") != "char":
+            return o["x0"] < c and o["x1"] > a and o["top"] < d and o["bottom"] > b
+        return a <= (o["x0"] + o["x1"]) / 2 < c and b <= (o["top"] + o["bottom"]) / 2 < d
+    return pag.filter(dentro)
 
 
 def _fora_das_tabelas(area, tabelas):
@@ -778,7 +996,7 @@ def _ao_lado(pag, tab, tabelas, sentido: str | None) -> tuple[str, str]:
         if c - a < 5:
             lados.append("")
             continue
-        lados.append(_texto(_fora_das_tabelas(pag.crop((a, t0, c, t1)), tabelas), sentido))
+        lados.append(_texto(_fora_das_tabelas(_zona(pag, (a, t0, c, t1)), tabelas), sentido))
     return lados[0], lados[1]
 
 
@@ -820,6 +1038,39 @@ def _duas_colunas(pag) -> float | None:
     return None
 
 
+# uma tabela com esta fração da sua área dentro de outra está dentro dela
+TABELA_CONTIDA = 0.9
+
+
+def _tabelas(pag) -> list:
+    """As tabelas da página; cada uma sabe que tabelas tem dentro de si.
+
+    Numa grelha em escada (a tabela salarial do EPAL de 2025), o pdfplumber
+    deteta a tabela de fora e outras dentro dela, e as células da de fora
+    liam também o texto das de dentro: saía duas vezes (695 palavras a
+    mais). Uma letra pertence à tabela mais pequena que a contém: a de fora
+    guarda em `interiores` as células das de dentro e não as lê. Deitar fora
+    as de dentro não servia: nas grelhas rodadas do 382 são elas que têm a
+    estrutura.
+    """
+    tabelas = pag.find_tables()
+
+    def area(b) -> float:
+        return max(0.0, b[2] - b[0]) * max(0.0, b[3] - b[1])
+
+    def dentro(t, outra) -> bool:
+        a, b = t.bbox, outra.bbox
+        comum = (max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3]))
+        return area(b) > area(a) and area(comum) >= TABELA_CONTIDA * area(a)
+    # as células das de dentro, e não as caixas: uma letra na caixa de uma
+    # tabela de dentro mas fora das células dela só a de fora a lê (EPAL, as
+    # etiquetas da escada)
+    for t in tabelas:
+        t.interiores = [c for o in tabelas if o is not t and dentro(o, t)
+                        for c in o.cells if c is not None]
+    return tabelas
+
+
 def _tabela_atravessa(pag, meio: float) -> bool:
     """Há uma tabela detetada que se estende pelos dois lados do meio?
 
@@ -828,7 +1079,7 @@ def _tabela_atravessa(pag, meio: float) -> bool:
     «ANEX» | «O II», «Gr» | «upos profissionais»).
     """
     return any(t.bbox[0] < meio - 20 and t.bbox[2] > meio + 20
-               for t in pag.find_tables())
+               for t in _tabelas(pag))
 
 
 def _extrair_pagina_deitada(pag, sentido: str) -> str:
@@ -840,7 +1091,7 @@ def _extrair_pagina_deitada(pag, sentido: str) -> str:
     como numa página direita, partia as linhas rodadas nas fronteiras.
     """
     x_ini, topo, x_fim, fundo = pag.bbox
-    tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[0], reverse=sentido == "ttb")
+    tabelas = sorted(_tabelas(pag), key=lambda t: t.bbox[0], reverse=sentido == "ttb")
     # o texto direito da página (o cabeçalho do BTE, uma nota) lê-se de uma
     # vez: as faixas verticais partiam-no («Boletim do Trabalh» | «ho e …»)
     direito = _extrair_texto(_fora_das_tabelas(pag, tabelas).filter(
@@ -858,24 +1109,24 @@ def _extrair_pagina_deitada(pag, sentido: str) -> str:
         x0, t0, x1, t1 = tab.bbox
         antes = (pos, x0) if sentido == "btt" else (x1, pos)
         if antes[1] - antes[0] > 1:
-            juntar(pag.crop((antes[0], topo, antes[1], fundo)))
+            juntar(_zona(pag, (antes[0], topo, antes[1], fundo)))
         # ao lado da tabela, na leitura: em «btt», a esquerda lógica é o fundo
         # da página; em «ttb», é o topo
         baixo = (x0, t1, x1, fundo) if fundo - t1 > 1 else None
         cima = (x0, topo, x1, t0) if t0 - topo > 1 else None
         primeiro, segundo = (baixo, cima) if sentido == "btt" else (cima, baixo)
         if primeiro:
-            juntar(pag.crop(primeiro))
+            juntar(_zona(pag, primeiro))
         dados = _dados_tabela(tab, sentido)
         corpo = _formatar_tabela(dados) if dados else ""
         if corpo:
             partes.append(f"{MARCA_TABELA_INI}\n{corpo}\n{MARCA_TABELA_FIM}")
         if segundo:
-            juntar(pag.crop(segundo))
+            juntar(_zona(pag, segundo))
         pos = max(pos, x1) if sentido == "btt" else min(pos, x0)
     resto = (pos, x_fim) if sentido == "btt" else (x_ini, pos)
     if resto[1] - resto[0] > 1:
-        juntar(pag.crop((resto[0], topo, resto[1], fundo)))
+        juntar(_zona(pag, (resto[0], topo, resto[1], fundo)))
     return "\n".join(partes)
 
 
@@ -969,11 +1220,12 @@ def _extrair_pagina(pag, colunas: bool = True) -> str:
     sentido = _sentido_da_pagina(pag)
     if sentido and _rodada(pag):
         return _extrair_pagina_deitada(pag, sentido)
-    goteira = None if sentido or not colunas else _duas_colunas(pag)
+    rodada_a_serio = sentido and _sentido_da_pagina(pag, MIN_RODADOS_SEM_COLUNAS)
+    goteira = None if rodada_a_serio or not colunas else _duas_colunas(pag)
     if goteira is not None:
         return _extrair_em_colunas(pag, goteira)
 
-    tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[1])
+    tabelas = sorted(_tabelas(pag), key=lambda t: t.bbox[1])
     if not tabelas:
         return _texto(pag, sentido)
 
@@ -982,7 +1234,7 @@ def _extrair_pagina(pag, colunas: bool = True) -> str:
     for tab in tabelas:
         x0, t0, x1, t1 = tab.bbox
         if t0 > topo:
-            banda = _fora_das_tabelas(pag.crop((pag.bbox[0], topo, pag.bbox[2], t0)), tabelas)
+            banda = _fora_das_tabelas(_zona(pag, (pag.bbox[0], topo, pag.bbox[2], t0)), tabelas)
             txt = _texto(banda, sentido)
             if txt.strip():
                 partes.append(txt)
@@ -998,7 +1250,7 @@ def _extrair_pagina(pag, colunas: bool = True) -> str:
             partes.append(direita)
         topo = max(topo, t1)
     if topo < pag.bbox[3]:
-        banda = _fora_das_tabelas(pag.crop((pag.bbox[0], topo, pag.bbox[2], pag.bbox[3])),
+        banda = _fora_das_tabelas(_zona(pag, (pag.bbox[0], topo, pag.bbox[2], pag.bbox[3])),
                                   tabelas)
         txt = _texto(banda, sentido)
         if txt.strip():
@@ -1109,17 +1361,32 @@ def extrair_pdf(pdf_path: Path, paginas: tuple[int, int] | None = None,
                 subtipo: str = "desconhecido") -> tuple[dict, str]:
     """Extrai uma convenção de um PDF do BTE (intervalo de páginas 0-based, fim exclusivo)."""
     import pdfplumber
+    import pypdfium2 as pdfium
+
+    from .recorte import letras_escondidas, tirar_escondidas
 
     pdf_path = Path(pdf_path)
     textos = []
-    with pdfplumber.open(pdf_path) as pdf:
-        pags = pdf.pages if paginas is None else pdf.pages[paginas[0]:paginas[1]]
-        for pag in pags:
-            # negrito simulado: o mesmo carácter desenhado duas vezes, quase
-            # no mesmo sítio («CCaarrrreeiirraa», 382); fica um
-            t = _extrair_pagina(pag.dedupe_chars())
-            if t.strip():
-                textos.append(t)
+    documento = pdfium.PdfDocument(str(pdf_path))
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            inicio = 0 if paginas is None else paginas[0]
+            pags = pdf.pages if paginas is None else pdf.pages[paginas[0]:paginas[1]]
+            for n, pag in enumerate(pags, inicio):
+                # o texto recortado não se vê e não entra (cct/recorte.py)
+                pagina = documento[n]
+                try:
+                    tirar_escondidas(pag, letras_escondidas(pagina))
+                finally:
+                    pagina.close()
+                normalizar_pagina(pag)
+                # negrito simulado: o mesmo carácter desenhado duas vezes, quase
+                # no mesmo sítio («CCaarrrreeiirraa», 382); fica um
+                t = _extrair_pagina(pag.dedupe_chars())
+                if t.strip():
+                    textos.append(t)
+    finally:
+        documento.close()
     if not textos:
         raise ValueError(f"Sem texto extraível em {pdf_path} — PDF digitalizado?")
 
