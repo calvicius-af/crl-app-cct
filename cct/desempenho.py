@@ -38,10 +38,40 @@ METRICAS = ("s_por_pagina", "rss_max_mb")
 
 
 def _rss_max_mb() -> float:
-    """A memória máxima deste processo, em MB (o Linux dá KB, o macOS bytes)."""
+    """A memória máxima deste processo, em MB.
+
+    No Linux e no macOS vem do `resource` (o Linux dá KB, o macOS bytes); no
+    Windows, onde o `resource` não existe e as estações do CRL correm, do pico
+    do conjunto de trabalho (`GetProcessMemoryInfo`).
+    """
+    if sys.platform.startswith("win"):
+        return _pico_windows_mb()
     import resource
     pico = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     return pico / (1024 * 1024) if sys.platform == "darwin" else pico / 1024
+
+
+def _pico_windows_mb() -> float:
+    import ctypes
+    from ctypes import wintypes
+
+    class Contadores(ctypes.Structure):
+        _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                    ("PeakWorkingSetSize", ctypes.c_size_t),
+                    ("WorkingSetSize", ctypes.c_size_t),
+                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                    ("PagefileUsage", ctypes.c_size_t),
+                    ("PeakPagefileUsage", ctypes.c_size_t)]
+    contadores = Contadores()
+    contadores.cb = ctypes.sizeof(contadores)
+    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel32.K32GetProcessMemoryInfo(kernel32.GetCurrentProcess(),
+                                     ctypes.byref(contadores), contadores.cb)
+    return contadores.PeakWorkingSetSize / (1024 * 1024)
 
 
 def _medir_um(pdf: Path, extrator: str) -> dict:
