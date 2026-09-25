@@ -389,3 +389,13 @@ def test_capitulo_depois_do_corpo_de_um_anexo_fecha_o_anexo():
                         "CAPÍTULO I - Disposições gerais\nCláusula 1.ª - Âmbito\nTexto.\n", "t")
     nos = {n["rotulo"]: n for n in doc["nos"]}
     assert nos["CAPÍTULO I - Disposições gerais"]["pai"] is None
+
+
+def test_texto_omitido_colado_ao_titulo_e_corpo():
+    """APDL de 2025, no PDF: «Cláusula 37.ª» / «Cláusula transitória» /
+    «(Anterior cláusula 35.ª)» / «(...)». A junção de linhas cola o «(...)»
+    ao título, e a cláusula ficava sem conteúdo."""
+    doc, final = estruturar("Cláusula 37.ª\nCláusula transitória (Anterior cláusula 35.ª) (...)\n"
+                            "Cláusula 38.ª - Outra\nTexto.\n", "t")
+    nos = {n["rotulo"]: final[n["char_start"]:n["char_end"]] for n in doc["nos"]}
+    assert nos["Cláusula 37.ª - Cláusula transitória (Anterior cláusula 35.ª)"].endswith("\n(...)\n")

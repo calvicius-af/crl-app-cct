@@ -378,6 +378,13 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
                             and RE_SO_DESIGNADOR.match(linhas[j].strip()))):
                     titulo_extra = linhas[j].strip()
                     i = j  # consome a linha do título
+                    # o texto omitido colado ao título pela junção de linhas:
+                    # «Cláusula 37.ª» / «Cláusula transitória (Anterior
+                    # cláusula 35.ª) (...)» (APDL de 2025) é título e corpo
+                    omissao = RE_OMISSAO_FIM.search(titulo_extra)
+                    if tipo_cabecalho in ("clausula", "artigo") and omissao:
+                        corpo_na_linha = omissao.group(0).strip()
+                        titulo_extra = titulo_extra[:omissao.start()].strip() or None
             rotulo = _normalizar_rotulo(tipo_cabecalho, m, titulo_extra)
             break
         eventos.append((tipo_encontrado, rotulo if tipo_encontrado else linhas[i]))

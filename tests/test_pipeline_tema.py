@@ -126,3 +126,24 @@ def test_documentos_sem_pasta_de_versoes_numa_so_linha(tmp_path, monkeypatch):
     assert len(linhas) == 1, relatorio
     assert "2 documento(s)" in linhas[0] and "contido no nome do PDF" in linhas[0]
     assert "26_PR_001_BTE_31_TESTE_X_Y, 26_PR_002_BTE_31_TESTE_Z_W" in linhas[0]
+
+
+def test_pasta_de_versoes_vazia_diz_que_esta_vazia(tmp_path, monkeypatch):
+    """Corrida de 2026-09-25: a pasta existia mas sem subpastas. A regra dos
+    nomes levava a procurar um erro de nome que não havia."""
+    pasta, codebook = _pasta(tmp_path)
+    versoes = tmp_path / "versoes"
+    versoes.mkdir()
+    real = pipeline_tema.extrair_pdf
+
+    def com_consolidado(pdf, **kw):
+        doc, texto = real(pdf, **kw)
+        for no in doc["nos"]:
+            no["origem"] = "consolidado"
+        return doc, texto
+    monkeypatch.setattr(pipeline_tema, "extrair_pdf", com_consolidado)
+    out = tmp_path / "out"
+    _correr(monkeypatch, "--pdfs", pasta, "--codebook", codebook, "--out", out,
+            "--pasta-versoes", versoes)
+    relatorio = (out / "relatorio.txt").read_text(encoding="utf-8")
+    assert "não tem subpastas" in relatorio and "contido no nome" not in relatorio

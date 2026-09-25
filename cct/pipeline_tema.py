@@ -126,8 +126,15 @@ def aviso_sem_pasta(pasta_versoes: Path, documentos: list[str]) -> str:
     """Uma linha para todos os documentos sem subpasta de versões.
 
     Na corrida de 2025 eram 39 linhas iguais, uma por documento. Não é um
-    defeito da extração: é o nome das subpastas que não bate com o do PDF.
+    defeito da extração: é o nome das subpastas que não bate com o do PDF,
+    ou a pasta não tem subpastas nenhumas, e então di-lo (corrida de
+    2026-09-25: a regra dos nomes levava a procurar um erro que não havia).
     """
+    if not any(p.is_dir() for p in pasta_versoes.iterdir()):
+        return (f"{len(documentos)} documento(s) com texto consolidado e a pasta de "
+                f"versões {pasta_versoes} não tem subpastas: é preciso uma subpasta "
+                "por convenção, com as versões anteriores; sem ela, o consolidado "
+                "fica todo na faixa CONSOLIDADO — " + ", ".join(documentos))
     return (f"{len(documentos)} documento(s) com texto consolidado sem pasta de "
             f"versões correspondente em {pasta_versoes}: o nome de cada subpasta "
             "tem de estar contido no nome do PDF (ex.: `ACIP_FESAHT` para "
