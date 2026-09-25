@@ -222,7 +222,7 @@ def medir_corpus(manifesto: dict, pasta: Path, extrator: str = "pdfplumber"):
             continue
         m = medir_pdf(doc_m["nome"], pdf, texto)
         medidas.append(m)
-        avisos = verificar(doc, texto, m.sem_perda, paginas_com_imagem(pdf))
+        avisos = verificar(doc, texto, m.palavras_referencia, paginas_com_imagem(pdf))
         resultados[doc_m["nome"]] = metricas(doc, texto, m, avisos)
     return resultados, medidas, ausentes
 

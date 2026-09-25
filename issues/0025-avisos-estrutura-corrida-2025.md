@@ -51,7 +51,7 @@ medida dos 277 PDF antes e depois, está em
 |---|---|---|
 | 1 | Tabelas publicadas como imagem (INCM p3, Portway p2, SUPERBOOK p28, LAGOS p18); EMPORDEF tinha grelha torta | o aviso diz a página da imagem; os traços quase direitos passam a direitos |
 | 2 | Regulamentos em anexo com os capítulos soltos; subanexos «I-(A)» como irmãos; «ANEXO A» perdia a palavra ANEXO; enquadramentos sem grelha | hierarquia dos anexos articulados e das partes; numeração com letra; níveis lidos como tabela |
-| 3 | Redação: remissão acabada em ordinal («34.ª»), dois pontos antes do cabeçalho seguinte; e defeitos: «secção» minúscula como cabeçalho | ordinal fecha a frase; dois pontos + cabeçalho sem perda medida é redação; marcadores estruturais só com maiúscula |
+| 3 | Redação: remissão acabada em ordinal («34.ª»), dois pontos antes do cabeçalho seguinte; e defeitos: «secção» minúscula como cabeçalho | ordinal fecha a frase; dois pontos + cabeçalho é redação quando o PDF também passa diretamente de um ao outro; marcadores estruturais só com maiúscula |
 | 4 | «[Revogado.]» e «(...)» lidos como título; «Pelo presente instrumento, […]:» lido como assinatura | são corpo; a assinatura nomeia uma entidade |
 | 5 | EPAL numera «Cláusula VII-8»; EMPORDEF «Cláusula de revisão»; DHL não tem articulado | numeração romana por capítulo; designador «de revisão»; mensagem própria da alteração salarial só com tabelas |
 | 6 | AGEAS: uma palavra vertical («Gestão») abaixo do mínimo de 10 letras rodadas | basta uma palavra |

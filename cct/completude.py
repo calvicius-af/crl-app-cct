@@ -234,17 +234,16 @@ class Medida:
     # medida). Sem isto, os 39 documentos perdidos na corrida de 2025
     # apareciam como OK no diagnóstico.
     excluido: str | None = None
+    # as palavras do PDF, sem o mobiliário, pela ordem da referência: a
+    # sanidade vê nelas o que o PDF tem entre o fim de um corpo e o cabeçalho
+    # seguinte (cct/sanidade.py, `clausulas_sem_corpo`)
+    palavras_referencia: list[str] = field(default_factory=list)
 
     @property
     def cobertura(self) -> float:
         if not self.palavras_pdf:
             return 1.0
         return 1 - sum(self.em_falta.values()) / self.palavras_pdf
-
-    @property
-    def sem_perda(self) -> bool:
-        """A leitura independente do PDF não dá por falta de texto."""
-        return not self.erro and self.cobertura >= COBERTURA_OK
 
     @property
     def excesso(self) -> float:
@@ -285,6 +284,7 @@ def medir(documento: str, paginas_pdf: list[str], texto: str) -> Medida:
     texto = _juntar_hifenizacao(_normalizar(texto))
 
     ref_palavras = palavras(referencia)
+    m.palavras_referencia = ref_palavras
     txt_palavras = palavras(texto)
     m.palavras_pdf, m.palavras_texto = len(ref_palavras), len(txt_palavras)
     ref, txt = Counter(ref_palavras), Counter(txt_palavras)

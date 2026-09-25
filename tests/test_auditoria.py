@@ -301,3 +301,27 @@ def test_enquadramento_sem_grelha_lido_como_texto_nao_da_aviso():
         "Nível I Director de serviços;\nSecretário-geral.\n"
         "Nível II Chefe de divisão;\nPsicólogo principal.\nNível III Técnico.")
     assert tabelas_esperadas(doc, texto + "\nx | y") == []
+
+
+def test_tabela_salarial_so_com_rotulos_de_nivel_continua_a_dar_aviso():
+    """Revisão do PR #92: três rótulos «Nível I/II/III» num anexo salarial sem
+    nenhum valor não provam a tabela; nem num enquadramento sem categorias."""
+    for rotulo, corpo in (
+            ("ANEXO III - Tabela salarial", "Nível I\nNível II\nNível III"),
+            ("ANEXO IV - Enquadramento em níveis de remuneração", "Nível I\nNível II\nNível III"),
+            ("ANEXO IV - Enquadramento em níveis de remuneração",
+             "Nível I Director.\nNível II\nNível III\nNível IV\nNível V Técnico.")):
+        doc, texto = _doc_com_anexo(rotulo, corpo)
+        assert len(tabelas_esperadas(doc, texto + "\nx | y")) == 1, rotulo
+
+
+def test_enquadramento_de_alteracao_com_niveis_omitidos_nao_da_aviso():
+    """AEBRAGA e AHRESP de 2025: os níveis que não mudam vêm com «(...)», e o
+    rótulo pode dizer «Categorias profissionais e níveis» em vez de
+    «Enquadramento». Chega que a maioria dos níveis traga categorias."""
+    corpo = ("Nível V (...)\nNível VI (...)\nNível VII (...)\nNível VIII (...)\n"
+             "Nível IX Caixeiro ajudante;\nNível X Operador;\nNível XI Cozinheiro.")
+    for rotulo in ("ANEXO II - Enquadramento das profissões por níveis salariais",
+                   "ANEXO II - Categorias profissionais e níveis de remuneração"):
+        doc, texto = _doc_com_anexo(rotulo, corpo)
+        assert tabelas_esperadas(doc, texto + "\nx | y") == [], rotulo

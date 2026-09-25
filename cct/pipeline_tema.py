@@ -310,7 +310,8 @@ def main():
                 imagens = paginas_com_imagem(pdf)
             except Exception:           # o auditor nunca custa o documento
                 imagens = []
-            for aviso in verificar_sanidade(doc, texto, sem_perda=medidas[-1].sem_perda,
+            for aviso in verificar_sanidade(doc, texto,
+                                            referencia=medidas[-1].palavras_referencia,
                                             paginas_imagem=imagens):
                 problemas.append(f"{pdf.stem}: {aviso}")
             # auditoria cruzada de tabelas: o que um extrator vê e o outro

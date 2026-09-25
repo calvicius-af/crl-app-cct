@@ -292,18 +292,24 @@ def test_ordinal_abreviado_fecha_a_frase():
         "Cláusula 67.ª - Outra: corpo sem frase terminada em ponto"]
 
 
-def test_dois_pontos_antes_de_cabecalho_sem_perda_e_redacao():
-    """SETAAB de 2025: a «Parentalidade» acaba em «nomeadamente:» e a
-    cláusula seguinte vem logo a seguir, no PDF também. Quando a completude
-    não encontra texto em falta, é redação; sem essa medida, continua a ser
-    o sinal das alíneas perdidas."""
+def test_dois_pontos_antes_de_cabecalho_como_no_pdf_e_redacao():
+    """SETAAB de 2025: a «Parentalidade» acaba em «nomeadamente:» e, no PDF
+    também, a cláusula seguinte vem logo a seguir. É redação. A prova é local:
+    se o PDF tem alguma coisa entre os dois, o aviso fica, por pequena que
+    seja a perda no documento (revisão do PR #92)."""
+    from cct.completude import palavras
     doc, final = estruturar(ALTERACAO.format(
         setima="Cláusula 7.ª - Parentalidade\nSão assegurados os direitos "
                "da lei, nomeadamente:\nCláusula 8.ª - Outra\nTexto final.\n"), "x")
     aviso = ["Cláusula 7.ª - Parentalidade: corpo sem frase terminada em ponto"]
+    pdf_igual = palavras(final)
+    pdf_com_alineas = palavras(final.replace(
+        "nomeadamente:\n", "nomeadamente:\na) Licença parental inicial;\n"))
     assert clausulas_sem_corpo(doc, final) == aviso
-    assert clausulas_sem_corpo(doc, final, sem_perda=True) == []
-
+    assert clausulas_sem_corpo(doc, final, pdf_igual) == []
+    assert clausulas_sem_corpo(doc, final, pdf_com_alineas) == aviso
+    # quatro palavras em mil: a cobertura do documento seria 99,6%
+    assert len(pdf_com_alineas) - len(pdf_igual) == 4
 
 def test_alteracao_salarial_so_com_numeros_e_tabelas_nao_tem_articulado():
     """DHL de 2025: «- Alteração salarial e outras», números e uma tabela.

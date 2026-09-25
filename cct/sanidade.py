@@ -38,7 +38,8 @@ RE_ANUNCIO = re.compile(
     r"|aditad[oa]s?|republicad[oa]s?)\b[^:]*:$", re.IGNORECASE)
 
 
-def clausulas_sem_corpo(doc: dict, texto: str, sem_perda: bool = False) -> list[str]:
+def clausulas_sem_corpo(doc: dict, texto: str,
+                        referencia: list[str] | None = None) -> list[str]:
     """Cláusulas e artigos cujo corpo não tem uma única frase terminada.
 
     Um cabeçalho seguido logo de outro cabeçalho é o sintoma clássico de
@@ -48,11 +49,14 @@ def clausulas_sem_corpo(doc: dict, texto: str, sem_perda: bool = False) -> list[
     enumeração que acaba em dois pontos sem nada a seguir continua a contar:
     é o caso típico das alíneas perdidas.
 
-    `sem_perda` diz que a medida independente da completude não encontrou
-    texto do PDF em falta. Nesse caso, um corpo que acaba em dois pontos e é
-    seguido logo por um cabeçalho está como foi publicado: a família SETAAB
-    de 2025 fecha a «Parentalidade» em «nomeadamente:» e passa à cláusula
-    seguinte, e a AHP anuncia a tabela («passam a ser:») antes do anexo.
+    `referencia` são as palavras do PDF, sem o mobiliário, pela ordem da
+    leitura independente (`Medida.palavras_referencia`). Um corpo que acaba em
+    dois pontos e é seguido por um cabeçalho está como foi publicado quando o
+    PDF também passa das últimas palavras do corpo diretamente às primeiras do
+    cabeçalho: a família SETAAB de 2025 fecha a «Parentalidade» em
+    «nomeadamente:» e passa à cláusula seguinte. A prova é local: se o PDF
+    tem alguma coisa entre os dois (as alíneas que se perderam), o aviso
+    fica, seja qual for a cobertura do documento (revisão do PR #92).
     """
     comecos = {no["char_start"]: no for no in doc.get("nos", [])}
     falhas = []
@@ -66,7 +70,7 @@ def clausulas_sem_corpo(doc: dict, texto: str, sem_perda: bool = False) -> list[
             falhas.append(f"{no['rotulo']}: sem conteúdo")
         elif not any(RE_FRASE_FECHADA.search(l) for l in corpo.split("\n") if l.strip()):
             if (_anuncia_o_que_segue(no, corpo, comecos) or _corpo_sem_frases(bruto)
-                    or (sem_perda and _dois_pontos_antes_de_cabecalho(no, corpo, comecos))):
+                    or _dois_pontos_como_no_pdf(no, corpo, comecos, referencia)):
                 continue
             falhas.append(f"{no['rotulo']}: corpo sem frase terminada em ponto")
     return falhas
@@ -86,10 +90,29 @@ def _corpo_sem_frases(bruto: str) -> bool:
 _TIPOS_CABECALHO = ("clausula", "artigo", "anexo", "capitulo", "seccao")
 
 
-def _dois_pontos_antes_de_cabecalho(no: dict, corpo: str, comecos: dict) -> bool:
+# palavras do fim do corpo e do início do cabeçalho que têm de estar seguidas
+# no PDF
+PALAVRAS_DO_FIM = 6
+PALAVRAS_DO_CABECALHO = 3
+
+
+def _dois_pontos_como_no_pdf(no: dict, corpo: str, comecos: dict,
+                             referencia: list[str] | None) -> bool:
+    """O corpo acaba em dois pontos e, no PDF, o cabeçalho seguinte vem logo a seguir."""
+    from .completude import palavras
+
     seguinte = comecos.get(no["char_end"])
-    return (corpo.rstrip().endswith(":") and seguinte is not None
-            and seguinte.get("tipo") in _TIPOS_CABECALHO)
+    if (not referencia or not corpo.rstrip().endswith(":") or seguinte is None
+            or seguinte.get("tipo") not in _TIPOS_CABECALHO):
+        return False
+    fim = palavras(corpo)[-PALAVRAS_DO_FIM:]
+    cabeca = palavras(seguinte.get("rotulo", ""))[:PALAVRAS_DO_CABECALHO]
+    if not fim or not cabeca:
+        return False
+    esperado = fim + cabeca
+    n = len(esperado)
+    return any(referencia[i:i + n] == esperado
+               for i in range(len(referencia) - n + 1) if referencia[i] == esperado[0])
 
 
 def _anuncia_o_que_segue(no: dict, corpo: str, comecos: dict) -> bool:
@@ -221,13 +244,13 @@ def sem_articulado(doc: dict, texto: str = "") -> str | None:
     return AVISO_SEM_ESTRUTURA
 
 
-def verificar(doc: dict, texto: str, sem_perda: bool = False,
+def verificar(doc: dict, texto: str, referencia: list[str] | None = None,
               paginas_imagem: list[int] | None = None) -> list[str]:
     """Todos os controlos; devolve a lista de avisos (vazia = tudo bem).
 
-    `sem_perda`: a completude, medida contra o PDF, não encontrou texto em
-    falta (ver `clausulas_sem_corpo`). `paginas_imagem`: as páginas do PDF com
-    uma imagem grande (ver `auditoria.tabelas_esperadas`).
+    `referencia`: as palavras do PDF pela leitura independente da completude
+    (ver `clausulas_sem_corpo`). `paginas_imagem`: as páginas do PDF com uma
+    imagem grande (ver `auditoria.tabelas_esperadas`).
     """
     from .auditoria import tabelas_esperadas
 
@@ -238,7 +261,7 @@ def verificar(doc: dict, texto: str, sem_perda: bool = False,
     aviso = deposito_no_fim(texto, e_retificacao=e_retificacao(doc, texto))
     if aviso:
         avisos.append(aviso)
-    vazias = clausulas_sem_corpo(doc, texto, sem_perda)
+    vazias = clausulas_sem_corpo(doc, texto, referencia)
     if vazias:
         avisos.append(f"{len(vazias)} cláusula(s)/artigo(s) sem corpo válido: "
                       + "; ".join(vazias[:5])

@@ -185,6 +185,37 @@ MIN_LINHAS_TEXTO = 3
 # «Nível I Director de serviços; Director de serviços clínicos; … Nível II …»
 # (CNIS, ACIP e AHRESP de 2025)
 _RE_NIVEL = re.compile(r"\b(?:N[íi]vel|Grupo|Grau|Escal[ãa]o)\s+(?:[IVXLCD]+|\d+)\b")
+# o rótulo diz que o anexo classifica categorias ou profissões por nível
+_RE_ENQUADRAMENTO = re.compile(r"enquadramento|categori|profiss", re.IGNORECASE)
+_RE_PALAVRA_DE_CATEGORIA = re.compile(r"[A-Za-zÀ-ÿ]{3,}")
+_RE_OMITIDO = re.compile(r"[(\[]\s*(?:(?:\.\s*){3}|…)\s*[)\]]\.?")
+
+
+def _enquadramento_lido_como_texto(rotulo: str, bruto: str) -> bool:
+    """Um enquadramento sem grelha, com as categorias de cada nível.
+
+    O rótulo tem de dizer que o anexo classifica categorias ou profissões
+    («Enquadramento das profissões…», «Categorias profissionais e níveis…»),
+    e não só uma tabela de valores; e pelo menos três níveis, e a maioria
+    deles, têm de trazer categorias antes do nível seguinte. Numa alteração,
+    os níveis que não mudam vêm com «(...)» (AEBRAGA de 2025), e um nível pode
+    vir vazio (CNIS). Uma tabela salarial de que só sobraram os rótulos
+    («Nível I», «Nível II», «Nível III») continua a dar aviso (revisão do PR
+    #92).
+    """
+    if not _RE_ENQUADRAMENTO.search(rotulo):
+        return False
+    corpo = bruto.split("\n", 1)[1] if "\n" in bruto else ""
+    marcas = list(_RE_NIVEL.finditer(corpo))
+    if len(marcas) < MIN_VALORES:
+        return False
+    fins = [m.start() for m in marcas[1:]] + [len(corpo)]
+    conteudos = [corpo[m.end():fim] for m, fim in zip(marcas, fins)]
+    com_categorias = sum(1 for c in conteudos if _RE_PALAVRA_DE_CATEGORIA.search(c))
+    # um nível omitido («(...)») não mudou; não é um nível vazio
+    omitidos = sum(1 for c in conteudos if _RE_OMITIDO.fullmatch(c.strip()))
+    return (com_categorias >= MIN_VALORES
+            and com_categorias * 2 > len(marcas) - omitidos)
 
 
 def _descendentes(no: dict, nos: list[dict]) -> list[dict]:
@@ -236,7 +267,7 @@ def tabelas_esperadas(doc: dict, texto: str,
             # rótulo não promete uma tabela de valores.
             corpo = [l for l in bruto.split("\n")[1:] if l.strip()]
             if (len(_RE_VALOR.findall(bruto)) >= MIN_VALORES
-                    or len(_RE_NIVEL.findall(bruto)) >= MIN_VALORES):
+                    or _enquadramento_lido_como_texto(rotulo, bruto)):
                 continue
             if (len(corpo) >= MIN_LINHAS_TEXTO
                     and not _RE_ANEXO_DE_VALORES.search(rotulo)):
