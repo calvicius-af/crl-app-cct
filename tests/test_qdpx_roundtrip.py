@@ -95,3 +95,29 @@ def test_codigos_referenciados_existem_no_codebook(qdpx_path):
     guids_codigos = {c.get("guid") for c in raiz.findall(".//q:CodeBook//q:Code", NS)}
     refs = {r.get("targetGUID") for r in raiz.findall(".//q:CodeRef", NS)}
     assert refs <= guids_codigos
+
+
+def _doc_com_tabela():
+    from cct.extractor import estruturar
+    return estruturar("Cláusula 1.ª - Âmbito\nTexto da primeira cláusula.\n"
+                      "ANEXO I - Tabela salarial\n\x02TABELA\nNível | Valor\n"
+                      "A | 1 355,48\nB | 1 200,00\n\x03TABELA\n"
+                      "Cláusula 2.ª - Vigência\nTexto depois da tabela.\n", "t")
+
+
+def test_verificar_offsets_de_todos_os_nos_de_um_documento_com_tabela():
+    """#84: as seleções recortam o texto de cada nó antes, dentro e depois
+    das tabelas, relidas do zip como o MaxQDA as lê."""
+    from cct.qdpx import verificar_offsets
+    doc, texto = _doc_com_tabela()
+    assert verificar_offsets(doc, texto) == []
+
+
+def test_verificar_offsets_apanha_um_remapeamento_errado(monkeypatch):
+    """O controlo negativo: com o remapeamento desviado um carácter, as
+    seleções deixam de bater e o verificador diz quais."""
+    from cct import qdpx
+    doc, texto = _doc_com_tabela()
+    real = qdpx._remapear
+    monkeypatch.setattr(qdpx, "_remapear", lambda i, f, p: tuple(x + 1 for x in real(i, f, p)))
+    assert qdpx.verificar_offsets(doc, texto)

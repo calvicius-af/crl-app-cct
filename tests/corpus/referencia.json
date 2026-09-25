@@ -6,9 +6,10 @@
       "a_mais": 0,
       "invertidas": 0,
       "mobiliario": 0,
-      "linhas_longas": 2,
+      "linhas_longas": 1,
       "saltos_numeracao": 0,
       "avisos_sanidade": 0,
+      "offsets_qdpx": 0,
       "clausulas": 65,
       "anexos": 4,
       "linhas_tabela": 34
@@ -22,6 +23,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 1,
       "avisos_sanidade": 0,
+      "offsets_qdpx": 0,
       "clausulas": 2,
       "anexos": 0,
       "linhas_tabela": 0
@@ -35,6 +37,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 2,
       "avisos_sanidade": 0,
+      "offsets_qdpx": 0,
       "clausulas": 4,
       "anexos": 1,
       "linhas_tabela": 12
@@ -48,6 +51,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 3,
       "avisos_sanidade": 0,
+      "offsets_qdpx": 0,
       "clausulas": 5,
       "anexos": 1,
       "linhas_tabela": 13
@@ -61,19 +65,21 @@
       "linhas_longas": 0,
       "saltos_numeracao": 0,
       "avisos_sanidade": 0,
+      "offsets_qdpx": 0,
       "clausulas": 73,
       "anexos": 3,
       "linhas_tabela": 14
     },
     "2026_BTE_31_SPE_382_AE_47252_EmpresaMetropolitana-SINTAP": {
       "cobertura": 0.9978,
-      "ordem": 0.9663,
+      "ordem": 0.9666,
       "a_mais": 19,
       "invertidas": 0,
       "mobiliario": 0,
       "linhas_longas": 0,
       "saltos_numeracao": 1,
       "avisos_sanidade": 0,
+      "offsets_qdpx": 0,
       "clausulas": 82,
       "anexos": 3,
       "linhas_tabela": 168
@@ -87,6 +93,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 0,
       "avisos_sanidade": 0,
+      "offsets_qdpx": 0,
       "clausulas": 45,
       "anexos": 2,
       "linhas_tabela": 19
@@ -100,6 +107,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 2,
       "avisos_sanidade": 0,
+      "offsets_qdpx": 0,
       "clausulas": 6,
       "anexos": 3,
       "linhas_tabela": 104
@@ -113,6 +121,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 2,
       "avisos_sanidade": 0,
+      "offsets_qdpx": 0,
       "clausulas": 6,
       "anexos": 3,
       "linhas_tabela": 104
@@ -126,6 +135,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 1,
       "avisos_sanidade": 0,
+      "offsets_qdpx": 0,
       "clausulas": 4,
       "anexos": 2,
       "linhas_tabela": 58
@@ -139,6 +149,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 0,
       "avisos_sanidade": 1,
+      "offsets_qdpx": 0,
       "clausulas": 0,
       "anexos": 0,
       "linhas_tabela": 24
@@ -152,6 +163,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 0,
       "avisos_sanidade": 1,
+      "offsets_qdpx": 0,
       "clausulas": 0,
       "anexos": 0,
       "linhas_tabela": 24
@@ -165,6 +177,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 0,
       "avisos_sanidade": 1,
+      "offsets_qdpx": 0,
       "clausulas": 0,
       "anexos": 0,
       "linhas_tabela": 24
@@ -178,6 +191,7 @@
       "linhas_longas": 0,
       "saltos_numeracao": 0,
       "avisos_sanidade": 1,
+      "offsets_qdpx": 0,
       "clausulas": 0,
       "anexos": 0,
       "linhas_tabela": 24

@@ -1,6 +1,6 @@
 # ISSUE-0025: avisos de estrutura que ficaram na corrida de 2025
 
-- **Estado:** Resolvida no código (2026-09-25) — falta confirmar numa corrida da estação
+- **Estado:** Resolvida — 2026-09-25; confirmada na corrida de `0a7f250` (#91 fechado)
 - **Data:** 2026-09-25
 - **GitHub:** #91
 - **Onde dói:** `cct/extractor.py` (estrutura), `cct/sanidade.py`, `cct/auditoria.py`, `cct/recorte.py`

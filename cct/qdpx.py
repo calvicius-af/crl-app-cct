@@ -255,3 +255,42 @@ def exportar_qdpx(itens: list[tuple[dict, str, dict]], destino: Path,
             zf.writestr(f"Sources/{guid}.txt",
                         texto.replace("\r\n", "\n").encode("utf-8"))
     return destino
+
+
+def verificar_offsets(doc: dict, texto: str) -> list[str]:
+    """Seleções de um QDPX real que não recortam o texto que deviam (issue #84).
+
+    Exporta o documento com uma seleção por nó (cláusulas, parágrafos,
+    anexos, tabelas: antes, dentro e depois das grelhas) e relê o zip com
+    leitura independente (zipfile + ElementTree), como o MaxQDA o lê. Cada
+    seleção, sem as quebras que o exportador acrescentou, tem de ser o trecho
+    canónico do nó, carácter a carácter. Devolve os nós que falham.
+    """
+    import tempfile
+
+    nos = [n for n in doc.get("nos", []) if n["char_end"] > n["char_start"]]
+    anot = {"anotacoes": [
+        {"no_id": n["id"], "codigo": f"Verificação/{n['tipo']}",
+         "char_start": n["char_start"], "char_end": n["char_end"],
+         "metodo": "verificação", "confianca": 1.0} for n in nos]}
+    if not nos:
+        return []
+    inseridos = set(indices_inseridos(pontos_de_espacamento(texto, doc)))
+    with tempfile.TemporaryDirectory() as pasta:
+        destino = exportar_qdpx([(doc, texto, anot)], Path(pasta) / "v.qdpx")
+        with zipfile.ZipFile(destino) as zf:
+            raiz = ET.fromstring(zf.read("project.qde").decode("utf-8"))
+            fonte = next(n for n in zf.namelist() if n.startswith("Sources/"))
+            exportado = zf.read(fonte).decode("utf-8")
+    selecoes = raiz.findall(f".//{{{NS}}}TextSource/{{{NS}}}PlainTextSelection")
+    falhas = []
+    for no, sel in zip(nos, selecoes):
+        ini, fim = int(sel.get("startPosition")), int(sel.get("endPosition"))
+        recorte = "".join(c for i, c in enumerate(exportado[ini:fim], start=ini)
+                          if i not in inseridos)
+        if not (0 <= ini < fim <= len(exportado)) or \
+                recorte != texto[no["char_start"]:no["char_end"]]:
+            falhas.append(no["rotulo"])
+    if len(selecoes) != len(nos):
+        falhas.append(f"{len(selecoes)} seleções para {len(nos)} nós")
+    return falhas

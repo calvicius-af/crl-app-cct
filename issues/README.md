@@ -27,7 +27,7 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 
 | # | Título | Estado |
 |---|---|---|
-| [0001](0001-numeracao-por-extenso.md) | Normalizar cláusulas com numeração por extenso | Em curso — falta gate com convenção real |
+| [0001](0001-numeracao-por-extenso.md) | Normalizar cláusulas com numeração por extenso | Resolvida |
 | [0002](0002-quebras-de-linha-em-titulos-multilinha.md) | Quebras de linha nos blocos de título do início dos documentos | Aberta |
 | [0003](0003-qdpx-perde-ganhos-do-docling.md) | O QDPX perde os ganhos de legibilidade do extrator Docling | Em curso |
 | [0004](0004-revisao-pr-23.md) | Correções exigidas pela revisão do PR #23 | Resolvida |
@@ -40,7 +40,7 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0011](0011-siglas-inexistente-da-traceback.md) | `--siglas` com ficheiro inexistente dá traceback em vez de mensagem | Resolvida |
 | [0012](0012-ci-nao-cobre-windows-nem-python-313.md) | O CI não corre em Windows nem em Python 3.13 | Resolvida |
 | [0013](0013-proveniencia-sem-git-na-estacao.md) | A proveniência perde o commit quando não há git na estação | Resolvida |
-| [0014](0014-carristur-sem-clausulas-nem-nota-de-deposito.md) | Quatro documentos CARRISTUR produzem zero cláusulas | Resolvida no código — falta confirmar na corrida |
+| [0014](0014-carristur-sem-clausulas-nem-nota-de-deposito.md) | Quatro documentos CARRISTUR produzem zero cláusulas | Resolvida |
 | [0015](0015-assinaturas-sem-quebra-nomes-deslocados.md) | O bloco de assinaturas sai sem quebra, com nomes deslocados e sem destaque | Em curso |
 | [0016](0016-marcadores-paragrafo-alinea-perdidos.md) | Marcadores de parágrafo e alínea perdidos ou trocados por hífens | Resolvida |
 | [0017](0017-titulo-clausula-68-nao-apanhado.md) | O título da Cláusula 68.ª não é apanhado | Resolvida |
@@ -50,8 +50,8 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0021](0021-alternativas-tabelas-maxqda.md) | Alternativas para tabelas melhor formatadas no MAXQDA | Aberta |
 | [0022](0022-nomes-nao-seguem-esquema-rnc.md) | Os nomes dos ficheiros não seguem o esquema definido em docs/rnc/README.md | Resolvida |
 | [0023](0023-auditoria-anexos-artigos-falsos-positivos.md) | Auditoria de anexos e artigos sinaliza falsos positivos | Resolvida no código — falta confirmar na corrida |
-| [0024](0024-tabelas-salariais-colapsadas-bte31.md) | Tabelas salariais colapsadas no TXT do BTE 31/2026 | Resolvida no código — falta importação no MaxQDA |
-| [0025](0025-avisos-estrutura-corrida-2025.md) | Avisos de estrutura que ficaram na corrida de 2025 | Resolvida no código — falta confirmar na corrida |
+| [0024](0024-tabelas-salariais-colapsadas-bte31.md) | Tabelas salariais colapsadas no TXT do BTE 31/2026 | Resolvida |
+| [0025](0025-avisos-estrutura-corrida-2025.md) | Avisos de estrutura que ficaram na corrida de 2025 | Resolvida |
 
 ## Ronda de 2026-09-18: qualidade da extração (linting e renomeação)
 
