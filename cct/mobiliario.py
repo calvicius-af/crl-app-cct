@@ -25,6 +25,9 @@ RE_CABECALHO = re.compile(
 RE_DATA = re.compile(rf"^\d{{1,2}}\s+(?:{MESES})\s+\d{{4}}$", re.IGNORECASE)
 RE_RODAPE = re.compile(r"^BTE\s+\d+(?:\s*\|\s*\d+)?$")
 RE_NUMERO_PAGINA = re.compile(r"^\d{1,4}$")
+# o rodapé partido pela leitura em colunas: «6 | 110», «BTE | 23» (corrida de
+# 2025). Só nas margens da página: a meio, «6 | 110» pode ser conteúdo.
+RE_RODAPE_PARTIDO = re.compile(r"^(?:BTE\s*)?\d{0,3}\s*\|\s*\d{1,4}$")
 
 # O PDFium lê o cabeçalho e a data numa só linha e, nas páginas rodadas, cola-
 # lhe o texto seguinte: «Boletim do Trabalho e Emprego 31 22 agosto 2026 Deve

@@ -488,9 +488,69 @@ def test_corpo_na_linha_do_cabecalho():
         "Artigo 7.º Serão ainda sujeitos ao teste todos os trabalhadores que o "
         "solicitem, nos termos do regulamento em vigor.",
         "Cláusula 5.ª (Revogada.)",
+        "Artigo 2.º [Revogado.]",
+        "Artigo 17.º As decisões dos árbitros são tomadas por maioria.",
+        "Artigo 18.º - Disposições finais e transitórias",
+        "Aplica-se o regime legal em vigor.",
         "Cláusula 6.ª - Férias", "O período de férias é de 22 dias úteis."])
     doc, final = estruturar(texto, "teste")
-    assert _rotulos(texto) == ["Artigo 7.º", "Cláusula 5.ª", "Cláusula 6.ª - Férias"]
+    assert _rotulos(texto) == ["Artigo 7.º", "Cláusula 5.ª", "Artigo 2.º", "Artigo 17.º",
+                               "Artigo 18.º - Disposições finais e transitórias",
+                               "Cláusula 6.ª - Férias"]
     from cct.sanidade import clausulas_sem_corpo
     assert clausulas_sem_corpo(doc, final) == []
     assert "Serão ainda sujeitos ao teste" in final
+
+
+def test_letras_em_escada_nao_se_separam_uma_a_uma(tmp_path):
+    """TINITA de 2025: letras escritas em escada também se sobrepõem com
+    alturas diferentes. Separá-las como linhas entrelaçadas dava uma letra por
+    linha («F F S / o é e l r r …») e 929 palavras a mais."""
+    linhas = [(72, 760, "Texto normal da página antes da escala.")]
+    for j, palavra in enumerate(["Folgas", "Férias", "Serviço"]):
+        for i, letra in enumerate(palavra):
+            linhas.append((100 + j * 40 + i * 1.5, 700 - i * 2.0, letra))
+    _doc, texto = extrair_pdf(escrever_pdf(tmp_path / "x.pdf", [linhas]))
+    assert "Folgas Férias Serviço" in texto
+
+
+def test_pagina_final_com_assinaturas_em_colunas(tmp_path):
+    """Corrida de 2025: nas páginas finais, as assinaturas vêm em duas
+    colunas e o fim do texto e a nota de depósito ocupam a largura toda.
+    Cortar a página ao meio partia a nota: «livro n.º 13, com o n.º 45/2025,
+    nos…» ficava depois dela."""
+    linhas = [(72, 800, "Boletim do Trabalho e Emprego, n.º 6, 15/2/2025")]
+    y = 760
+    for t in ["O presente acordo produz efeitos a partir de 1 de janeiro de 2025, com exceção das",
+              "cláusulas de expressão pecuniária, que produzem efeitos a partir de 1 de março."]:
+        linhas.append((72, y, t))
+        y -= 14
+    y -= 10
+    esquerda = ["Pela Empresa X, SA:", "Maria Alves Pereira, na qualidade",
+                "de presidente do conselho de", "administração.",
+                "João Carlos Silva, vogal do", "conselho de administração."]
+    direita = ["Pelo Sindicato dos Trabalhadores", "da Administração Pública e de",
+               "Entidades com Fins Públicos - SINTAP:", "Carlos Miguel Dias Moreira, na",
+               "qualidade de mandatário.", "Ana Rita Costa, mandatária."]
+    for a, b in zip(esquerda, direita):
+        linhas += [(72, y, a), (320, y, b)]
+        y -= 14
+    y -= 10
+    for t in ["Depositado em 20 de fevereiro de 2025, a fl. 90 do livro n.º 13, com o n.º 45/2025, nos",
+              "termos do artigo 494.º do Código do Trabalho, aprovado pela Lei n.º 7/2009, de 12 de fevereiro."]:
+        linhas.append((72, y, t))
+        y -= 14
+    linhas.append((470, 40, "BTE 6 | 110"))
+    _doc, texto = extrair_pdf(escrever_pdf(tmp_path / "x.pdf", [linhas]))
+    from cct.sanidade import deposito_no_fim
+    assert deposito_no_fim(texto) is None, texto
+    assert "com exceção das cláusulas de expressão pecuniária" in texto
+    assert texto.index("Pela Empresa X") < texto.index("Pelo Sindicato") < texto.index("Depositado")
+    assert "110" not in texto
+
+
+def test_rodape_partido_nas_margens_sai():
+    paginas = [f"Texto {n}.\nMais texto {n}.\nOutra linha {n}.\nFim {n}.\n{n} | 1{n}"
+               for n in range(1, 4)] + ["Texto.\nMais.\nOutra.\nFim.\nBTE | 23"]
+    junto = "\n".join(_remover_cabecalhos_rodapes(paginas))
+    assert "|" not in junto and junto.count("Fim") == 4

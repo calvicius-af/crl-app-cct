@@ -14,7 +14,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from .mobiliario import e_mobiliario, sem_prefixo_de_cabecalho
+from .mobiliario import RE_RODAPE_PARTIDO, e_mobiliario, sem_prefixo_de_cabecalho
 
 RE_CAPITULO = re.compile(r"^(?:CAP[IÍ]TULO|T[IÍ]TULO)\s+([IVXLCD]+|\d+)\b(.*)$")
 RE_SECCAO = re.compile(r"^SEC[ÇC][AÃ]O\s+([IVXLCD]+|\d+)\b(.*)$", re.IGNORECASE)
@@ -228,8 +228,13 @@ RE_FIM_DE_ITEM = re.compile(r"[,;]\s*$")
 # o corpo que vem na linha do cabeçalho: uma frase acabada, longa de mais para
 # ser um título, ou só «Revogada.»
 RE_FRASE_ACABADA = re.compile(r"""[.!?:][)\]»”"']*\s*$""")
-RE_REVOGADA = re.compile(r"^\(?\s*revogad[oa]s?\s*\.?\s*\)?$", re.IGNORECASE)
+RE_REVOGADA = re.compile(r"^[(\[]?\s*revogad[oa]s?\s*\.?\s*[)\]]?$", re.IGNORECASE)
 MAX_TITULO = 90
+# uma frase acabada com estas palavras já não é um título: «As decisões dos
+# árbitros são tomadas por maioria.» (8), «Devem existir, em locais
+# apropriados, lavabos suficientes.» (7). O limite de 90 caracteres deixava
+# passar 13 artigos na corrida de 2025.
+MIN_PALAVRAS_FRASE = 7
 
 
 def _nao_e_cabecalho(tipo: str, linha: str, resto: str, na_tabela: bool) -> bool:
@@ -250,7 +255,8 @@ def _e_corpo(resto: str) -> bool:
     """O resto da linha do cabeçalho é corpo, e não o título."""
     resto = resto.strip(" -–—:")
     return bool(RE_REVOGADA.match(resto)
-                or (len(resto) > MAX_TITULO and RE_FRASE_ACABADA.search(resto)))
+                or (RE_FRASE_ACABADA.search(resto)
+                    and (len(resto) > MAX_TITULO or len(resto.split()) >= MIN_PALAVRAS_FRASE)))
 
 
 def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[dict, str]:
@@ -588,6 +594,7 @@ def _linhas_rodadas(area, sentido: str) -> str:
 # sobrepostas. O PDFium lê-as bem, porque segue a ordem do conteúdo.
 Y_TOLERANCIA = 3
 MIN_SOBREPOSICOES = 3
+MIN_LETRAS_LINHA = 4
 
 
 def _tolerancia_vertical(area) -> float:
@@ -596,6 +603,12 @@ def _tolerancia_vertical(area) -> float:
     Numa linha a sério, as letras seguem-se sem se sobreporem; quando duas
     linhas se fundem, letras de uma caem em cima de letras da outra, com
     outra altura. A tolerância passa a metade da menor dessas distâncias.
+
+    Só conta quando, separadas, as letras formam linhas a sério (de
+    `MIN_LETRAS_LINHA` letras ou mais, com quase todas as letras). Letras
+    escritas em escada, uma a uma, também se sobrepõem com alturas
+    diferentes: nas escalas do TINITA, separá-las dava uma letra por linha e
+    baralhava as palavras (corrida de 2025 no ramo do PR #90).
     """
     from pdfplumber.utils import cluster_objects
 
@@ -606,9 +619,14 @@ def _tolerancia_vertical(area) -> float:
         sobrepostas = [abs(b["top"] - a["top"]) for a, b in zip(linha, linha[1:])
                        if a["x1"] - b["x0"] > 0.3 * min(a["width"], b["width"])
                        and abs(b["top"] - a["top"]) > 0.3]
-        if len(sobrepostas) >= MIN_SOBREPOSICOES:
-            distancias.extend(sobrepostas)
-    return min(distancias) / 2 if distancias else Y_TOLERANCIA
+        if len(sobrepostas) < MIN_SOBREPOSICOES:
+            continue
+        tolerancia = min(sobrepostas) / 2
+        partes = [len(p) for p in cluster_objects(linha, "top", tolerancia)]
+        cheias = [n for n in partes if n >= MIN_LETRAS_LINHA]
+        if len(cheias) >= 2 and sum(cheias) >= 0.8 * len(linha):
+            distancias.append(tolerancia)
+    return min(distancias) if distancias else Y_TOLERANCIA
 
 
 def _virado(o) -> bool:
@@ -835,7 +853,67 @@ def _extrair_pagina_deitada(pag, sentido: str) -> str:
     return "\n".join(partes)
 
 
-def _extrair_pagina(pag) -> str:
+# Numa linha que atravessa a goteira, o espaço entre a última letra à esquerda
+# e a primeira à direita é o de uma palavra; entre duas colunas é bem maior.
+GOTEIRA_MINIMA = 8
+
+
+def _faixas_de_colunas(pag, goteira: float) -> list[tuple[float, float, bool]] | None:
+    """Faixas horizontais de uma página em colunas: (topo, fundo, larga).
+
+    Nas páginas finais de 2025 as assinaturas vêm em duas colunas, mas o fim
+    do texto e a nota de depósito ocupam a largura toda. Cortar a página
+    inteira ao meio partia essas linhas em duas metades, lidas em sítios
+    diferentes: «livro n.º 13, com o n.º 253/2025, nos termos do artigo …»
+    ficava depois da nota (74 avisos de «linhas depois da nota de depósito»).
+    Devolve `None` quando nenhuma linha atravessa a goteira: a página é toda
+    em colunas.
+    """
+    from pdfplumber.utils import cluster_objects
+
+    chars = [c for c in pag.chars if c["text"].strip() and c.get("upright", True)]
+    linhas = []
+    for linha in cluster_objects(chars, "top", Y_TOLERANCIA):
+        esquerda = [c for c in linha if (c["x0"] + c["x1"]) / 2 < goteira]
+        direita = [c for c in linha if (c["x0"] + c["x1"]) / 2 >= goteira]
+        larga = bool(esquerda and direita) and (
+            min(c["x0"] for c in direita) - max(c["x1"] for c in esquerda) < GOTEIRA_MINIMA)
+        linhas.append((min(c["top"] for c in linha), max(c["bottom"] for c in linha), larga))
+    linhas.sort()
+    if not any(larga for *_, larga in linhas):
+        return None
+    faixas: list[list] = []
+    for topo, fundo, larga in linhas:
+        if faixas and faixas[-1][2] == larga:
+            faixas[-1][1] = max(faixas[-1][1], fundo)
+        else:
+            faixas.append([topo, fundo, larga])
+    # as fronteiras ficam a meio do espaço entre faixas; as pontas, na página
+    limites = [pag.bbox[1]] + [(a[1] + b[0]) / 2 for a, b in zip(faixas, faixas[1:])] + [pag.bbox[3]]
+    return [(limites[i], limites[i + 1], f[2]) for i, f in enumerate(faixas)]
+
+
+def _extrair_em_colunas(pag, goteira: float) -> str:
+    """Uma página em duas colunas, com as linhas de largura inteira no seu sítio.
+
+    O texto sai por faixas, de cima para baixo; numa faixa em colunas lê-se
+    a esquerda e depois a direita. A marca de coluna separa os segmentos, para
+    a remoção do mobiliário ver o topo e o fundo de cada um.
+    """
+    x0, _topo, x1, _fundo = pag.bbox
+    faixas = _faixas_de_colunas(pag, goteira) or [(pag.bbox[1], pag.bbox[3], False)]
+    segmentos: list[list[str]] = [[]]
+    for topo, fundo, larga in faixas:
+        if larga:
+            segmentos[-1].append(_extrair_pagina(pag.crop((x0, topo, x1, fundo)), colunas=False))
+            continue
+        segmentos[-1].append(_extrair_pagina(pag.crop((x0, topo, goteira, fundo)), colunas=False))
+        segmentos.append([_extrair_pagina(pag.crop((goteira, topo, x1, fundo)), colunas=False)])
+    return f"\n{MARCA_COLUNA}\n".join(
+        t for t in ("\n".join(p for p in seg if p.strip()) for seg in segmentos) if t.strip())
+
+
+def _extrair_pagina(pag, colunas: bool = True) -> str:
     """Extrai uma página intercalando bandas de texto e tabelas na ordem de leitura.
 
     O BTE é de coluna única: fatiamos a página em bandas horizontais entre
@@ -846,12 +924,9 @@ def _extrair_pagina(pag) -> str:
     sentido = _sentido_da_pagina(pag)
     if sentido and _rodada(pag):
         return _extrair_pagina_deitada(pag, sentido)
-    goteira = None if sentido else _duas_colunas(pag)
+    goteira = None if sentido or not colunas else _duas_colunas(pag)
     if goteira is not None:
-        esq = pag.crop((pag.bbox[0], pag.bbox[1], goteira, pag.bbox[3]))
-        dir_ = pag.crop((goteira, pag.bbox[1], pag.bbox[2], pag.bbox[3]))
-        return f"\n{MARCA_COLUNA}\n".join(
-            t for t in (_extrair_pagina(esq), _extrair_pagina(dir_)) if t.strip())
+        return _extrair_em_colunas(pag, goteira)
 
     tabelas = sorted(pag.find_tables(), key=lambda t: t.bbox[1])
     if not tabelas:
@@ -976,7 +1051,8 @@ def _remover_cabecalhos_rodapes(paginas: list[str]) -> list[str]:
                     if resto:
                         linhas.append(resto)
                     continue
-                if i in margens and (limpa in repetidas or re.fullmatch(r"\d+", limpa)):
+                if i in margens and (limpa in repetidas or re.fullmatch(r"\d+", limpa)
+                                     or RE_RODAPE_PARTIDO.match(limpa)):
                     continue
                 linhas.append(linha)
         limpas.append("\n".join(linhas))
