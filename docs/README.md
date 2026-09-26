@@ -6,6 +6,7 @@ Por onde começar, consoante o que precisas:
 |---|---|
 | ver o sistema a funcionar, com ficheiros reais | [../examples/](../examples/README.md) |
 | perceber como funciona | [arquitetura/arquitetura.md](arquitetura/arquitetura.md) |
+| reagir ao rascunho do modelo de dados da BD operacional (#14) | [arquitetura/modelo-de-dados-rascunho.md](arquitetura/modelo-de-dados-rascunho.md) |
 | perceber **porque** é assim | [adr/](adr/README.md) — 19 decisões registadas |
 | operá-lo | [operacao/guia-operacao.md](operacao/guia-operacao.md) |
 | arrumar e nomear os ficheiros do RNC | [rnc/README.md](rnc/README.md) — a convenção, o catálogo e os vocabulários |
