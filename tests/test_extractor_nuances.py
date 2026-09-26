@@ -277,6 +277,23 @@ def test_data_de_outorga_nao_vira_titulo_do_anexo():
     assert "Maia, 14 de julho de 2026." in final
 
 
+def test_linha_de_tabela_nao_vira_titulo_do_anexo():
+    # 382 de 2026: o ANEXO III não tem título próprio, só as grelhas de
+    # carreiras; a primeira linha da tabela colava-se ao rótulo, «ANEXO III -
+    # | Carreira de Direção Geral», e saía da tabela (ISSUE-0018)
+    from cct.extractor import MARCA_TABELA_FIM, MARCA_TABELA_INI
+    texto = (f"ANEXO III\n{MARCA_TABELA_INI}\n | Carreira de Direção Geral\n"
+             f"Sub-Nível | I | II\n{MARCA_TABELA_FIM}\n")
+    doc, final = estruturar(texto, "t")
+    anexo = [n for n in doc["nos"] if n["tipo"] == "anexo"]
+    assert anexo[0]["rotulo"] == "ANEXO III"
+    assert "| Carreira de Direção Geral" in final.split("ANEXO III", 1)[1]
+    # uma linha curta fora da tabela continua a ser o título
+    doc, _ = estruturar("ANEXO III\nTabela salarial\nTexto.\n", "t")
+    assert [n["rotulo"] for n in doc["nos"] if n["tipo"] == "anexo"] == [
+        "ANEXO III - Tabela salarial"]
+
+
 # ---------- "Declaração" como início de bloco (ISSUE-0015, ponto 3) ----------
 
 def test_declaracao_nao_se_cola_ao_nome_anterior():
