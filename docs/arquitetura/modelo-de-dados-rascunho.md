@@ -45,8 +45,8 @@ Dois caminhos produzem os mesmos dados, com uma diferença que importa ao modelo
 
 Um QDPX, um XLSX ou um manifesto não pertencem, portanto, a uma publicação: pertencem a
 uma execução e contêm várias publicações. E o texto de cada documento dentro do QDPX não
-é o TXT canónico: `cct/qdpx.py` insere linhas em branco antes das cláusulas e das secções, à volta das tabelas e
-das assinaturas (`pontos_de_espacamento`) e remapeia os offsets. As codificações feitas
+é o TXT canónico: `cct/qdpx.py` insere linhas em branco antes das cláusulas, das secções e
+das assinaturas, e à volta das tabelas (`pontos_de_espacamento`), e remapeia os offsets. As codificações feitas
 no MaxQDA estão nesse texto espaçado.
 
 Quanto aos instrumentos: só a família `convencao` passa da fase 1. As portarias de
