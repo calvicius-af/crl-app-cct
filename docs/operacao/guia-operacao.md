@@ -220,7 +220,7 @@ lento (1,7 s/página a quente e cerca de 4 GB de memória, medidos no corpus) e 
 ```
 .venv/bin/python -m cct.desempenho medir                      # pdfplumber, sobre data/corpus
 .venv/bin/python -m cct.desempenho medir --extrator docling   # o docling, com os modelos já em cache
-.venv/bin/python -m cct.desempenho medir --comparar           # falha acima da referência + 15% ou do orçamento
+.venv/bin/python -m cct.desempenho medir --comparar           # falha acima da referência + 15% (e do orçamento, se aprovado)
 ```
 
 Mede cada PDF do corpus de regressão num processo à parte: o arranque, a extração a

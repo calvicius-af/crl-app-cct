@@ -51,8 +51,10 @@ só no ambiente em que foi medida.
 
 ## Gate
 
-- `python -m cct.desempenho medir --comparar` sai com 1 acima da referência + 15% ou do
-  orçamento. Sem referência para o ambiente, só verifica o orçamento e diz como a criar.
+- `python -m cct.desempenho medir --comparar` sai com 1 acima da referência deste
+  ambiente + 15%. O orçamento absoluto só trava quando o seu estado, em
+  `tests/desempenho/referencia.json`, for `aprovado`; enquanto for `proposta` (como
+  está), é mostrado e não falha. Sem referência para o ambiente, diz como a criar.
 - O workflow `Desempenho` (`.github/workflows/desempenho.yml`) corre-o todas as segundas-
   feiras sobre o corpus, só com o pdfplumber, e guarda as medidas como artefacto. Não
   corre em cada PR: os tempos de uma máquina partilhada variam demasiado para bloquear
@@ -62,7 +64,9 @@ só no ambiente em que foi medida.
 
 ## O que fica
 
-1. **Aprovar o orçamento.** Os valores acima são uma proposta.
+1. **Aprovar o orçamento.** Os valores acima são uma proposta. Aprová-los é mudar o
+   `estado` para `aprovado` em `tests/desempenho/referencia.json`: a partir daí, o
+   workflow semanal passa a falhar acima deles.
 2. **Referência do CI:** a primeira corrida do workflow dá as medidas de `linux-x86_64`,
    que se juntam à referência (artefacto `desempenho`).
 3. **PDF com OCR.** O corpus só tem PDF com camada de texto, e o extrator clássico não faz

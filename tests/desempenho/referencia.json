@@ -1,7 +1,8 @@
 {
   "tolerancia": 0.15,
   "orcamento": {
-    "_nota": "Proposta de 2026-09-26, por aprovar (#26): cerca de 2,5 vezes a referência medida num Mac arm64 com 10 núcleos, para caber numa máquina do CI ou numa estação mais lenta.",
+    "estado": "proposta",
+    "_nota": "Proposta de 2026-09-26, por aprovar (#26): cerca de 2,5 vezes a referência medida num Mac arm64 com 10 núcleos, para caber numa máquina do CI ou numa estação mais lenta. Enquanto o estado for «proposta», o --comparar mostra o orçamento mas não falha por ele; passa a travar quando o estado for «aprovado».",
     "pdfplumber": {
       "s_por_pagina": 0.5,
       "rss_max_mb": 600

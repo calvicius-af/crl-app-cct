@@ -5,6 +5,9 @@ o contrato: o que se agrega, quando uma medida é regressão, e que o comando
 mede um PDF num subprocesso e grava a referência do ambiente.
 """
 import json
+import sys
+
+import pytest
 
 from cct import desempenho
 from tests.pdf_sintetico import escrever_pdf, pagina_bte
@@ -61,3 +64,38 @@ def test_sem_referencia_para_o_ambiente_diz_como_a_criar(tmp_path, capsys, monke
     assert desempenho.main(["medir", "--pdfs", str(pdfs), "--referencia",
                             str(tmp_path / "nao_existe.json"), "--comparar"]) == 0
     assert "--atualizar" in capsys.readouterr().out
+
+
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="só em Windows")
+def test_memoria_maxima_em_windows():
+    """As estações são Windows, onde o `resource` não existe: o pico vem do
+    GetProcessMemoryInfo, com os tipos Win32 declarados (revisão do PR #94)."""
+    assert desempenho._rss_max_mb() > 1
+
+
+def _referencia_com_orcamento(tmp_path, estado):
+    ref = tmp_path / f"referencia-{estado}.json"
+    ref.write_text(json.dumps({"tolerancia": 0.15, "ambientes": {}, "orcamento": {
+        "estado": estado, "pdfplumber": {"s_por_pagina": 0.000001, "rss_max_mb": 1}}}),
+        encoding="utf-8")
+    return ref
+
+
+def test_orcamento_por_aprovar_so_informa_e_aprovado_trava(tmp_path, capsys, monkeypatch):
+    """Revisão do PR #94: um orçamento que ainda é proposta não pode ser um gate."""
+    monkeypatch.setattr(desempenho, "RESULTADOS", tmp_path / "resultados")
+    pdfs = tmp_path / "pdfs"
+    pdfs.mkdir()
+    escrever_pdf(pdfs / "x.pdf", [pagina_bte(1, ["Texto."])])
+    comum = ["medir", "--pdfs", str(pdfs), "--comparar", "--referencia"]
+    assert desempenho.main(comum + [str(_referencia_com_orcamento(tmp_path, "proposta"))]) == 0
+    assert "Orçamento por aprovar (só informativo, não falha)" in capsys.readouterr().out
+    assert desempenho.main(comum + [str(_referencia_com_orcamento(tmp_path, "aprovado"))]) == 1
+    assert "passa o orçamento" in capsys.readouterr().out
+
+
+def test_a_referencia_do_repositorio_tem_o_orcamento_por_aprovar():
+    """Enquanto a decisão do #26 não for tomada, o gate semanal não aplica o orçamento."""
+    ref = json.loads(desempenho.REFERENCIA.read_text(encoding="utf-8"))
+    assert ref["orcamento"]["estado"] == "proposta"
+    assert not desempenho.orcamento_aprovado(ref)
