@@ -65,6 +65,9 @@ jobs:
           }
           New-SmbShare -Name crl -Path C:\partilha -FullAccess "$env:USERDOMAIN\$env:USERNAME" | Out-Null
           Get-SmbShare -Name crl
+          # o robocopy devolve 1 quando copiou ficheiros, e o Actions leria
+          # esse código como falha do passo
+          exit 0
 
       - name: Instalar a partir da unidade mapeada L:\ (o caso da estação)
         # O mapeamento vale para a sessão deste passo: mapear, provar a
