@@ -196,6 +196,24 @@ que um outorgante do mesmo lado (patronal ou sindical), é sempre o primeiro da 
 entra no nome — o aviso fica no relatório para confirmação, mas não há escolha a fazer
 entre outorgantes.
 
+**Confirmar na app.** Depois de «Recolher do BTE…», se houver documentos por confirmar, a
+app abre a janela «Confirmar siglas» (também disponível no botão com o mesmo nome). Para
+cada documento mostra a sigla sugerida de cada outorgante, que se aceita ou corrige, e os
+outros avisos. Todos os documentos começam desmarcados: confirma-se cada um marcando-o,
+depois de rever as siglas e os avisos, e «Gravar e nomear» sem nenhum marcado não grava
+nada. Uma sigla apagada não volta à sugestão: enquanto um documento marcado tiver uma
+sigla vazia, ou só com pontuação, nada é gravado e a janela diz qual é. No nome e no
+`siglas.csv` só entram letras e algarismos, sem acentos, até 20 caracteres; se isso mudar a
+sigla escrita («E.M.M.» fica `EMM`), a janela mostra-o e pergunta antes de gravar. O
+`siglas.csv` guarda uma sigla por entidade, por isso a mesma entidade em vários documentos
+tem uma só caixa: corrigi-la num documento corrige-a nos outros. Os documentos confirmados são nomeados
+logo a seguir, offline e só eles;
+as siglas confirmadas ficam gravadas no `siglas.csv` da raiz do projeto (criado se não
+existir, e nunca substituído: as linhas que lá estão ficam) e não voltam a ser
+perguntadas, porque a recolha e a nomeação carregam esse ficheiro sempre que ele existe.
+Na linha de comandos, o mesmo faz-se com `python -m cct.nomeacao --aplicar --confirmar
+CHAVE` (repetível).
+
 O `siglas.csv` **não é um ficheiro do repositório**: é conhecimento da equipa (que
 entidade usa que sigla), escrito localmente por quem opera a recolha, tal como os
 próprios índices do BTE em `data/raw/indices/`. Não existe um `siglas.csv` "oficial" para

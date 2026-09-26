@@ -70,7 +70,8 @@ def main(argv=None):
     texto1 = recolha.texto_resumo(r1, rede=rede)
     print(texto1)
 
-    tabela = nomeacao.carregar_siglas(Path(args.siglas)) if args.siglas else None
+    # o siglas.csv da equipa (as siglas confirmadas na app) entra sempre (#38)
+    tabela = nomeacao.tabela_de_siglas([args.siglas] if args.siglas else []) or None
     voc_ambito = (mod_ambito.carregar_vocabulario(Path(args.ambitos))
                   if args.ambitos else mod_ambito.carregar_vocabulario())
     r2 = nomeacao.nomear(registo, Path(args.destino), aplicar=args.aplicar,

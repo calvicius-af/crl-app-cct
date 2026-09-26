@@ -33,6 +33,10 @@ from .recolha import (INTERVALO_PERSISTENCIA, RAIZ, REGISTO_OMISSAO, Registo,
                       familia, sha256_ficheiro)
 
 DESTINO_OMISSAO = RAIZ / "data" / "raw" / "bte"
+# O siglas.csv da equipa, na raiz do projeto (não vem no repositório). É onde a
+# app grava as siglas confirmadas, e carrega-se sempre que existe: uma sigla
+# confirmada uma vez não volta a ser perguntada (#38).
+SIGLAS_EQUIPA = RAIZ / "siglas.csv"
 
 # Os esquemas de nome que a aplicação escreve. Ver ADR-0021 e ADR-0022.
 #
@@ -165,6 +169,19 @@ def _limpar_sigla(token: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "", _sem_acentos(token))
 
 
+def normalizar_sigla(sigla: str) -> str:
+    """A sigla como entra no nome e no siglas.csv: só letras e algarismos, sem
+    acentos, até MAX_SIGLA. Vazia se não sobrar nada ("!!!", "  ")."""
+    return _limpar_sigla(sigla)[:MAX_SIGLA]
+
+
+def chave_entidade(nome: str) -> str:
+    """A regra única de «a mesma entidade» na tabela de siglas: sem acentos nem
+    maiúsculas, e sem os espaços e a pontuação à volta. Serve a leitura do
+    siglas.csv, a procura da sigla, a gravação e a janela de confirmação."""
+    return _sem_acentos((nome or "").strip().strip(" .;,")).lower()
+
+
 def _camel(nome: str, max_chars: int = MAX_SIGLA) -> str:
     """Recurso quando não há sigla: 'Águas do Norte' → 'AguasNorte'.
 
@@ -197,7 +214,7 @@ def sigla(nome: str, tabela: dict[str, str] | None = None) -> tuple[str, str | N
     if not nome:
         return "", "outorgante vazio"
     if tabela:
-        chave = _sem_acentos(nome).lower()
+        chave = chave_entidade(nome)
         if chave in tabela:
             return tabela[chave], None
         # Correspondência parcial, para apanhar as variações de pontuação e os
@@ -274,6 +291,30 @@ def tipo_normalizado(tipo: str | None) -> str:
     return limpo or "SEMTIPO"
 
 
+def _outorgantes_escolhidos(entrada: dict, maximo: int = MAX_SIGLAS_RNC
+                            ) -> tuple[list[str], list[str], list[str]]:
+    """Os outorgantes que entram no nome, todos os outorgantes, e os avisos."""
+    avisos: list[str] = []
+    nomes = [n.strip() for n in re.split(r"[;\n]", entrada.get("outorgantes") or "")
+             if n.strip()]
+    if not nomes:
+        nomes = _partes_do_titulo(entrada.get("titulo", ""))
+        if nomes:
+            avisos.append("outorgantes lidos do título — confirmar")
+    if not nomes:
+        return [], [], avisos + ["sem outorgantes no índice nem no título"]
+    patronais = [n for n in nomes if not e_sindical(n)]
+    sindicais = [n for n in nomes if e_sindical(n)]
+    if patronais and sindicais:
+        escolhidos = [patronais[0], sindicais[0]][:maximo]
+    else:
+        escolhidos = nomes[:maximo]
+        lado = "patronal" if patronais else "sindical"
+        avisos.append(f"só há partes do lado {lado} — o nome usa as "
+                      f"{len(escolhidos)} primeira(s) pela ordem do índice; confirmar")
+    return escolhidos, nomes, avisos
+
+
 def siglas_outorgantes(entrada: dict, tabela: dict[str, str] | None = None,
                        maximo: int = MAX_SIGLAS_RNC) -> tuple[list[str], int, list[str]]:
     """A primeira sigla patronal e a primeira sindical, e quantas partes sobram.
@@ -284,24 +325,9 @@ def siglas_outorgantes(entrada: dict, tabela: dict[str, str] | None = None,
     as `maximo` primeiras pela ordem do índice e fica um aviso, porque o par
     escolhido pode não ser o principal.
     """
-    avisos: list[str] = []
-    nomes = [n.strip() for n in re.split(r"[;\n]", entrada.get("outorgantes") or "")
-             if n.strip()]
+    escolhidos, nomes, avisos = _outorgantes_escolhidos(entrada, maximo)
     if not nomes:
-        nomes = _partes_do_titulo(entrada.get("titulo", ""))
-        if nomes:
-            avisos.append("outorgantes lidos do título — confirmar")
-    if not nomes:
-        return [], 0, avisos + ["sem outorgantes no índice nem no título"]
-    patronais = [n for n in nomes if not e_sindical(n)]
-    sindicais = [n for n in nomes if e_sindical(n)]
-    if patronais and sindicais:
-        escolhidos = [patronais[0], sindicais[0]][:maximo]
-    else:
-        escolhidos = nomes[:maximo]
-        lado = "patronal" if patronais else "sindical"
-        avisos.append(f"só há partes do lado {lado} — o nome usa as "
-                      f"{len(escolhidos)} primeira(s) pela ordem do índice; confirmar")
+        return [], 0, avisos
     siglas: list[str] = []
     for nome in escolhidos:
         s, aviso = sigla(nome, tabela)
@@ -642,13 +668,102 @@ def carregar_siglas(caminho: Path) -> dict[str, str]:
                 and linha[i_origem].strip().lower().split("+")[0]
                 in ORIGENS_IGNORADAS):
             continue
-        nome = _sem_acentos(linha[i_nome]).strip().lower()
-        valor = _limpar_sigla(linha[i_sigla])[:MAX_SIGLA]
+        nome = chave_entidade(linha[i_nome])
+        valor = normalizar_sigla(linha[i_sigla])
         if not nome or not valor:
             continue
         if not tem_cabecalho and nome in COLUNAS_NOME:
             continue                       # cabeçalho não declarado
         tabela.setdefault(nome, valor)
+    return tabela
+
+
+def siglas_derivadas(entrada: dict, tabela: dict[str, str] | None = None,
+                     esquema: str = ESQUEMA_OMISSAO) -> list[tuple[str, str]]:
+    """(outorgante, sigla sugerida) das siglas do nome que foram adivinhadas."""
+    if esquema == "rnc":
+        escolhidos, _nomes, _avisos = _outorgantes_escolhidos(entrada)
+    else:
+        patronais, sindicais = separar_outorgantes(entrada.get("outorgantes", ""),
+                                                   entrada.get("titulo", ""))
+        escolhidos = [lista[0] for lista in (patronais, sindicais) if lista]
+    derivadas = []
+    for nome in escolhidos:
+        s, aviso = sigla(nome, tabela)
+        if aviso and s:
+            derivadas.append((nome.strip(" .;,"), s))
+    return derivadas
+
+
+def pendentes(registo: Registo, tabela: dict[str, str] | None = None,
+              esquema: str = ESQUEMA_OMISSAO) -> list[dict]:
+    """Os documentos por confirmar, com as siglas a confirmar e os outros avisos.
+
+    É o que a janela de confirmação da app mostra (#38): para cada documento,
+    a sigla sugerida de cada outorgante cuja sigla foi adivinhada, e os
+    restantes avisos, que a pessoa vê antes de confirmar.
+    """
+    lista = []
+    for e in registo.entradas.values():
+        nomeacao = e.get("nomeacao") or {}
+        if nomeacao.get("estado") != "por_confirmar":
+            continue
+        derivadas = siglas_derivadas(e, tabela, esquema)
+        outros = [a for a in nomeacao.get("avisos", []) if "sigla derivada" not in a]
+        lista.append({"chave": e["chave"], "doc_id": nomeacao.get("doc_id", ""),
+                      "titulo": (e.get("titulo") or "")[:160],
+                      "siglas": derivadas, "outros_avisos": outros})
+    return sorted(lista, key=lambda p: p["chave"])
+
+
+def gravar_siglas(caminho: Path, decisoes: dict[str, str]) -> Path:
+    """Acrescenta ou atualiza `nome;sigla` no siglas.csv da equipa.
+
+    O ficheiro é criado se não existir e nunca é substituído: as linhas que já
+    lá estão ficam, e uma entidade que já lá esteja passa a ter a sigla nova.
+    Uma sigla que não sobrevive à normalização é um erro (ValueError), e nada
+    é escrito. Escreve-se no formato sem cabeçalho que o `carregar_siglas()` lê.
+    """
+    import csv
+    caminho = Path(caminho)
+    linhas: list[list[str]] = []
+    if caminho.exists():
+        with open(caminho, encoding="utf-8-sig", newline="") as f:
+            linhas = [l for l in csv.reader(f, delimiter=";") if l and l[0].strip()]
+    inuteis = [n for n, s in decisoes.items() if n.strip() and not normalizar_sigla(s)]
+    if inuteis:
+        # nunca descartar em silêncio uma decisão (revisão do PR #96)
+        raise ValueError("sigla sem letras nem algarismos para: " + "; ".join(inuteis))
+    decisoes = {n.strip(): normalizar_sigla(s) for n, s in decisoes.items() if n.strip()}
+    por_chave = {chave_entidade(n): n for n in decisoes}
+    vistas = set()
+    for linha in linhas:
+        chave = chave_entidade(linha[0])
+        if chave in por_chave and len(linha) >= 2:
+            linha[1] = decisoes[por_chave[chave]]
+            vistas.add(chave)
+    linhas += [[n, s] for n, s in decisoes.items()
+               if chave_entidade(n) not in vistas]
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    with open(caminho, "w", encoding="utf-8", newline="") as f:
+        csv.writer(f, delimiter=";", lineterminator="\n").writerows(linhas)
+    return caminho
+
+
+def tabela_de_siglas(caminhos: list[Path], equipa: Path | None = None) -> dict[str, str]:
+    """A tabela de siglas: o siglas.csv da equipa (se existir) e os indicados.
+
+    O da equipa vem primeiro e ganha: é onde ficam as siglas que uma pessoa
+    confirmou, uma a uma. Em caso de conflito entre os indicados, ganha o
+    primeiro, como sempre.
+    """
+    equipa = SIGLAS_EQUIPA if equipa is None else equipa
+    ordem = ([equipa] if equipa.is_file() else []) + [
+        Path(c) for c in caminhos if Path(c).resolve() != equipa.resolve()]
+    tabela: dict[str, str] = {}
+    for caminho in ordem:
+        for nome, s in carregar_siglas(caminho).items():
+            tabela.setdefault(nome, s)
     return tabela
 
 
@@ -707,7 +822,8 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
            aceitar_heuristicas: bool = False,
            esquema: str = ESQUEMA_OMISSAO,
            vocabulario_ambito: dict[str, str] | None = None,
-           migrar: bool = False) -> dict:
+           migrar: bool = False,
+           confirmados: set[str] | None = None) -> dict:
     """Atribui nomes e, com `aplicar=True`, copia os PDFs para o destino.
 
     Um documento cujo nome tenha avisos de `nome_documento()` (sigla
@@ -729,6 +845,11 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
     apagado depois de conferido o `sha256`, e a correspondência fica em
     `resumo["migracoes"]` — é dela que o catálogo precisa para não perder as
     colunas da equipa (SPEC-0004, passo 4).
+
+    `confirmados` são as chaves dos documentos que uma pessoa confirmou, um a
+    um (a janela de confirmação da app, #38): só esses são processados, e os
+    avisos deles não os travam — foram vistos. É a alternativa, documento a
+    documento, ao `aceitar_heuristicas`, que vale para a corrida inteira.
     """
     if esquema not in ESQUEMAS:
         raise ValueError(f"esquema de nome desconhecido: {esquema!r} "
@@ -746,7 +867,8 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
                 if e.get("familia") in familias
                 and (e.get("descarga") or {}).get("estado") in ESTADOS_COM_FICHEIRO
                 and not (esquema == "rnc"
-                         and e.get("familia") in FAMILIAS_SO_METADADO)]
+                         and e.get("familia") in FAMILIAS_SO_METADADO)
+                and (confirmados is None or e.get("chave") in confirmados)]
     entradas.sort(key=lambda e: (e.get("ano") or 0, e.get("num_bte") or 0,
                                  (e.get("nomeacao") or {}).get("ordinal") or 0))
     vistos: dict[tuple, list[str]] = {}
@@ -844,7 +966,7 @@ def nomear(registo: Registo, destino: Path, *, aplicar: bool = False,
                     contar("conflito")
                 continue
 
-            if avisos_heuristica and not aceitar_heuristicas:
+            if avisos_heuristica and not (aceitar_heuristicas or confirmados):
                 nomeacao["estado"] = "por_confirmar"
                 contar("por_confirmar")
                 continue
@@ -942,6 +1064,10 @@ def main(argv=None):
                    help="escreve mesmo os documentos com sigla derivada por "
                         "heurística, sem esperar por confirmação humana "
                         "(--siglas) — usar com critério")
+    p.add_argument("--confirmar", action="append", default=[], metavar="CHAVE",
+                   help="processa só este documento, confirmado por uma pessoa "
+                        "(os avisos dele não o travam); repetível — é o que a "
+                        "janela de confirmação da app usa")
     p.add_argument("--migrar", action="store_true",
                    help="passa os nomes já escritos no esquema RNC anterior "
                         "(ADR-0016) para o esquema do ADR-0022, uma única vez; "
@@ -962,7 +1088,6 @@ def main(argv=None):
     # continue a poder ser usada em testes com caminhos construídos. O
     # `siglas.csv` é conhecimento da equipa e não vem no repositório (PR #39):
     # a mensagem tem de dizer isso, porque um traceback não o diria.
-    tabela: dict[str, str] = {}
     for caminho in args.siglas:
         caminho = Path(caminho)
         if not caminho.is_file():
@@ -971,8 +1096,7 @@ def main(argv=None):
                 "  → o siglas.csv é conhecimento da equipa e não vem no\n"
                 "    repositório: copiar docs/operacao/siglas.exemplo.csv\n"
                 "    para a raiz do projeto, editar, e repetir")
-        for nome, s in carregar_siglas(caminho).items():
-            tabela.setdefault(nome, s)      # o primeiro ficheiro ganha
+    tabela = tabela_de_siglas(args.siglas)
     voc_ambito = (mod_ambito.carregar_vocabulario(Path(args.ambitos))
                   if args.ambitos else mod_ambito.carregar_vocabulario())
     resumo = nomear(registo, Path(args.destino), aplicar=args.aplicar,
@@ -980,7 +1104,7 @@ def main(argv=None):
                     familias=tuple(f.strip() for f in args.familias.split(",") if f.strip()),
                     aceitar_heuristicas=args.aceitar_heuristicas,
                     esquema=args.esquema, vocabulario_ambito=voc_ambito,
-                    migrar=args.migrar)
+                    migrar=args.migrar, confirmados=set(args.confirmar) or None)
     if resumo["migracoes"] and args.correspondencia:
         escrever_correspondencia(resumo["migracoes"], Path(args.correspondencia))
     print(texto_resumo(resumo, aplicar=args.aplicar))
