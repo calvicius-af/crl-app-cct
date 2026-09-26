@@ -247,7 +247,7 @@ buracos. Registo: [docling-isolado-2026-09-26.md](../validacao/docling-isolado-2
 ```
 .venv/bin/python -m cct.desempenho medir                      # pdfplumber, sobre data/corpus
 .venv/bin/python -m cct.desempenho medir --extrator docling   # o docling, com os modelos já em cache
-.venv/bin/python -m cct.desempenho medir --comparar           # falha acima da referência + 15% ou do orçamento
+.venv/bin/python -m cct.desempenho medir --comparar           # falha acima da referência + 15% (e do orçamento, se aprovado)
 ```
 
 Mede cada PDF do corpus de regressão num processo à parte: o arranque, a extração a

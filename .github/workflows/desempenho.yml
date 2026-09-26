@@ -1,9 +1,10 @@
 name: Desempenho
 
-# Gate agendado de desempenho dos extratores (#26): mede o corpus de regressão
-# com `python -m cct.desempenho` e falha quando os segundos por página ou a
-# memória passam a referência deste ambiente mais 15%, ou o orçamento
-# absoluto (tests/desempenho/referencia.json). Agendado, e não em cada PR: os
+# Medida agendada de desempenho dos extratores (#26): mede o corpus de
+# regressão com `python -m cct.desempenho` e falha quando os segundos por
+# página ou a memória passam a referência deste ambiente mais 15%. O orçamento
+# absoluto (tests/desempenho/referencia.json) só trava quando o seu estado for
+# «aprovado»; enquanto for «proposta», é mostrado e não falha. Agendado, e não em cada PR: os
 # tempos de uma máquina partilhada variam, e uma semana de margem chega para
 # apanhar uma regressão sem bloquear quem trabalha.
 on:

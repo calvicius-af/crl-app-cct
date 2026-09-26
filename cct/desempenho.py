@@ -65,12 +65,20 @@ def _pico_windows_mb() -> float:
                     ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
                     ("PagefileUsage", ctypes.c_size_t),
                     ("PeakPagefileUsage", ctypes.c_size_t)]
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+    # os tipos declarados: sem eles, o ctypes passa o identificador do processo
+    # (64 bits) como um int de 32 e rebenta com OverflowError (revisão do PR #94)
+    kernel32.GetCurrentProcess.argtypes = []
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel32.K32GetProcessMemoryInfo.argtypes = [
+        wintypes.HANDLE, ctypes.POINTER(Contadores), wintypes.DWORD]
+    kernel32.K32GetProcessMemoryInfo.restype = wintypes.BOOL
     contadores = Contadores()
     contadores.cb = ctypes.sizeof(contadores)
-    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
-    kernel32.K32GetProcessMemoryInfo(kernel32.GetCurrentProcess(),
-                                     ctypes.byref(contadores), contadores.cb)
+    if not kernel32.K32GetProcessMemoryInfo(kernel32.GetCurrentProcess(),
+                                            ctypes.byref(contadores), contadores.cb):
+        raise OSError(ctypes.get_last_error(),  # type: ignore[attr-defined]
+                      "GetProcessMemoryInfo falhou")
     return contadores.PeakWorkingSetSize / (1024 * 1024)
 
 
@@ -160,6 +168,15 @@ def comparar(atual: dict, referencia: dict | None, orcamento: dict | None,
     return problemas
 
 
+def orcamento_aprovado(ref: dict) -> bool:
+    """O orçamento absoluto só trava depois de aprovado (revisão do PR #94).
+
+    Enquanto for uma proposta (`"estado": "proposta"`), o `--comparar` mostra-o
+    mas não falha por ele; a referência do próprio ambiente vale sempre.
+    """
+    return (ref.get("orcamento") or {}).get("estado") == "aprovado"
+
+
 def _carregar(caminho: Path) -> dict:
     if caminho.exists():
         return json.loads(caminho.read_text(encoding="utf-8"))
@@ -214,13 +231,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Referência atualizada: {args.referencia} (fazer commit)")
         return 0
     if args.comparar:
+        tolerancia = ref.get("tolerancia", TOLERANCIA)
         do_ambiente = ref.get("ambientes", {}).get(amb["chave"], {}).get(args.extrator)
         orcamento = ref.get("orcamento", {}).get(args.extrator)
-        problemas = comparar(atual, (do_ambiente or {}).get("agregado"), orcamento,
-                             ref.get("tolerancia", TOLERANCIA))
+        problemas = comparar(atual, (do_ambiente or {}).get("agregado"), None, tolerancia)
         if do_ambiente is None:
-            print(f"Sem referência para {amb['chave']} ({args.extrator}): só se verifica o "
-                  "orçamento. Para a criar: python -m cct.desempenho medir --atualizar")
+            print(f"Sem referência para {amb['chave']} ({args.extrator}). Para a criar: "
+                  "python -m cct.desempenho medir --atualizar")
+        do_orcamento = comparar(atual, None, orcamento, tolerancia)
+        if orcamento_aprovado(ref):
+            problemas += do_orcamento
+        elif orcamento:
+            estado = "; ".join(do_orcamento) or "dentro do orçamento"
+            print(f"Orçamento por aprovar (só informativo, não falha): {estado}")
         for problema in problemas:
             print(f"REGRESSÃO: {problema}")
         return 1 if problemas else 0
