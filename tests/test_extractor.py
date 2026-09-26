@@ -323,6 +323,32 @@ def test_duas_colunas_de_texto_sem_grelha_continuam_a_ser_cortadas(tmp_path):
     assert texto.index("Esquerda linha 24") < texto.index("Direita linha 0"), texto
 
 
+def test_seccao_por_baixo_das_colunas_le_se_depois_das_duas(tmp_path):
+    """ISSUE-0006, boletim 28 de 2021, p44: por baixo de um bloco em duas
+    colunas, «DECISÕES ARBITRAIS», curto e encostado à esquerda, não atravessa
+    a goteira; lia-se entre a coluna esquerda e a direita. Um espaço em branco
+    largo, nas duas colunas à mesma altura, é uma mudança de secção. O espaço
+    entre parágrafos, ainda que coincida nas duas colunas, não é."""
+    from tests.pdf_sintetico import escrever_pdf
+    itens = []
+    y = 760
+    for k in range(20):
+        if k == 10:
+            y -= 14                       # um parágrafo novo nas duas colunas
+        itens.append((40, y, f"Esquerda linha {k} do texto."))
+        itens.append((320, y, f"Direita linha {k} do texto."))
+        y -= 14
+    itens.append((40, y - 60, "DECISÕES ARBITRAIS"))
+    itens.append((40, y - 80, "..."))
+    itens.append((40, y - 140, "AVISOS DE CESSAÇÃO DA VIGÊNCIA DE CONVENÇÕES COLETIVAS "
+                               "E DE OUTROS INSTRUMENTOS DE REGULAMENTAÇÃO"))
+    pdf = escrever_pdf(tmp_path / "x.pdf", [itens])
+    _doc, texto = extrair_pdf(pdf)
+    ordem = [texto.index(t) for t in ("Esquerda linha 9", "Esquerda linha 19", "Direita linha 0",
+                                      "Direita linha 19", "DECISÕES ARBITRAIS", "AVISOS DE CESSAÇÃO")]
+    assert ordem == sorted(ordem), texto
+
+
 def test_texto_ao_lado_de_uma_tabela_nao_se_perde(tmp_path):
     """As bandas só liam acima e abaixo das tabelas: o que estava ao lado,
     na mesma altura, desaparecia (CARRISTUR: «Deve ler-se:» e o título)."""
