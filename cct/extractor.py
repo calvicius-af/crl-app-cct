@@ -1175,6 +1175,13 @@ def _extrair_pagina_deitada(pag, sentido: str) -> str:
     return "\n".join(partes)
 
 
+# Uma faixa em colunas acaba também num espaço em branco que atravessa a
+# página inteira, as duas colunas vazias à mesma altura, desta ordem de
+# grandeza em alturas de linha: é uma mudança de secção, e não o espaço entre
+# parágrafos (ISSUE-0006; boletim 28 de 2021, p44)
+SALTO_DE_SECCAO = 3.0
+
+
 # Numa linha que atravessa a goteira, o espaço entre a última letra à esquerda
 # e a primeira à direita é o de uma palavra; entre duas colunas é bem maior.
 GOTEIRA_MINIMA = 8
@@ -1203,9 +1210,16 @@ def _faixas_de_colunas(pag, goteira: float) -> list[tuple[float, float, bool]] |
     linhas.sort()
     if not any(larga for *_, larga in linhas):
         return None
+    # a altura típica de uma linha, para medir os espaços em branco
+    alturas = sorted(fundo - topo for topo, fundo, _ in linhas)
+    salto_de_seccao = SALTO_DE_SECCAO * alturas[len(alturas) // 2]
     faixas: list[list] = []
     for topo, fundo, larga in linhas:
-        if faixas and faixas[-1][2] == larga:
+        # «DECISÕES ARBITRAIS», curto e encostado à esquerda, por baixo de um
+        # bloco em colunas: sem isto lia-se entre a coluna esquerda e a direita
+        mudanca_de_seccao = (faixas and not larga and not faixas[-1][2]
+                             and topo - faixas[-1][1] >= salto_de_seccao)
+        if faixas and faixas[-1][2] == larga and not mudanca_de_seccao:
             faixas[-1][1] = max(faixas[-1][1], fundo)
         else:
             faixas.append([topo, fundo, larga])
