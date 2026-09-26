@@ -28,7 +28,7 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | # | Título | Estado |
 |---|---|---|
 | [0001](0001-numeracao-por-extenso.md) | Normalizar cláusulas com numeração por extenso | Resolvida |
-| [0002](0002-quebras-de-linha-em-titulos-multilinha.md) | Quebras de linha nos blocos de título do início dos documentos | Aberta |
+| [0002](0002-quebras-de-linha-em-titulos-multilinha.md) | Quebras de linha nos blocos de título do início dos documentos | Resolvida |
 | [0003](0003-qdpx-perde-ganhos-do-docling.md) | O QDPX perde os ganhos de legibilidade do extrator Docling | Em curso |
 | [0004](0004-revisao-pr-23.md) | Correções exigidas pela revisão do PR #23 | Resolvida |
 | [0005](0005-programa-qualidade-tecnica.md) | Programa de qualidade técnica pós-PR #23 | Em curso |
@@ -44,7 +44,7 @@ comportamento novo, é spec. Se é corrigir, ajustar ou completar algo que já e
 | [0015](0015-assinaturas-sem-quebra-nomes-deslocados.md) | O bloco de assinaturas sai sem quebra, com nomes deslocados e sem destaque | Em curso |
 | [0016](0016-marcadores-paragrafo-alinea-perdidos.md) | Marcadores de parágrafo e alínea perdidos ou trocados por hífens | Resolvida |
 | [0017](0017-titulo-clausula-68-nao-apanhado.md) | O título da Cláusula 68.ª não é apanhado | Resolvida |
-| [0018](0018-titulo-anexo-depois-da-tabela.md) | O título do último anexo sai depois dos dados da tabela | Em curso |
+| [0018](0018-titulo-anexo-depois-da-tabela.md) | O título do último anexo sai depois dos dados da tabela | Resolvida |
 | [0019](0019-residuo-be-do-cabecalho.md) | Resíduo "BE" do cabeçalho do BTE no corpo do texto | Resolvida |
 | [0020](0020-tabelas-carristur-rodadas.md) | As tabelas dos CARRISTUR estão rodadas 90º e saem invertidas | Resolvida |
 | [0021](0021-alternativas-tabelas-maxqda.md) | Alternativas para tabelas melhor formatadas no MAXQDA | Aberta |

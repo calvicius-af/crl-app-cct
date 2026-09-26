@@ -1,10 +1,11 @@
 # ISSUE-0018: o título do último anexo sai depois dos dados da tabela
 
-- **Estado:** Em curso — a fusão rótulo+data corrigida em 2026-09-19; falta recuperar
-  o título próprio do anexo (ver "O que foi feito")
+- **Estado:** Resolvida — 2026-09-26 (ver "Resolução"); o que resta é do Docling, que
+  não lê a tabela deste anexo (família da ISSUE-0020)
 - **Data:** 2026-09-18
 - **GitHub:** (a criar)
-- **Onde dói:** `cct/extractor_docling.py` (`ordenar_por_leitura`, `documento_para_texto`)
+- **Onde dói:** `cct/extractor_docling.py` (`ordenar_por_leitura`, `documento_para_texto`),
+  `cct/extractor.py` (`estruturar`)
 
 ## O que acontece
 
@@ -80,3 +81,29 @@ desse anexo não produz conteúdo extraível — problema de leitura de tabela, 
 rótulo, relacionado com a família de defeitos da ISSUE-0020. O teste novo
 (`test_data_de_outorga_nao_vira_titulo_do_anexo`) cobre só a parte da data; falta um
 teste e uma correção para a recuperação do título quando a tabela devolve conteúdo.
+
+## Resolução (2026-09-26)
+
+**O anexo não tem título próprio.** A página 34 do 382 (rodada, a toda a largura) traz
+só «ANEXO III» e, logo a seguir, as quatro grelhas de carreiras, cada uma com o seu
+nome numa faixa própria («Carreira de Direção Geral», «Carreira de Coordenação», …). O
+«título real do anexo (o mapa remuneratório)» que a secção anterior dava por perdido
+não existe no PDF: o que devia acontecer é «ANEXO III» sozinho, seguido das tabelas.
+
+**O defeito real estava no extrator por omissão.** Com o pdfplumber, a primeira linha
+da tabela colava-se ao rótulo, «ANEXO III - | Carreira de Direção Geral», e saía da
+tabela. A regra nova, em `estruturar`: uma linha de tabela com várias células nunca é
+o título de um cabeçalho, como já não podia ser um cabeçalho (`_linha_de_tabela`,
+partilhada pelas duas decisões).
+
+Medido sobre os textos brutos de 336 PDF (corpus do BTE 31, 2026, 2025 e 31 boletins
+de 2021), antes e depois: mudam os rótulos de 9 documentos, e em todos pela mesma
+razão, o cabeçalho de uma tabela engolido pelo rótulo de um anexo («ANEXO II - Grupo |
+Categorias | Nível salarial | …» na GENERALI de 2025, «ANEXO IV - Níveis | Valor» na
+ANIPC, «ANEXO I - H | 870,20 €» num boletim de 2021). As palavras de cada documento
+são as mesmas antes e depois; a linha volta à tabela. Teste:
+`tests/test_extractor_nuances.py::test_linha_de_tabela_nao_vira_titulo_do_anexo`.
+
+Com o Docling, a data de outorga já não se cola ao rótulo (2026-09-19); a tabela deste
+anexo continua a sair vazia, o que é um problema de leitura de tabelas do Docling e não
+de rótulos.

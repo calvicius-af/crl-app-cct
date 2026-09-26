@@ -307,6 +307,11 @@ MAX_TITULO = 90
 MIN_PALAVRAS_FRASE = 7
 
 
+def _linha_de_tabela(linha: str, na_tabela: bool) -> bool:
+    """Uma linha de tabela com várias células: nunca é cabeçalho nem título."""
+    return na_tabela and " | " in linha
+
+
 def _nao_e_cabecalho(tipo: str, linha: str, resto: str, na_tabela: bool,
                      item_anterior: bool = False) -> bool:
     """Uma linha com a forma de um cabeçalho que não o é.
@@ -321,8 +326,8 @@ def _nao_e_cabecalho(tipo: str, linha: str, resto: str, na_tabela: bool,
     Viagens em serviço - 71,65 €.» abria uma cláusula falsa e separava o fim
     da lista do artigo a que pertence (revisão do PR #90).
     """
-    if na_tabela and " | " in linha:
-        return True       # uma linha de tabela com várias células
+    if _linha_de_tabela(linha, na_tabela):
+        return True
     if tipo not in ("clausula", "artigo"):
         return False
     return bool(RE_RESTO_DE_REMISSAO.match(resto) or RE_FIM_DE_ITEM.search(linha)
@@ -394,7 +399,10 @@ def estruturar(texto: str, doc_id: str, subtipo: str = "desconhecido") -> tuple[
                 j = i + 1
                 while j < len(linhas) and not linhas[j].strip():
                     j += 1
-                if j < len(linhas) and (
+                # uma linha de tabela com várias células nunca é o título:
+                # «ANEXO III» seguido da grelha de carreiras dava «ANEXO III -
+                # | Carreira de Direção Geral» (382 de 2026, ISSUE-0018)
+                if j < len(linhas) and not _linha_de_tabela(linhas[j], j in em_tabela) and (
                         _titulo_candidato(linhas[j])
                         or (tipo_cabecalho in ("clausula", "artigo")
                             and RE_SO_DESIGNADOR.match(linhas[j].strip()))):
