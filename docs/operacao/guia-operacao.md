@@ -239,8 +239,10 @@ Com a pasta dos modelos, o OCR fica desligado (os PDF do BTE têm texto). Para o
 por palavra-passe, com mais de 500 páginas (`CCT_MAX_PAGINAS`) ou mais de 100 MB
 (`CCT_MAX_MB`) é recusado com uma mensagem que diz o que fazer, e a corrida continua com
 os outros documentos. No docling, cada documento tem um tempo máximo de 900 s
-(`CCT_DOCLING_TEMPO_MAX_S`). Uma conversão que não acabe é um erro, e não um texto com
-buracos. Registo: [docling-isolado-2026-09-26.md](../validacao/docling-isolado-2026-09-26.md).
+(`CCT_DOCLING_TEMPO_MAX_S`) e uma memória máxima de 10 000 MB
+(`CCT_DOCLING_MEMORIA_MAX_MB`; 0 desliga). Uma conversão que não acabe, ou que passe o
+limite de memória, é um erro, e não um texto com buracos. Com `CCT_DOCLING_MODELOS`, o
+modo offline é forçado mesmo que o ambiente diga o contrário. Registo: [docling-isolado-2026-09-26.md](../validacao/docling-isolado-2026-09-26.md).
 
 ### Medir o desempenho dos extratores
 

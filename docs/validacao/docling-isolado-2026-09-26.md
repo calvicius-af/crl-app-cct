@@ -12,8 +12,9 @@ tempo, e erros claros para PDF malformados, protegidos ou excessivos.
 |---|---|---|
 | Hosts, artefactos, versões e checksums dos modelos | `python -m cct.modelos_docling inventariar` escreve `manifesto_modelos.json`, com a versão do docling e o caminho, o tamanho e o SHA-256 de cada ficheiro. Origem: `huggingface.co/docling-project` (revisão fixada pela versão do docling); o RapidOCR, a do pacote `rapidocr` | `test_manifesto_dos_modelos_apanha_ficheiros_alterados_em_falta_e_a_mais` |
 | Prefetch e instalação offline verificável | `descarregar --destino` numa máquina com rede; `verificar --pasta` na estação, que falha se um ficheiro faltar, mudar ou sobrar | idem |
-| Nenhum conteúdo enviado durante a extração | `enable_remote_services=False` e `allow_external_plugins=False` sempre; com `CCT_DOCLING_MODELOS`, o docling lê os modelos da pasta em modo offline (`HF_HUB_OFFLINE`) | `test_conversao_com_modelos_locais_nao_usa_a_rede`: converte com `socket.connect` bloqueado |
+| Nenhum conteúdo enviado durante a extração | `enable_remote_services=False` e `allow_external_plugins=False` sempre; com `CCT_DOCLING_MODELOS`, o docling lê os modelos da pasta em modo offline, forçado mesmo que o ambiente diga `HF_HUB_OFFLINE=0` (as variáveis e a configuração do `huggingface_hub`, se já importado) | `test_conversao_com_modelos_locais_nao_usa_a_rede`: converte com `socket.connect` bloqueado e as duas variáveis a `0`; `test_modo_offline_forcado_mesmo_com_o_ambiente_a_dizer_o_contrario` |
 | Limites de tamanho, páginas e tempo | `cct/limites.py`: até 100 MB e 500 páginas (`CCT_MAX_MB`, `CCT_MAX_PAGINAS`), verificados com o PDFium antes de qualquer extrator; no docling, 900 s por documento (`CCT_DOCLING_TEMPO_MAX_S`), e uma conversão parcial é um erro | `test_pdf_com_paginas_ou_tamanho_a_mais`, `test_opcoes_do_docling_sem_servicos_remotos_e_com_tempo_maximo` |
+| Limite de memória | `limite_de_memoria` em `cct/limites.py`: durante a conversão do docling, um vigilante mede a memória residente do processo (`cct/memoria.py`: Windows, Linux e macOS, só com a biblioteca padrão) e, acima de 10 000 MB (`CCT_DOCLING_MEMORIA_MAX_MB`; 0 desliga), interrompe a conversão com `MemoriaExcedida` | `test_limite_de_memoria_interrompe_acima_do_limite`, `test_limite_de_memoria_abaixo_do_limite_ou_desligado_nao_interrompe` |
 | PDF malformado ou protegido | erro com o que fazer, antes de extrair; no pipeline, o documento fica fora do QDPX e a corrida continua | `test_pdf_corrompido_recusado_com_o_que_fazer`, `test_pdf_protegido_por_palavra_passe` |
 
 ## O OCR na via offline
@@ -36,6 +37,10 @@ nós em todos os documentos. Os PDF do BTE têm texto, e o OCR não acrescenta n
    tempo por documento já existe dentro do docling (`document_timeout`), que termina a
    conversão de forma controlada. A extração não cria processos nem ficheiros temporários
    próprios que possam ficar órfãos.
-2. **Sem limite de memória imposto.** O pico medido é de 4,4 GB (#26). Um limite do
-   sistema (`RLIMIT_AS`) só existe no Linux, e as estações são Windows. O orçamento de
-   memória fica no gate de desempenho do #26.
+2. **Um vigilante, e não um limite do sistema, para a memória.** O `RLIMIT_AS` só existe
+   no Linux, e as estações são Windows. O vigilante mede a memória do processo a cada
+   0,5 s e interrompe a conversão quando o controlo volta ao Python (entre as etapas de
+   cada página). Ensaio real: com o limite a 500 MB, a conversão de um PDF do corpus
+   parou aos 518 MB, em 3,7 s, com a mensagem de erro; no pipeline, esse documento fica
+   fora do QDPX e a corrida continua. O limite por omissão (10 000 MB) é mais do dobro do
+   pico medido no corpus (4,4 GB, #26).

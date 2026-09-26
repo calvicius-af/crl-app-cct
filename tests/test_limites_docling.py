@@ -64,9 +64,10 @@ def test_opcoes_do_docling_sem_servicos_remotos_e_com_tempo_maximo(monkeypatch):
     assert opcoes["allow_external_plugins"] is False
     assert opcoes["document_timeout"] > 0 and "artifacts_path" not in opcoes
     monkeypatch.setenv("CCT_DOCLING_TEMPO_MAX_S", "30")
+    # o caminho como o sistema o escreve: «\\modelos» em Windows (revisão do PR #95)
     assert opcoes_seguras(Path("/modelos")) == {
         "enable_remote_services": False, "allow_external_plugins": False,
-        "document_timeout": 30.0, "artifacts_path": "/modelos", "do_ocr": False}
+        "document_timeout": 30.0, "artifacts_path": str(Path("/modelos")), "do_ocr": False}
     monkeypatch.setenv("CCT_DOCLING_OCR", "1")
     assert opcoes_seguras(Path("/modelos"))["do_ocr"] is True
 
@@ -106,6 +107,9 @@ def test_conversao_com_modelos_locais_nao_usa_a_rede(tmp_path, monkeypatch):
         pytest.skip("sem modelos do docling descarregados (CCT_DOCLING_MODELOS)")
     from cct import extractor_docling
     monkeypatch.setenv("CCT_DOCLING_MODELOS", str(pasta))
+    # o ambiente a dizer o contrário não pode desfazer o modo offline
+    monkeypatch.setenv("HF_HUB_OFFLINE", "0")
+    monkeypatch.setenv("TRANSFORMERS_OFFLINE", "0")
     monkeypatch.setattr(extractor_docling, "_conversor", None)
 
     def sem_rede(*_a, **_k):
@@ -115,3 +119,60 @@ def test_conversao_com_modelos_locais_nao_usa_a_rede(tmp_path, monkeypatch):
     doc, texto = extractor_docling.extrair_pdf_docling(_pdf(tmp_path))
     assert "Férias" in texto
     monkeypatch.setattr(extractor_docling, "_conversor", None)
+
+
+def test_modo_offline_forcado_mesmo_com_o_ambiente_a_dizer_o_contrario(monkeypatch):
+    """Revisão do PR #95: um HF_HUB_OFFLINE=0 já definido não desfaz o modo
+    offline prometido com CCT_DOCLING_MODELOS; também não a configuração do
+    huggingface_hub, se já tiver sido importado."""
+    import sys
+    import types
+    from cct.extractor_docling import forcar_offline
+    monkeypatch.setenv("HF_HUB_OFFLINE", "0")
+    monkeypatch.setenv("TRANSFORMERS_OFFLINE", "true")
+    constantes = types.SimpleNamespace(HF_HUB_OFFLINE=False)
+    monkeypatch.setitem(sys.modules, "huggingface_hub.constants", constantes)
+    assert forcar_offline() == ["HF_HUB_OFFLINE=0"]
+    assert os.environ["HF_HUB_OFFLINE"] == os.environ["TRANSFORMERS_OFFLINE"] == "1"
+    assert constantes.HF_HUB_OFFLINE is True
+
+
+def _trabalhar(segundos):
+    """Trabalho em Python, onde a interrupção pode chegar."""
+    import time
+    fim = time.monotonic() + segundos
+    while time.monotonic() < fim:
+        sum(range(1000))
+
+
+def test_limite_de_memoria_interrompe_acima_do_limite():
+    from cct.limites import MemoriaExcedida, limite_de_memoria
+    with pytest.raises(MemoriaExcedida, match="9000 MB, acima do limite de 100 MB"):
+        with limite_de_memoria(100, intervalo=0.05, medir=lambda: 9000.0):
+            _trabalhar(5)
+
+
+def test_limite_de_memoria_abaixo_do_limite_ou_desligado_nao_interrompe():
+    import threading
+    from cct.limites import limite_de_memoria
+    with limite_de_memoria(100, intervalo=0.05, medir=lambda: 50.0):
+        _trabalhar(0.3)
+    with limite_de_memoria(0, medir=lambda: 9000.0):
+        _trabalhar(0.2)
+    erros = []
+
+    def noutra_thread():
+        try:
+            with limite_de_memoria(100, intervalo=0.05, medir=lambda: 9000.0):
+                _trabalhar(0.3)
+        except Exception as e:            # fora da thread principal, não vigia
+            erros.append(e)
+    t = threading.Thread(target=noutra_thread)
+    t.start()
+    t.join()
+    assert erros == []
+
+
+def test_memoria_do_processo_mede_se_neste_sistema():
+    from cct import memoria
+    assert 1 < memoria.atual_mb() <= memoria.pico_mb() + 1

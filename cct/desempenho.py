@@ -38,48 +38,9 @@ METRICAS = ("s_por_pagina", "rss_max_mb")
 
 
 def _rss_max_mb() -> float:
-    """A memória máxima deste processo, em MB.
-
-    No Linux e no macOS vem do `resource` (o Linux dá KB, o macOS bytes); no
-    Windows, onde o `resource` não existe e as estações do CRL correm, do pico
-    do conjunto de trabalho (`GetProcessMemoryInfo`).
-    """
-    if sys.platform.startswith("win"):
-        return _pico_windows_mb()
-    import resource
-    pico = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    return pico / (1024 * 1024) if sys.platform == "darwin" else pico / 1024
-
-
-def _pico_windows_mb() -> float:
-    import ctypes
-    from ctypes import wintypes
-
-    class Contadores(ctypes.Structure):
-        _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
-                    ("PeakWorkingSetSize", ctypes.c_size_t),
-                    ("WorkingSetSize", ctypes.c_size_t),
-                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
-                    ("QuotaPagedPoolUsage", ctypes.c_size_t),
-                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
-                    ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
-                    ("PagefileUsage", ctypes.c_size_t),
-                    ("PeakPagefileUsage", ctypes.c_size_t)]
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
-    # os tipos declarados: sem eles, o ctypes passa o identificador do processo
-    # (64 bits) como um int de 32 e rebenta com OverflowError (revisão do PR #94)
-    kernel32.GetCurrentProcess.argtypes = []
-    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
-    kernel32.K32GetProcessMemoryInfo.argtypes = [
-        wintypes.HANDLE, ctypes.POINTER(Contadores), wintypes.DWORD]
-    kernel32.K32GetProcessMemoryInfo.restype = wintypes.BOOL
-    contadores = Contadores()
-    contadores.cb = ctypes.sizeof(contadores)
-    if not kernel32.K32GetProcessMemoryInfo(kernel32.GetCurrentProcess(),
-                                            ctypes.byref(contadores), contadores.cb):
-        raise OSError(ctypes.get_last_error(),  # type: ignore[attr-defined]
-                      "GetProcessMemoryInfo falhou")
-    return contadores.PeakWorkingSetSize / (1024 * 1024)
+    """A memória máxima deste processo, em MB (cct/memoria.py)."""
+    from .memoria import pico_mb
+    return pico_mb()
 
 
 def _medir_um(pdf: Path, extrator: str) -> dict:

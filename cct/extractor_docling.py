@@ -16,6 +16,7 @@ corrida — o extrator clássico continua a ser a via rápida.
 """
 import os
 import re
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -72,6 +73,38 @@ _conversor = None
 # Limites e perímetro da conversão (#25). O tempo por documento mede-se no
 # #26: 1,75 s por página a quente; 900 s chegam para 500 páginas.
 TEMPO_MAX_S = 900.0
+# Memória máxima da conversão, em MB (CCT_DOCLING_MEMORIA_MAX_MB; 0 desliga).
+# O pico medido no corpus é de 4,4 GB (#26): 10 GB deixam folga e param um PDF
+# patológico antes de esgotar uma estação de 16 GB.
+MEMORIA_MAX_MB = 10_000.0
+# as variáveis que põem o huggingface_hub e o transformers em modo offline, e
+# os valores que dizem «ligado»
+_VARIAVEIS_OFFLINE = ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE")
+_LIGADO = {"1", "true", "yes", "on"}
+
+
+def memoria_max_mb() -> float:
+    valor = os.environ.get("CCT_DOCLING_MEMORIA_MAX_MB")
+    return float(valor) if valor else MEMORIA_MAX_MB
+
+
+def forcar_offline() -> list[str]:
+    """Põe o docling em modo offline, seja qual for o ambiente (revisão do PR #95).
+
+    Com a pasta dos modelos, a promessa é que nada vai à rede. Um
+    `HF_HUB_OFFLINE=0` já definido no ambiente não pode desfazer isso: as
+    variáveis ficam a `1`, e a configuração do `huggingface_hub`, que as lê
+    quando é importado, também, se já o tiver sido. Devolve os valores
+    contrários que encontrou, para se avisar.
+    """
+    contrarias = [f"{v}={os.environ[v]}" for v in _VARIAVEIS_OFFLINE
+                  if v in os.environ and os.environ[v].strip().lower() not in _LIGADO]
+    for variavel in _VARIAVEIS_OFFLINE:
+        os.environ[variavel] = "1"
+    constantes = sys.modules.get("huggingface_hub.constants")
+    if constantes is not None:
+        constantes.HF_HUB_OFFLINE = True  # type: ignore[attr-defined]
+    return contrarias
 
 
 def pasta_modelos() -> Path | None:
@@ -316,8 +349,10 @@ def _obter_conversor():
         pasta = pasta_modelos()
         if pasta is not None:
             # os modelos estão na pasta: nada se descarrega, nem se tenta
-            os.environ.setdefault("HF_HUB_OFFLINE", "1")
-            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+            contrarias = forcar_offline()
+            if contrarias:
+                print(f"CCT_DOCLING_MODELOS: modo offline forçado; o ambiente dizia "
+                      f"{', '.join(contrarias)}", file=sys.stderr)
         opcoes = PdfPipelineOptions(**opcoes_seguras(pasta))
         _conversor = DocumentConverter(
             format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opcoes)})
@@ -334,7 +369,9 @@ def _converter(pdf_path: Path, paginas: tuple[int, int] | None):
     # page_range e a hierarquia que infere não acrescenta nada — quem
     # reconhece capítulos e cláusulas é o estruturar, e a ordem de
     # leitura vem da geometria (ordenar_por_leitura)
-    resultado = _obter_conversor().convert(str(pdf_path), **kwargs)
+    from .limites import limite_de_memoria
+    with limite_de_memoria(memoria_max_mb()):
+        resultado = _obter_conversor().convert(str(pdf_path), **kwargs)
     # uma conversão parcial (o tempo máximo acabou, uma página falhou) não
     # passa por completa: o texto teria buracos sem ninguém saber
     estado = getattr(getattr(resultado, "status", None), "value", "success")
