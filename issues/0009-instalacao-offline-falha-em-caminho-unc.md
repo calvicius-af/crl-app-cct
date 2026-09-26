@@ -1,6 +1,7 @@
 # ISSUE-0009: a instalação offline falha quando o projeto está num caminho de rede
 
-- **Estado:** Resolvida no código — falta confirmar no próximo gate numa estação do CRL
+- **Estado:** Resolvida no código e verificada no CI com uma unidade de rede real — falta
+  confirmar no próximo gate numa estação do CRL
 - **Data:** 2026-09-17
 - **GitHub:** #59 (sub-issue de #58)
 - **Onde dói:** `scripts/instalar_offline.py` (`instalar()`, L180-196), `scripts/instalar_offline.bat`
@@ -117,5 +118,35 @@ Resolvido no código, com testes em `tests/test_pacote_offline.py` (secções «
 4. Um `.venv` reaproveitado tem de ter o pip, o que evita a instalação parcial silenciosa
    referida nas notas.
 
-Falta a confirmação numa estação real: um runner Windows do CI não tem unidades de rede
-mapeadas (ver ISSUE-0012).
+## Reprodução no CI (2026-09-26)
+
+Um runner Windows *pode* ter unidades de rede: o workflow
+`.github/workflows/instalacao-rede.yml` cria uma partilha SMB local, mapeia `L:` com
+`net use` e instala o pacote offline verdadeiro (preparado no próprio job) sem rede para
+o pip. Antes de instalar, prova que a condição do defeito está presente —
+`Path("L:\\...").resolve()` devolve `\\localhost\crl\...` —, e um passo de controlo
+com a forma antiga (`--find-links \\localhost\...` em texto) reproduz o erro da
+estação letra a letra: `Processing \crl\unc\vendor\wheels\pdfplumber-...` e
+`[Errno 2] No such file or directory`.
+
+**A causa, confirmada:** o pip segue a RFC 8089, para a qual `file://localhost/x` é o
+`/x` do disco local. O servidor da estação chamava-se precisamente `localhost`
+(`L:` → `\\localhost\C$\...`); qualquer caminho para ele, em texto ou em URI, perdia o
+servidor na conversão que o pip faz entre caminhos e URI. Por isso o `--find-links`
+em URI da correção anterior não bastava para um projeto aberto diretamente por
+`\\localhost\...`, e o CI mostrou-o.
+
+**O que passou a fazer o instalador:** mantém a letra da unidade (`abspath`, já de
+2026-09-23), e, quando a pasta é mesmo um caminho UNC, passa ao pip um URI com
+`127.0.0.1` no lugar de `localhost` (`endereco_para_o_pip`), a mesma máquina, que o pip
+trata como servidor. O diagnóstico reconhece também «neither a file nor a directory»
+como um problema de caminho.
+
+**Verificado no runner** (Windows, Python 3.13): a partir de `L:` pelo `.bat`, como na
+estação, com o `doctor` e 91 testes a correr do `.venv` em `L:`; a partir de
+`\\localhost\crl\...`; e a partir de `\\NOME-DA-MÁQUINA\crl\...`, o caso geral de
+um servidor. O workflow corre nos PR que mexem no instalador, no preparador ou nas
+dependências.
+
+Falta a confirmação numa estação real, que o runner não substitui: região portuguesa,
+políticas do proxy e a partilha institucional, com as suas permissões.

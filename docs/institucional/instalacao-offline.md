@@ -74,6 +74,11 @@ python scripts/preparar_pacote_offline.py --alvos macosx_11_0_arm64:311
    está pronta.
 4. Abrir a aplicação com duplo clique em `scripts/AppCCT.bat`.
 
+A pasta pode ficar num disco local, numa unidade de rede mapeada (`L:\...`) ou ser
+aberta por um caminho de rede (`\\servidor\...`): as três formas são instaladas no CI,
+num runner Windows com uma partilha real (`.github/workflows/instalacao-rede.yml`,
+ISSUE-0009).
+
 O instalador chama o `pip` com a opção `--no-index`, que o impede de contactar
 o PyPI ou o proxy. Se a rede estiver completamente cortada, a instalação
 corre na mesma.
