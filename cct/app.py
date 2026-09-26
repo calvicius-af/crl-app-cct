@@ -29,26 +29,38 @@ FIM_DA_CORRIDA = object()
 
 
 def decisoes_confirmadas(lista: list[dict], marcados: set[str],
-                         valores: dict[tuple[str, str], str]) -> tuple[dict[str, str], list[str]]:
+                         valores: dict[tuple[str, str], str]
+                         ) -> tuple[dict[str, str], list[str], list[str]]:
     """O que a janela de confirmação grava e que documentos manda nomear (#38).
 
     `lista` vem de `nomeacao.pendentes`; `marcados` são as chaves dos
-    documentos que a pessoa confirmou; `valores[(chave, outorgante)]` é a sigla
-    escrita na janela (a sugerida, ou a corrigida). Devolve as siglas a gravar
-    no siglas.csv, `{outorgante: sigla}`, e as chaves a nomear.
+    documentos que a pessoa confirmou, um a um; `valores[(chave, outorgante)]`
+    é a sigla escrita na janela (a sugerida, ou a corrigida). Um outorgante
+    sem valor (sem campo) fica com a sugerida; um campo esvaziado nunca é
+    trocado pela sugestão (revisão do PR #96): impede a confirmação e diz
+    porquê. Devolve as siglas a gravar no siglas.csv, `{outorgante: sigla}`,
+    as chaves a nomear e os motivos que impedem gravar — com algum motivo,
+    não se grava nada.
     """
     siglas: dict[str, str] = {}
     chaves = []
+    motivos = []
     for p in lista:
         if p["chave"] not in marcados:
             continue
-        escritas = {nome: (valores.get((p["chave"], nome)) or sugerida).strip()
+        escritas = {nome: (valores[(p["chave"], nome)] if (p["chave"], nome) in valores
+                           else sugerida).strip()
                     for nome, sugerida in p["siglas"]}
-        if any(not s for s in escritas.values()):
-            continue                     # uma sigla apagada: não se confirma
+        vazias = [nome for nome, sigla in escritas.items() if not sigla]
+        if vazias:
+            motivos += [f"{p['doc_id'] or p['chave']}: sigla vazia para «{nome}»"
+                        for nome in vazias]
+            continue
         siglas.update(escritas)
         chaves.append(p["chave"])
-    return siglas, chaves
+    if motivos:
+        return {}, [], motivos
+    return siglas, chaves, []
 
 
 class AppCCT(_JANELA):
@@ -302,7 +314,8 @@ class AppCCT(_JANELA):
         ttk.Label(janela, padding=8, wraplength=780, text=(
             "Estas siglas foram adivinhadas a partir do nome do outorgante. "
             "Confirmar cada documento, corrigindo a sigla se for preciso. As "
-            "siglas confirmadas ficam gravadas e não voltam a ser perguntadas; "
+            "siglas confirmadas ficam gravadas e não voltam a ser perguntadas. "
+            "Só se gravam os documentos marcados, um a um, depois de revistos; "
             "com vários outorgantes do mesmo lado, o nome usa sempre o primeiro."
         )).pack(fill="x")
         # os botões antes da lista: o `pack` dá o espaço por ordem, e uma lista
@@ -321,7 +334,9 @@ class AppCCT(_JANELA):
         marcas: dict[str, tk.BooleanVar] = {}
         campos: dict[tuple[str, str], tk.StringVar] = {}
         for p in lista:
-            marcas[p["chave"]] = tk.BooleanVar(value=bool(p["siglas"]))
+            # desmarcado: cada documento confirma-se de propósito, depois de rever
+            # as siglas e os avisos, e nunca em lote (revisão do PR #96)
+            marcas[p["chave"]] = tk.BooleanVar(value=False)
             ttk.Checkbutton(corpo, variable=marcas[p["chave"]],
                             text=f"{p['doc_id'] or p['chave']}").pack(anchor="w", pady=(8, 0))
             ttk.Label(corpo, text=p["titulo"], foreground="gray",
@@ -338,9 +353,14 @@ class AppCCT(_JANELA):
                           wraplength=720).pack(anchor="w", padx=24)
 
         def gravar():
-            siglas, chaves = decisoes_confirmadas(
+            siglas, chaves, motivos = decisoes_confirmadas(
                 lista, {c for c, v in marcas.items() if v.get()},
                 {k: v.get() for k, v in campos.items()})
+            if motivos:
+                messagebox.showwarning(
+                    "Siglas", "Nada foi gravado. Escrever a sigla ou desmarcar o "
+                    "documento:\n\n" + "\n".join(motivos), parent=janela)
+                return
             if not chaves:
                 messagebox.showinfo("Siglas", "Nenhum documento confirmado.", parent=janela)
                 return

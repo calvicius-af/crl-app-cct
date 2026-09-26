@@ -199,7 +199,11 @@ entre outorgantes.
 **Confirmar na app.** Depois de «Recolher do BTE…», se houver documentos por confirmar, a
 app abre a janela «Confirmar siglas» (também disponível no botão com o mesmo nome). Para
 cada documento mostra a sigla sugerida de cada outorgante, que se aceita ou corrige, e os
-outros avisos. Os documentos confirmados são nomeados logo a seguir, offline e só eles;
+outros avisos. Todos os documentos começam desmarcados: confirma-se cada um marcando-o,
+depois de rever as siglas e os avisos, e «Gravar e nomear» sem nenhum marcado não grava
+nada. Uma sigla apagada não volta à sugestão: enquanto um documento marcado tiver uma
+sigla vazia, nada é gravado e a janela diz qual é. Os documentos confirmados são nomeados
+logo a seguir, offline e só eles;
 as siglas confirmadas ficam gravadas no `siglas.csv` da raiz do projeto (criado se não
 existir, e nunca substituído: as linhas que lá estão ficam) e não voltam a ser
 perguntadas, porque a recolha e a nomeação carregam esse ficheiro sempre que ele existe.
