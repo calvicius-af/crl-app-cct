@@ -25,9 +25,10 @@ jobs:
       # ISSUE-0012: as estações do CRL são Windows 11 com Python 3.13, e a
       # matriz não cobria nem o sistema nem a versão. O mínimo defensável:
       # acrescentar windows-latest/3.13 às combinações existentes. Limite
-      # honesto: um runner Windows não reproduz uma estação do CRL (sem
-      # unidades de rede mapeadas, região portuguesa, políticas de proxy) —
-      # os gates manuais continuam a ser necessários
+      # honesto: um runner Windows não reproduz uma estação do CRL (região
+      # portuguesa, políticas de proxy; as unidades de rede mapeadas têm o
+      # seu workflow, instalacao-rede.yml) — os gates manuais continuam a ser
+      # necessários
       # (docs/validacao/instalacao-estacao-crl-2026-09-17.md).
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]

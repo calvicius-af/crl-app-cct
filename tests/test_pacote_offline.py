@@ -233,6 +233,19 @@ def test_find_links_e_passado_como_uri(monkeypatch, tmp_path):
     assert str(instalar_offline.WHEELS) not in comando
 
 
+@pytest.mark.parametrize("pasta,esperado", [
+    # o servidor «localhost» é, para o pip (RFC 8089), o disco local: perdia-se
+    # o servidor, como na estação e no CI (instalacao-rede.yml)
+    (r"\\localhost\crl\unc\vendor\wheels", "file://127.0.0.1/crl/unc/vendor/wheels"),
+    (r"\\LOCALHOST\C$\profiles\vendor\wheels", "file://127.0.0.1/C%24/profiles/vendor/wheels"),  # o pip descodifica o %24
+    (r"\\servidor\partilha\vendor\wheels", "file://servidor/partilha/vendor/wheels"),
+    (r"L:\crl-app-cct\vendor\wheels", "file:///L:/crl-app-cct/vendor/wheels"),
+])
+def test_endereco_para_o_pip_nunca_usa_o_servidor_localhost(pasta, esperado):
+    from pathlib import PureWindowsPath
+    assert instalar_offline.endereco_para_o_pip(PureWindowsPath(pasta)) == esperado
+
+
 def test_aviso_unc_aparece_com_caminho_de_rede(monkeypatch, capsys):
     """Um caminho UNC é conhecido por falhar: o aviso tem de sair antes."""
     monkeypatch.setattr(instalar_offline, "RAIZ",
@@ -259,6 +272,8 @@ def test_aviso_unc_silencia_com_caminho_local(monkeypatch, capsys):
      "(Access is denied)", "permiss"),
     ("ERROR: pdfplumber-0.11.10-cp311-win_amd64.whl is not a supported "
      "wheel on this platform", "outra versão"),
+    ("WARNING: Location 'file://localhost/crl/unc/vendor/wheels' is ignored: it is "
+     "neither a file nor a directory.", "caminho"),
     ("ERROR: algo completamente diferente", "enviar a saída"),
 ])
 def test_diagnostico_do_pip_distingue_familias_de_causa(padrao, esperado):

@@ -23,7 +23,7 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 # abspath em vez de resolve(): em Windows, resolve() sobre um ficheiro numa
 # unidade mapeada de rede devolve o caminho UNC de destino (L:\... vira
@@ -194,6 +194,25 @@ def criar_venv(refazer: bool) -> None:
     print("  ✓ criado")
 
 
+def endereco_para_o_pip(pasta: Path) -> str:
+    """O --find-links que o pip abre sem perder o servidor (ISSUE-0009).
+
+    Um URI e não um caminho: o pip converte os caminhos em URI e de volta, e
+    é nessa volta que o servidor se perde. E nunca com o servidor
+    `localhost`: o pip segue a RFC 8089, para a qual `file://localhost/x` é
+    o `/x` do disco local, e `\\\\localhost\\crl\\...` virava `\\crl\\...` — o
+    erro da estação, e o que o CI reproduz (.github/workflows/instalacao-rede.yml).
+    `127.0.0.1` é a mesma máquina, e o pip já o trata como servidor.
+    """
+    texto = str(pasta)
+    if not texto.startswith("\\\\"):
+        return pasta.as_uri()
+    servidor, _, resto = texto[2:].partition("\\")
+    if servidor.lower() == "localhost":
+        servidor = "127.0.0.1"
+    return PureWindowsPath(f"\\\\{servidor}\\{resto}").as_uri()
+
+
 def instalar() -> None:
     print("== Instalação das bibliotecas (sem rede)")
     # As dependências vêm de requirements.txt, a fonte de verdade única. O
@@ -211,10 +230,7 @@ def instalar() -> None:
     comando = [
         str(python_do_venv()), "-m", "pip", "install",
         "--no-index",                       # nunca contacta o PyPI nem o proxy
-        # URI em vez de caminho: o pip normaliza caminhos de sistema de
-        # ficheiros e, com um prefixo UNC, perde o componente do servidor
-        # (ISSUE-0009). A forma file:/// passa intacta.
-        "--find-links", WHEELS.as_uri(),
+        "--find-links", endereco_para_o_pip(WHEELS),
         "--disable-pip-version-check",
         "--no-cache-dir",
         *argumentos_de_constraints(constraints),
@@ -240,7 +256,8 @@ def diagnostico_do_pip(saida: str) -> str:
     orientação estar alinhada com ele.
     """
     s = saida.lower()
-    if "no such file or directory" in s or "errno 2" in s or "unc" in s:
+    if ("no such file or directory" in s or "errno 2" in s or "unc" in s
+            or "neither a file nor a directory" in s):
         return ("a causa parece ser o caminho das bibliotecas, não as "
                 "bibliotecas: se o projeto estiver numa unidade de rede "
                 "(\\\\servidor\\... ou letra mapeada), copiá-lo para um disco "
