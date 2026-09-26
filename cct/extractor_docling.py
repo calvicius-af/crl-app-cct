@@ -14,7 +14,9 @@ para cada coluna abrangida por um colspan (ISSUE-0003, pontos 1 e 2).
 Custo: ~1-1,7 s/página em CPU e download único dos modelos na primeira
 corrida — o extrator clássico continua a ser a via rápida.
 """
+import os
 import re
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -67,6 +69,70 @@ RE_NUMERO_COLADO_LISTA = re.compile(r"^(\d+)(?=[A-ZÀ-Ú])")
 RE_ALINEA_FUNDIDA = re.compile(r";\s+([a-zà-ú]\)\s+[A-ZÀ-Ú])")
 
 _conversor = None
+
+# Limites e perímetro da conversão (#25). O tempo por documento mede-se no
+# #26: 1,75 s por página a quente; 900 s chegam para 500 páginas.
+TEMPO_MAX_S = 900.0
+# Memória máxima da conversão, em MB (CCT_DOCLING_MEMORIA_MAX_MB; 0 desliga).
+# O pico medido no corpus é de 4,4 GB (#26): 10 GB deixam folga e param um PDF
+# patológico antes de esgotar uma estação de 16 GB.
+MEMORIA_MAX_MB = 10_000.0
+# as variáveis que põem o huggingface_hub e o transformers em modo offline, e
+# os valores que dizem «ligado»
+_VARIAVEIS_OFFLINE = ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE")
+_LIGADO = {"1", "true", "yes", "on"}
+
+
+def memoria_max_mb() -> float:
+    valor = os.environ.get("CCT_DOCLING_MEMORIA_MAX_MB")
+    return float(valor) if valor else MEMORIA_MAX_MB
+
+
+def forcar_offline() -> list[str]:
+    """Põe o docling em modo offline, seja qual for o ambiente (revisão do PR #95).
+
+    Com a pasta dos modelos, a promessa é que nada vai à rede. Um
+    `HF_HUB_OFFLINE=0` já definido no ambiente não pode desfazer isso: as
+    variáveis ficam a `1`, e a configuração do `huggingface_hub`, que as lê
+    quando é importado, também, se já o tiver sido. Devolve os valores
+    contrários que encontrou, para se avisar.
+    """
+    contrarias = [f"{v}={os.environ[v]}" for v in _VARIAVEIS_OFFLINE
+                  if v in os.environ and os.environ[v].strip().lower() not in _LIGADO]
+    for variavel in _VARIAVEIS_OFFLINE:
+        os.environ[variavel] = "1"
+    constantes = sys.modules.get("huggingface_hub.constants")
+    if constantes is not None:
+        constantes.HF_HUB_OFFLINE = True  # type: ignore[attr-defined]
+    return contrarias
+
+
+def pasta_modelos() -> Path | None:
+    """A pasta com os modelos descarregados (CCT_DOCLING_MODELOS), se houver."""
+    pasta = os.environ.get("CCT_DOCLING_MODELOS")
+    return Path(pasta) if pasta else None
+
+
+def opcoes_seguras(pasta: Path | None = None) -> dict:
+    """As opções do pipeline do docling que definem o perímetro da conversão.
+
+    Nenhum serviço remoto nem plugin externo: o conteúdo dos documentos nunca
+    sai da máquina. Um tempo máximo por documento, para que um PDF patológico
+    não prenda a corrida. Com a pasta dos modelos, o docling lê-os de lá.
+
+    Com a pasta dos modelos, o OCR fica desligado, a menos que
+    `CCT_DOCLING_OCR=1`: os PDF do BTE têm texto, e o OCR automático escolhe o
+    motor pelo que está instalado, não pelo que está na pasta. Sem o
+    `onnxruntime`, escolhia um motor cujos modelos não estavam lá e ia buscá-los
+    à rede (medido a 2026-09-26, com a rede bloqueada).
+    """
+    tempo = os.environ.get("CCT_DOCLING_TEMPO_MAX_S")
+    opcoes: dict = {"enable_remote_services": False, "allow_external_plugins": False,
+                    "document_timeout": float(tempo) if tempo else TEMPO_MAX_S}
+    if pasta is not None:
+        opcoes["artifacts_path"] = str(pasta)
+        opcoes["do_ocr"] = os.environ.get("CCT_DOCLING_OCR") == "1"
+    return opcoes
 
 
 def limpar_texto_item(texto: str) -> str | None:
@@ -277,20 +343,44 @@ def documento_para_texto(documento) -> str:
 def _obter_conversor():
     global _conversor
     if _conversor is None:
-        from docling.document_converter import DocumentConverter
-        _conversor = DocumentConverter()
+        from docling.datamodel.base_models import InputFormat
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.document_converter import DocumentConverter, PdfFormatOption
+        pasta = pasta_modelos()
+        if pasta is not None:
+            # os modelos estão na pasta: nada se descarrega, nem se tenta
+            contrarias = forcar_offline()
+            if contrarias:
+                print(f"CCT_DOCLING_MODELOS: modo offline forçado; o ambiente dizia "
+                      f"{', '.join(contrarias)}", file=sys.stderr)
+        opcoes = PdfPipelineOptions(**opcoes_seguras(pasta))
+        _conversor = DocumentConverter(
+            format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opcoes)})
     return _conversor
 
 
 def _converter(pdf_path: Path, paginas: tuple[int, int] | None):
-    kwargs = {}
+    from .limites import verificar_pdf
+    verificar_pdf(pdf_path)     # corrompido, protegido ou excessivo: falha já
+    kwargs: dict = {}
     if paginas is not None:  # 0-based fim-exclusivo → 1-based inclusivo
         kwargs["page_range"] = (paginas[0] + 1, paginas[1])
     # sem o pós-processador docling-hierarchical-pdf: rebenta com
     # page_range e a hierarquia que infere não acrescenta nada — quem
     # reconhece capítulos e cláusulas é o estruturar, e a ordem de
     # leitura vem da geometria (ordenar_por_leitura)
-    return _obter_conversor().convert(str(pdf_path), **kwargs)
+    from .limites import limite_de_memoria
+    with limite_de_memoria(memoria_max_mb()):
+        resultado = _obter_conversor().convert(str(pdf_path), **kwargs)
+    # uma conversão parcial (o tempo máximo acabou, uma página falhou) não
+    # passa por completa: o texto teria buracos sem ninguém saber
+    estado = getattr(getattr(resultado, "status", None), "value", "success")
+    if estado != "success":
+        raise ValueError(
+            f"{Path(pdf_path).name}: o docling não converteu o documento todo "
+            f"({estado}); com o tempo máximo de {opcoes_seguras()['document_timeout']:g} s, "
+            "subir CCT_DOCLING_TEMPO_MAX_S ou usar o pdfplumber")
+    return resultado
 
 
 def extrair_pdf_docling(pdf_path: Path, paginas: tuple[int, int] | None = None,
