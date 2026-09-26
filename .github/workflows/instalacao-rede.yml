@@ -93,17 +93,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "os testes falham a partir de L:" }
           Pop-Location
 
-      - name: Instalar a partir do caminho UNC \\localhost\crl
+      - name: Instalar a partir do caminho UNC, por \\localhost e pelo nome da máquina
+        # \\localhost é o caso que o pip confunde com o disco local (RFC 8089);
+        # \\NOME é o caso geral de um servidor. A segunda corrida refaz o .venv.
         run: |
-          python \\localhost\crl\unc\scripts\instalar_offline.py
-          if ($LASTEXITCODE -ne 0) { throw "a instalação a partir do caminho UNC falhou" }
-          $py = "\\localhost\crl\unc\.venv\Scripts\python.exe"
-          & $py -c "import pdfplumber, openpyxl, cct.pipeline_tema; print('ok: bibliotecas e cct carregam do caminho UNC')"
-          if ($LASTEXITCODE -ne 0) { throw "as bibliotecas não carregam do caminho UNC" }
+          $refazer = @()
+          foreach ($servidor in "localhost", $env:COMPUTERNAME) {
+            $raiz = "\\$servidor\crl\unc"
+            python "$raiz\scripts\instalar_offline.py" @refazer
+            if ($LASTEXITCODE -ne 0) { throw "a instalação a partir de $raiz falhou" }
+            Push-Location $raiz
+            & "$raiz\.venv\Scripts\python.exe" -m cct.doctor
+            if ($LASTEXITCODE -ne 0) { throw "o doctor encontrou problemas na instalação em $raiz" }
+            Pop-Location
+            $refazer = @("--refazer")
+          }
 
       - name: Controlo, só informativo — o --find-links antigo (caminho UNC em texto)
-        # A forma anterior à correção: registar se este pip ainda falha com
-        # ela ajuda a saber se o defeito era do pip ou do caminho.
+        # A forma anterior à correção, com o servidor localhost: se este pip
+        # ainda perde o servidor («Processing \crl\...»), o controlo falha, e
+        # é isso que mostra que o runner reproduz o erro da estação.
         if: always()
         continue-on-error: true
         run: |
