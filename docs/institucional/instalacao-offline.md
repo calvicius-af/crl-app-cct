@@ -48,7 +48,9 @@ lá uma biblioteca chega para que ela passe a entrar no pacote offline.
 wheels novas ficassem ao lado das antigas, a instalação na estação poderia escolher uma
 versão que já não é a pretendida, sem aviso nenhum.
 
-Espaço ocupado: cerca de 25 MB por versão de Python coberta.
+Confirmar o espaço real com o `MANIFESTO.txt` do pacote gerado para as
+versões e plataformas escolhidas; não reservar espaço com base numa estimativa
+fixa de uma versão anterior.
 
 Para incluir também o `pytest`, e assim poder correr a suite de testes na
 estação:
@@ -65,8 +67,8 @@ python scripts/preparar_pacote_offline.py --alvos macosx_11_0_arm64:311
 
 ## 4. Instalar na estação (uma vez por máquina)
 
-1. Copiar a pasta do projeto completa da partilha de rede para a estação,
-   incluindo a pasta `vendor/wheels/`.
+1. Copiar a pasta do projeto completa, incluindo `vendor/wheels/`, para disco
+   local ou para uma partilha com permissões de leitura e escrita apropriadas.
 2. Duplo clique em `scripts/instalar_offline.bat` (Windows) ou
    `scripts/instalar_offline.command` (macOS).
 3. A janela mostra a verificação prévia, a conferência dos hashes contra o
@@ -75,9 +77,10 @@ python scripts/preparar_pacote_offline.py --alvos macosx_11_0_arm64:311
 4. Abrir a aplicação com duplo clique em `scripts/AppCCT.bat`.
 
 A pasta pode ficar num disco local, numa unidade de rede mapeada (`L:\...`) ou ser
-aberta por um caminho de rede (`\\servidor\...`): as três formas são instaladas no CI,
-num runner Windows com uma partilha real (`.github/workflows/instalacao-rede.yml`,
-ISSUE-0009).
+aberta por um caminho de rede (`\\servidor\...`). O CI ensaia unidade mapeada,
+`\\localhost\...` e `\\NOME-DA-MÁQUINA\...` numa partilha SMB local de um runner
+Windows (`.github/workflows/instalacao-rede.yml`, ISSUE-0009). A instalação
+na partilha e nas políticas do CRL ainda exige prova na estação real.
 
 O instalador chama o `pip` com a opção `--no-index`, que o impede de contactar
 o PyPI ou o proxy. Se a rede estiver completamente cortada, a instalação
@@ -118,8 +121,9 @@ Em qualquer outro caso, correr o diagnóstico e guardar o resultado, usando o
 
 ## 6. Actualizar a aplicação mais tarde
 
-Alterações ao código da aplicação não exigem repetir nada disto: substitui-se a
-pasta do projeto (ou faz-se `git pull`) e o `.venv` existente continua a servir.
+Se mudar apenas o código, atualizar o projeto sem substituir o `.venv`.
+Repetir `cct.doctor` e a corrida de fumo. Se mudar o Python, a plataforma,
+as dependências ou as constraints, preparar e instalar um pacote compatível.
 
 Só é preciso voltar a correr o preparador quando as dependências mudarem, o que
 está registado em `requirements.txt`. Nesse caso, correr o preparador de novo (a
@@ -164,7 +168,12 @@ passa a ser zero. Os pontos que uma auditoria interna tenderá a perguntar:
    isso seja verificável depois.
 5. **Momento da descarga.** Uma vez, numa máquina identificada, e não em cada
    estação.
-6. **Ausência de tráfego posterior.** A aplicação não faz pedidos de rede em
-   operação (ver [requisitos-tecnicos.md](requisitos-tecnicos.md) §4). As duas
-   exceções opcionais, Docling e camada semântica local, estão desligadas por
-   omissão.
+6. **Rede em operação.** A operação base não pede rede (ver
+   [requisitos-tecnicos.md](requisitos-tecnicos.md) §4). A recolha pública do
+   BTE exige confirmação explícita; Docling pode obter modelos na primeira
+   utilização, se não forem pré-provisionados; a semântica comunica apenas
+   com loopback. São capacidades opcionais desligadas por omissão.
+
+Antes da primeira release, executar a
+[matriz de testes](../validacao/plano-primeira-release.md), incluindo a
+instalação no caminho real da estação, com o pacote `--incluir-testes`.
