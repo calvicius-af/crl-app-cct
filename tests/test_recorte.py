@@ -49,3 +49,26 @@ def test_espaco_por_cima_de_uma_letra_nao_parte_a_palavra(tmp_path):
                                                     (76, 700, " "))])
     _doc, texto = extrair_pdf(pdf)
     assert "A suspensão" in texto, texto
+
+
+def test_ligaduras_e_hifenes_escondidos_tambem_saem():
+    """O PDFium decompõe a ligadura «fi» em «f» e «i», na mesma origem, e dá
+    o hífen de fim de linha como U+FFFE; o pdfplumber tem «fi» e «-». Sem as
+    emparelhar, ficavam da camada escondida «1fi45» e «150-» numa tabela
+    (boletim 28 de 2021, p44)."""
+    from types import SimpleNamespace
+
+    from cct.recorte import tirar_escondidas
+
+    def letra(texto, x, y=700.0):
+        return {"text": texto, "matrix": (1, 0, 0, 1, x, y), "fontname": "F"}
+    visiveis = [letra("1", 10), letra("4", 15), letra("5", 20)]
+    escondidas = [letra("fi", 12.0), letra("-", 30.0), letra("f", 50.0, 600.0)]
+    pag = SimpleNamespace(objects={"char": visiveis + escondidas})
+    tiradas = tirar_escondidas(pag, [("f", 12.0, 700.0), ("i", 12.0, 700.0),
+                                     ("￾", 30.0, 700.0), ("f", 50.05, 600.0)])
+    assert tiradas == 3
+    assert [c["text"] for c in pag.objects["char"]] == ["1", "4", "5"]
+    # uma letra só com metade da ligadura na origem não sai
+    pag = SimpleNamespace(objects={"char": [letra("fi", 12.0)]})
+    assert tirar_escondidas(pag, [("f", 12.0, 700.0)]) == 0

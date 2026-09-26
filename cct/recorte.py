@@ -129,19 +129,33 @@ def texto_visivel(pagina) -> str:
         textpage.close()
 
 
+# O PDFium dá o hífen de fim de linha como U+FFFE; o pdfplumber, como «-»
+_EQUIVALENTES = {"\ufffe": "-"}
+
+
 def tirar_escondidas(pag, letras: list[tuple[str, float, float]]) -> int:
-    """Tira da página do pdfplumber as letras escondidas; devolve quantas."""
+    """Tira da página do pdfplumber as letras escondidas; devolve quantas.
+
+    Uma letra do pdfplumber emparelha com as do PDFium que têm a mesma
+    origem: a mesma letra, ou as várias em que o PDFium decompõe uma
+    ligadura («fi» é «f» e «i», ambas na origem do «fi»). Sem isto, as
+    ligaduras e os hífenes da camada escondida ficavam no texto (boletim 28
+    de 2021, p44: «1fi45», «150-» numa tabela).
+    """
     if not letras:
         return 0
-    por_letra: dict[str, list[tuple[float, float]]] = {}
+    por_origem: dict[tuple[int, int], list[tuple[float, float, str]]] = {}
     for texto, x, y in letras:
-        por_letra.setdefault(texto, []).append((x, y))
+        por_origem.setdefault((round(x), round(y)), []).append(
+            (x, y, _EQUIVALENTES.get(texto, texto)))
 
     def escondida(c) -> bool:
         # a origem da letra são os dois últimos termos da matriz do texto
         ox, oy = c["matrix"][4], c["matrix"][5]
-        return any(abs(ox - x) <= TOLERANCIA and abs(oy - y) <= TOLERANCIA
-                   for x, y in por_letra.get(c["text"], ()))
+        mesmas = [t for i in (-1, 0, 1) for j in (-1, 0, 1)
+                  for x, y, t in por_origem.get((round(ox) + i, round(oy) + j), ())
+                  if abs(ox - x) <= TOLERANCIA and abs(oy - y) <= TOLERANCIA]
+        return c["text"] in mesmas or (len(mesmas) > 1 and c["text"] == "".join(mesmas))
     todas = pag.objects.get("char", [])
     tiradas = [c for c in todas if not c["text"].isspace() and escondida(c)]
     # o PDFium não dá os espaços como letras: um espaço sai com as letras
