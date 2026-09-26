@@ -42,11 +42,15 @@ vendor/
 └── <projeto>-<commit>/
 ```
 
-Esta é a estrutura de destino. A primeira migração foi aplicada em agosto de
-2026; os conjuntos históricos mantêm a sua proveniência e os novos comandos já
-escrevem directamente nos caminhos canónicos.
-atuais. A migração é incremental porque alguns caminhos ainda são usados pelo
-código e pela documentação.
+Esta é uma estrutura de destino, não uma arrumação criada automaticamente pela
+aplicação. Atualmente, a aquisição lê `data/raw/indices/`, guarda PDFs de
+origem em `data/interim/recolha/`, mantém `data/registo/registo_bte.jsonl`,
+escreve os PDFs nomeados em `data/raw/bte/bte_<ano>/` e os relatórios em
+`results/aquisicao/`. O pipeline lê também `data/raw/maxqda/` e
+`data/raw/textos_consolidados/` quando fornecidos e escreve diretamente no
+`--out` indicado, por exemplo `results/corrida/` ou `results/runs/<ano>/<id>/`.
+A migração de agosto de 2026 foi parcial; os comandos não promovem
+automaticamente resultados para `validated/` ou `deliveries/`.
 
 ## Classes de permanência
 
@@ -82,8 +86,8 @@ Cada nova execução de `cct.pipeline_tema` escreve `manifest.json` com:
 - SHA-256 e tamanho dos inputs e outputs;
 - início, fim, contagens e problemas da corrida.
 
-O manifesto prova proveniência; não prova qualidade. A aprovação humana fica em
-`validation/` e promove o conjunto para `results/validated/`.
+O manifesto prova proveniência; não prova qualidade. Guardar a aprovação
+humana junto da corrida antes de a copiar manualmente para `results/validated/`.
 
 Para resultados antigos já migrados, usar `scripts/manifestar_legado.py`.
 O manifesto resultante é uma prova de integridade e localização actual; não

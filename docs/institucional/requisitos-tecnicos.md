@@ -5,9 +5,9 @@
 Aplicação local de apoio à análise qualitativa de convenções coletivas de
 trabalho (CRL). Converte PDFs do Boletim do Trabalho e Emprego em projetos
 MaxQDA (formato aberto REFI-QDA/QDPX) e ficheiros Excel, com pré-codificação
-temática e comparação de versões. **Totalmente offline**: não envia dados
-para o exterior, não requer serviços cloud, não abre portas de rede
-(exceção opcional descrita em §5).
+temática e comparação de versões. A operação base é local e sem pedidos de
+rede; a recolha do BTE e a obtenção inicial de modelos Docling são opcionais
+(§3 e §5-A). A camada semântica opcional só aceita loopback (§5).
 
 ## 2. Plataformas-alvo
 | Componente | Requisito |
@@ -15,7 +15,7 @@ para o exterior, não requer serviços cloud, não abre portas de rede
 | Sistema operativo | Windows 10/11 (principal); macOS 13+ (secundário) |
 | Python | 3.11 ou superior, 64 bits, com tcl/tk (opção por omissão do instalador oficial) |
 | Privilégios | utilizador normal — sem administração após instalação do Python |
-| Disco | ~200 MB na instalação base + espaço para PDFs/resultados; Docling opcional requer vários GB |
+| Disco | dimensionar a partir do pacote preparado, PDFs e resultados locais; Docling opcional requer vários GB |
 | Rede | não necessária em operação (exceção opcional em §5-A) |
 
 ## 3. Bibliotecas Python (todas open-source, via pip)
@@ -57,10 +57,11 @@ e resolução de problemas em
   tratados pela equipa). Sem dados pessoais além dos constantes nos
   documentos públicos.
 - Saídas: ficheiros locais (.qdpx, .xlsx, .txt) na pasta escolhida.
-- Sem telemetria, sem atualizações automáticas, sem escrita fora das pastas
-  do projeto.
-- Código-fonte auditável e suite automática (`python -m pytest`), executada no CI em
-  Linux/macOS e Python 3.11/3.12.
+- Sem telemetria nem atualizações automáticas; escolher os destinos de saída
+  e os modelos opcionais conforme as permissões da estação.
+- Código-fonte auditável e suite automática (`python -m pytest`), executada no CI
+  em Linux/macOS/Windows 3.11/3.12 e Windows 3.13. Um workflow separado ensaia
+  instalação offline em unidade SMB e caminhos UNC no Windows 3.13.
 
 ## 5. Componente opcional — camada semântica local
 Se ativada, a aplicação comunica com um servidor LLM **local** (por exemplo,
@@ -85,24 +86,20 @@ fornecidos pela DGERT. Características relevantes para segurança de rede:
 | Proxy | usa o proxy do sistema (`HTTPS_PROXY`) |
 | Bibliotecas | `urllib` da biblioteca padrão do Python — sem dependências novas |
 | Volume | ~1 MB por documento; ~14 documentos por número do boletim; pausa de 1 s entre pedidos |
-| Se bloqueado | a equipa coloca os PDFs à mão numa pasta local e corre apenas a fase de nomeação, que é offline |
+| Se bloqueado | a equipa obtém os PDFs por via institucional, confirma a correspondência com o índice e regista origem, identificadores e hashes antes de os associar ao registo; copiar PDFs sem registo para a pasta final não ativa a nomeação automática |
 
 Decisão de arquitetura e alternativas ponderadas:
 [ADR-0015](../adr/0015-recolha-em-rede-desligada-por-omissao.md).
 Se o Instituto preferir, esta componente pode ser excluída do plano de
 implementação sem qualquer efeito no resto da aplicação.
 
-## 6. Plano de teste sugerido (estação padrão Windows)
-1. Instalar Python 3.11+ 64 bits (instalador oficial, opção tcl/tk).
-2. Copiar a pasta do projeto e criar o ambiente (ver §3).
-3. `python -m cct.doctor` → deve terminar com "Tudo pronto".
-4. `python -m pytest -q` → todos os testes aplicáveis passam; os que exigem corpus local
-   ou Docling real identificam claramente a dependência.
-5. Duplo clique em `AppCCT.bat` → a janela abre; botão "Verificar
-   instalação" repete o passo 3 dentro da app.
-6. Corrida de fumo: pasta com 2 PDFs de teste + tema 4.08 → gera
-   `projeto.qdpx` e `sugestoes_peritas.xlsx` em <1 minuto.
-7. Importar o `projeto.qdpx` no MaxQDA 2022+ e confirmar a árvore de códigos.
+## 6. Plano de testes da primeira release
+
+Seguir o [plano por ambiente](../validacao/plano-primeira-release.md), que
+inclui CI, preparação do pacote, estação CRL em unidade de rede, macOS,
+importação MaxQDA, corpus e ensaios opcionais. O `doctor` distingue
+dependências obrigatórias de fontes opcionais ausentes: guardar o resultado
+completo e verificar cada item, sem exigir uma frase fixa de aprovação.
 
 ## 7. Manutenção
 - Atualizações = substituir a pasta do projeto, ou `git pull` (sem instaladores).

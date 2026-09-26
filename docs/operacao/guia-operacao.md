@@ -1,8 +1,8 @@
 # Guia de operação — Pipeline CCT → MaxQDA
 
 Este guia explica como usar o pipeline sem saber programação.
-Regra de ouro: **se algo falhar, o problema está quase sempre no nome ou no
-sítio de um ficheiro.** Verifica primeiro a secção "Onde ficam os ficheiros".
+Quando algo falhar, começar por `relatorio.txt` e `diagnostico.md` e confirmar
+os caminhos de entrada na secção "Onde ficam os ficheiros".
 
 ---
 
@@ -11,7 +11,7 @@ sítio de um ficheiro.** Verifica primeiro a secção "Onde ficam os ficheiros".
 Recebe PDFs de convenções coletivas do BTE e produz:
 1. **projeto.qdpx** — para importar no MaxQDA, com as convenções já
    pré-codificadas por tema e organizadas em faixas:
-   - `AUTO/…` — codificações fiáveis (quase não precisam de revisão)
+   - `AUTO/…` — sugestões calibradas; rever a sua validade antes de as usar
    - `REVER/…` — codificações a rever por humanos
    - `CONSOLIDADO/…` — texto republicado sem novidade (fora da análise)
    - `00 Estrutura` — preâmbulos, assinaturas, marca do texto consolidado
@@ -28,7 +28,7 @@ Recebe PDFs de convenções coletivas do BTE e produz:
    com o número de parágrafo que o MaxQDA mostra. Traz também o relatório,
    o ambiente e a última aquisição. **É este o ficheiro a enviar quando uma
    corrida tem problemas.** Para o gerar de novo sobre uma corrida já feita:
-   `.venv\Scripts\python -m cct.completude --corrida results\corrida`.
+   `.\.venv\Scripts\python.exe -m cct.completude --corrida results\corrida`.
 
 ---
 
@@ -73,6 +73,12 @@ preciso descarregar nem renomear nada à mão:
 2. Na app gráfica, carregar em **"Recolher do BTE…"** — a aplicação pergunta se pode
    ligar-se à internet. Responder *Não* faz uma simulação, que mostra o que seria
    descarregado sem descarregar nada.
+   A seguir, **"Confirmar siglas…"** mostra cada documento por confirmar,
+   com as siglas propostas e outros avisos. Conferir os outorgantes no índice
+   e no ato publicado, corrigir a sigla e marcar apenas os documentos revistos.
+   A decisão fica em `siglas.csv` na raiz da instalação, um ficheiro local da
+   equipa que não é distribuído pelo Git. A mesma entidade partilha a sigla
+   entre documentos; rever também os outros avisos antes de marcar cada um.
 3. Por linha de comandos, a partir da raiz do projeto, usar **sempre o Python
    do ambiente virtual**. No PowerShell do Windows:
 
@@ -101,6 +107,14 @@ Se a pasta de destino mudar, a versão atual verifica os PDFs **no novo
 destino**; a existência de uma cópia noutro caminho guardado no registo não
 conta como `ja_existente`. A nova descarga pode ser necessária. Não corrigir
 `caminho` no JSONL à mão.
+
+Na CLI, para siglas confirmadas, copiar `docs/operacao/siglas.exemplo.csv`
+para `siglas.csv`, preencher `nome;sigla` com a fonte verificada e simular
+`.\.venv\Scripts\python.exe -m cct.nomeacao --siglas siglas.csv`. Para confirmar **um documento de cada vez**
+depois de rever todos os avisos, executar
+`.\.venv\Scripts\python.exe -m cct.nomeacao --confirmar CHAVE --aplicar`
+com a chave do registo; esta fase é
+offline. Não usar `--aceitar-heuristicas` como atalho para aprovação do lote.
 
 **Caso observado em 23-09-2026, BTE 31/2026:** o índice
 `BTE31_2026_CRL.xlsx` tinha 14 documentos. A simulação encontrou os 14 PDFs
@@ -195,13 +209,14 @@ ou: `python -m cct.app`. Preencher os campos e carregar em "Correr".
     --pasta-versoes data/raw/textos_consolidados \
     --out results/runs/2026/2026_4_08
 ```
-Em Windows, o interpretador é `.venv\Scripts\python`:
+Em Windows, no PowerShell (numa só linha):
+```powershell
+.\.venv\Scripts\python.exe -m cct.pipeline_tema --pdfs data\raw\bte\bte_2026 --codebook codebooks\4_08_protecao_dados.yaml --out results\runs\2026\2026_4_08
 ```
-.venv\Scripts\python -m cct.pipeline_tema ^
-    --pdfs data\raw\bte\bte_2026 ^
-    --codebook codebooks\4_08_protecao_dados.yaml ^
-    --out results\runs\2026\2026_4_08
-```
+`--pdfs` aceita a pasta do ano, a pasta `convencoes` ou uma pasta de
+âmbito (`PRI`, `SPE`, `APU`). Na pasta do ano ou `convencoes`, procura os PDFs
+em `convencoes/{PRI,SPE,APU}`; um caminho `PRI` só processa esse âmbito.
+Confirmar a contagem antes de importar o QDPX.
 Só `--pdfs`, `--codebook` e `--out` são obrigatórios; o resto melhora o
 resultado mas pode faltar.
 
@@ -221,16 +236,19 @@ Os modelos do docling descarregam-se uma vez, numa máquina com internet, e veri
 pelo SHA-256 antes de cada uso. Depois, a extração corre sem rede e sem nenhum serviço
 remoto: o conteúdo dos documentos nunca sai da máquina.
 
-```
-# numa máquina com internet
+```bash
+# na máquina de preparação com internet
 .venv/bin/python -m cct.modelos_docling descarregar --destino modelos_docling
-# copiar a pasta modelos_docling para a partilha; na estação:
-.venv/bin/python -m cct.modelos_docling verificar --pasta L:/partilha/modelos_docling
-CCT_DOCLING_MODELOS=L:/partilha/modelos_docling .venv/bin/python -m cct.pipeline_tema --extrator docling ...
+# no macOS, depois de copiar os modelos para /Volumes/partilha:
+.venv/bin/python -m cct.modelos_docling verificar --pasta /Volumes/partilha/modelos_docling
+CCT_DOCLING_MODELOS=/Volumes/partilha/modelos_docling .venv/bin/python -m cct.pipeline_tema --extrator docling --pdfs data/raw/bte/bte_2026 --codebook codebooks/4_08_protecao_dados.yaml --out results/corrida_docling
 ```
 
-Em Windows (PowerShell), a variável define-se antes do comando:
-`$env:CCT_DOCLING_MODELOS = "L:\partilha\modelos_docling"`.
+Em Windows (PowerShell), verificar primeiro com
+`.\.venv\Scripts\python.exe -m cct.modelos_docling verificar --pasta L:\partilha\modelos_docling`,
+definir `$env:CCT_DOCLING_MODELOS = "L:\partilha\modelos_docling"` e correr o
+pipeline com `--extrator docling`. Repetir a verificação após cada cópia ou
+alteração dos modelos.
 
 Com a pasta dos modelos, o OCR fica desligado (os PDF do BTE têm texto). Para o ligar,
 `CCT_DOCLING_OCR=1`, com os modelos do OCR completos na pasta.
@@ -275,14 +293,14 @@ Sai um Excel com cada cláusula classificada: `=` / `alteracao` / `nova` /
 
 | Mensagem / sintoma | Causa provável | Solução |
 |---|---|---|
-| "Sem PDFs em …" | pasta errada ou vazia | confirmar o caminho em --pdfs |
+| "Sem PDFs em …" | pasta errada ou vazia | confirmar `--pdfs`; a pasta do ano e `convencoes` abrangem `PRI`, `SPE` e `APU`; uma subpasta só inclui o seu âmbito |
 | "N documento(s) com texto consolidado sem pasta de versões correspondente" (uma linha com os nomes) | o nome da subpasta não está contido no nome do PDF | renomear a subpasta (ex.: `ACIP_FESAHT`); sem ela, o consolidado fica todo na faixa CONSOLIDADO |
 | "A pasta de versões anteriores não existe" | `--pasta-versoes` (ou o campo «Versões anteriores» da app) aponta para uma pasta que não existe | corrigir o caminho, ou retirar a opção: sem ela os consolidados ficam todos na faixa CONSOLIDADO. Antes, cada documento consolidado ficava fora do QDPX (corrida de 2025) |
 | "ERRO, documento fora do QDPX" / `EXCLUÍDO` no diagnostico.md | o documento foi extraído mas falhou num passo seguinte | enviar o `diagnostico.md`: diz o erro de cada documento excluído |
 | "a versão antiga parece parcial" | a base da comparação é uma revisão de 2-3 páginas | juntar à subpasta o último texto completo |
-| "PDF digitalizado?" / 0 cláusulas | o PDF é uma imagem (scan) | obter o PDF nativo do BTE; OCR ainda não suportado |
+| "PDF digitalizado?" / 0 cláusulas | o PDF é uma imagem (scan) | obter o PDF nativo do BTE; em alternativa, ensaiar o Docling opcional com OCR e modelos completos, conferindo o texto com o PDF |
 | subtipo sempre "desconhecido" | falta o ficheiro de variáveis ou o nome do PDF não bate certo com o MaxQDA | ver 3.2; o cruzamento usa os primeiros ~30 caracteres do nome |
-| códigos todos em REVER, nada em AUTO | falta `--metricas` (calibração) | usar o metricas.json da última avaliação contra a amostra de referência |
+| códigos todos em REVER, nada em AUTO | falta `--metricas` (calibração) | só usar métricas validadas contra gabarito revisto; a interpretação do gabarito atual está suspensa (GitHub #10) |
 | erro ao importar QDPX no MaxQDA | versão antiga do MaxQDA | usar MaxQDA 2022 ou superior (REFI-QDA) |
 | a app gráfica não abre no macOS | o Python não tem o Tk (Homebrew) ou tem um Tk antigo (o Python da Apple) | abrir `scripts/AppCCT.command`: a janela do terminal fica aberta com a causa e a solução (por exemplo, `brew install python-tk@3.11`); o mesmo em `python -m cct.doctor`. O pipeline no terminal não precisa do Tk |
 | a app/comando "não faz nada" | ambiente por instalar | correr `python -m cct.doctor` e seguir as instruções |
@@ -345,8 +363,12 @@ para o repositório.
    catálogo, referências de versões, variáveis/documentos do MaxQDA e
    manifestos que dependam do nome. Se o MaxQDA já tiver importado o PDF,
    coordenar a alteração com a equipa antes de a executar. A migração para o
-   futuro esquema comum das três famílias segue a [SPEC-0004](../../specs/0004-esquema-de-nomes-comum-as-tres-familias.md);
-   essa especificação ainda não está implementada.
+   esquema comum das três famílias já está implementada: para nomes de 2026
+   do ADR-0016, usar `python -m cct.nomeacao --migrar --correspondencia <CSV>`, primeiro em
+   simulação e depois com `--aplicar`, conforme
+   [RNC §10](../rnc/README.md#10-migração-do-ciclo-anterior). Isso não resolve
+   automaticamente uma alteração de sigla num nome já escrito; exigir decisão
+   e correspondência para todos os sistemas a jusante.
 4. Verificar que cada chave mantém um só PDF final com hash igual ao PDF
    recolhido, que não há colisões de nomes sem distinção de maiúsculas no
    Windows, que os 14 documentos e respetivos códigos estão representados
@@ -432,14 +454,15 @@ O procedimento de diagnóstico, correção e validação está em
 3. Remede-se contra a amostra de referência:
    `python -m cct.avaliar_baseline --xlsx <amostra-referencia>.xlsx --pdfs <pasta>
    --codebook <tema>.yaml --out results/benchmarks/<tema>/metricas/baseline_X`
-4. A triagem AUTO/REVER recalibra-se sozinha na corrida seguinte
-   (passar o novo `metricas.json` em `--metricas`).
+4. Depois de validar o gabarito e aprovar as métricas, passar o novo
+   `metricas.json` em `--metricas` para recalibrar AUTO/REVER; documentar
+   a revisão humana da faixa AUTO (GitHub #10).
 
 ## 7. Limitações conhecidas
-- PDFs digitalizados (imagens) não funcionam.
-- Numeração por extenso ("Cláusula primeira") já é reconhecida na extração,
-  mas ainda não é convertida para número canónico na comparação diacrónica
-  (ISSUE-0001 / GitHub #28).
+- PDFs digitalizados não funcionam no extrator base; Docling com OCR é uma
+  opção sujeita à instalação dos modelos e à conferência humana.
+- A numeração por extenso é normalizada para a comparação diacrónica;
+  ver `cct/numeracao.py` e `tests/test_numeracao.py`.
 - Blocos de título com várias linhas no início dos documentos podem ficar
   com quebras imperfeitas.
 - A camada semântica (modelo local, por exemplo LM Studio + gemma) é opcional e as suas

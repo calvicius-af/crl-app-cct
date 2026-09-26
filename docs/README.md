@@ -7,11 +7,13 @@ Por onde começar, consoante o que precisas:
 | ver o sistema a funcionar, com ficheiros reais | [../examples/](../examples/README.md) |
 | perceber como funciona | [arquitetura/arquitetura.md](arquitetura/arquitetura.md) |
 | reagir ao rascunho do modelo de dados da BD operacional (#14) | [arquitetura/modelo-de-dados-rascunho.md](arquitetura/modelo-de-dados-rascunho.md) |
-| perceber **porque** é assim | [adr/](adr/README.md) — 19 decisões registadas |
+| perceber **porque** é assim | [adr/](adr/README.md) — decisões registadas, incluindo as substituídas |
 | operá-lo | [operacao/guia-operacao.md](operacao/guia-operacao.md) |
 | arrumar e nomear os ficheiros do RNC | [rnc/README.md](rnc/README.md) — a convenção, o catálogo e os vocabulários |
 | criar ou afinar um codebook | [operacao/prompts-codebooks.md](operacao/prompts-codebooks.md) |
 | saber se é fiável | [validacao/](validacao/README.md) — gates, memos das peritas, métricas |
+| preparar a primeira release | [validacao/plano-primeira-release.md](validacao/plano-primeira-release.md) — ensaios por ambiente e evidências |
+| consultar a auditoria de setembro de 2026 | [validacao/auditoria-repositorio-2026-09-26.md](validacao/auditoria-repositorio-2026-09-26.md) — divergências e provas pendentes |
 | instalar numa máquina nova | [dados/](dados/README.md) + [institucional/requisitos-tecnicos.md](institucional/requisitos-tecnicos.md) |
 | organizar corridas e resultados locais | [dados/organizacao-workspace.md](dados/organizacao-workspace.md) |
 | consultar a migração de agosto de 2026 | [dados/migracao-2026-08.md](dados/migracao-2026-08.md) |
@@ -21,7 +23,7 @@ Por onde começar, consoante o que precisas:
 
 ## Como está organizada
 
-- **arquitetura/** — o desenho do sistema: as quatro fases, os módulos, os fluxos de
+- **arquitetura/** — o desenho do sistema: aquisição opcional, pipeline, módulos e fluxos de
   dados de e para o MaxQDA.
 - **adr/** — uma página por decisão estruturante, escrita no momento em que se decide.
   Não se apaga nem se reescreve: se a decisão mudar, escreve-se outra que a substitui.

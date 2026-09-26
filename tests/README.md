@@ -7,8 +7,11 @@ dependem do corpus local. Todos correm pelo mesmo comando:
 python -m pytest -q
 ```
 
-Os testes que precisam de ficheiros não distribuídos usam `skipif`; o CI de um
-clone limpo continua, assim, determinístico.
+Os testes que precisam de ficheiros não distribuídos podem ser ignorados num
+clone limpo. A execução local da suite, por si só, não prova o corpus real,
+a instalação offline nem a importação no MaxQDA. O CI tem um job de corpus
+estrito e um workflow SMB separado; ver
+[plano da primeira release](../docs/validacao/plano-primeira-release.md).
 
 ## Mapa atual
 
@@ -21,6 +24,9 @@ clone limpo continua, assim, determinístico.
 | QDPX e offsets | `test_qdpx*.py`, `test_qdc.py` |
 | Dados e contratos | `test_schemas.py`, `test_variaveis.py`, `test_referencia_harness.py` |
 | Operação | `test_sanidade.py`, `test_proveniencia.py`, `test_inventario_workspace.py` |
+| Aquisição e nomes | `test_recolha.py`, `test_nomeacao.py`, `test_aquisicao.py` |
+| Instalação e limites | `test_pacote_offline.py`, `test_doctor.py`, `test_limites_docling.py`, `test_subprocesso_utf8.py` |
+| Regressão e desempenho | `test_corpus.py`, `test_desempenho.py`, `test_completude.py` |
 
 Os nomes `fase3`, `fase3b`, `fase3c` e `fase5b` são históricos. Não devem ser
 copiados para funcionalidades novas; os testes novos recebem o nome do domínio.
@@ -46,6 +52,7 @@ grande que só mova ficheiros. Quando os grupos forem separados, usar marcadores
 
 ## Resultados dos testes
 
-Os testes escrevem apenas em `tmp_path`; não devem acrescentar ficheiros a
-`results/`. Baselines aprovadas e artefactos dourados pequenos pertencem a
+Os testes de unidade devem usar diretórios temporários; comandos de corpus,
+desempenho e ensaios manuais podem produzir ficheiros em `results/`, que
+ficam fora do Git. Baselines aprovadas e artefactos dourados pequenos pertencem a
 `tests/fixtures/golden/` ou `examples/`, com proveniência documentada.
