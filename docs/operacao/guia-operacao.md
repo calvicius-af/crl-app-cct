@@ -208,12 +208,58 @@ resultado mas pode faltar.
 **`--extrator docling`** (opcional): usa o docling em vez do pdfplumber na
 extração. Recupera tabelas de anexos (tabelas salariais, perfis de função)
 e layouts difíceis que o extrator clássico perde, ao custo de ser mais
-lento (~1-1,7 s/página) e de exigir instalação à parte:
+lento (1,7 s/página a quente e cerca de 4 GB de memória, medidos no corpus) e de exigir instalação à parte:
 `.venv/bin/python -m pip install docling`
 (Windows: `.venv\Scripts\python -m pip install docling`)
 (≈4 GB com PyTorch; em Mac Apple Silicon o Python tem de ser arm64 —
 `python3 -c "import platform; print(platform.machine())"` deve dizer
 `arm64`). A primeira corrida descarrega os modelos de layout.
+
+### Docling sem rede: modelos na partilha
+
+Os modelos do docling descarregam-se uma vez, numa máquina com internet, e verificam-se
+pelo SHA-256 antes de cada uso. Depois, a extração corre sem rede e sem nenhum serviço
+remoto: o conteúdo dos documentos nunca sai da máquina.
+
+```
+# numa máquina com internet
+.venv/bin/python -m cct.modelos_docling descarregar --destino modelos_docling
+# copiar a pasta modelos_docling para a partilha; na estação:
+.venv/bin/python -m cct.modelos_docling verificar --pasta L:/partilha/modelos_docling
+CCT_DOCLING_MODELOS=L:/partilha/modelos_docling .venv/bin/python -m cct.pipeline_tema --extrator docling ...
+```
+
+Em Windows (PowerShell), a variável define-se antes do comando:
+`$env:CCT_DOCLING_MODELOS = "L:\partilha\modelos_docling"`.
+
+Com a pasta dos modelos, o OCR fica desligado (os PDF do BTE têm texto). Para o ligar,
+`CCT_DOCLING_OCR=1`, com os modelos do OCR completos na pasta.
+
+**Limites.** Antes de extrair, o PDF é aberto com o PDFium. Um PDF corrompido, protegido
+por palavra-passe, com mais de 500 páginas (`CCT_MAX_PAGINAS`) ou mais de 100 MB
+(`CCT_MAX_MB`) é recusado com uma mensagem que diz o que fazer, e a corrida continua com
+os outros documentos. No docling, cada documento tem um tempo máximo de 900 s
+(`CCT_DOCLING_TEMPO_MAX_S`) e uma memória máxima de 10 000 MB
+(`CCT_DOCLING_MEMORIA_MAX_MB`; 0 desliga). Uma conversão que não acabe, ou que passe o
+limite de memória, é um erro, e não um texto com buracos. Com `CCT_DOCLING_MODELOS`, o
+modo offline é forçado mesmo que o ambiente diga o contrário. Registo: [docling-isolado-2026-09-26.md](../validacao/docling-isolado-2026-09-26.md).
+
+### Medir o desempenho dos extratores
+
+```
+.venv/bin/python -m cct.desempenho medir                      # pdfplumber, sobre data/corpus
+.venv/bin/python -m cct.desempenho medir --extrator docling   # o docling, com os modelos já em cache
+.venv/bin/python -m cct.desempenho medir --comparar           # falha acima da referência + 15% (e do orçamento, se aprovado)
+```
+
+Mede cada PDF do corpus de regressão num processo à parte: o arranque, a extração a
+frio (com o carregamento dos modelos, no docling) e a quente, os segundos por página e a
+memória máxima. O resultado fica em `results/desempenho/`, com a máquina, o Python e as
+versões identificados. A referência e o orçamento estão em
+`tests/desempenho/referencia.json`, por ambiente; `--atualizar` grava a referência do
+ambiente em que se corre. Para medir o docling sem rede, com os modelos já descarregados:
+`HF_HUB_OFFLINE=1`. Registo das medidas:
+[desempenho-2026-09-26.md](../validacao/desempenho-2026-09-26.md).
 
 ### Comparar duas versões de uma convenção (avulso)
 ```
