@@ -169,6 +169,19 @@ def _limpar_sigla(token: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "", _sem_acentos(token))
 
 
+def normalizar_sigla(sigla: str) -> str:
+    """A sigla como entra no nome e no siglas.csv: só letras e algarismos, sem
+    acentos, até MAX_SIGLA. Vazia se não sobrar nada ("!!!", "  ")."""
+    return _limpar_sigla(sigla)[:MAX_SIGLA]
+
+
+def chave_entidade(nome: str) -> str:
+    """A regra única de «a mesma entidade» na tabela de siglas: sem acentos nem
+    maiúsculas, e sem os espaços e a pontuação à volta. Serve a leitura do
+    siglas.csv, a procura da sigla, a gravação e a janela de confirmação."""
+    return _sem_acentos((nome or "").strip().strip(" .;,")).lower()
+
+
 def _camel(nome: str, max_chars: int = MAX_SIGLA) -> str:
     """Recurso quando não há sigla: 'Águas do Norte' → 'AguasNorte'.
 
@@ -201,7 +214,7 @@ def sigla(nome: str, tabela: dict[str, str] | None = None) -> tuple[str, str | N
     if not nome:
         return "", "outorgante vazio"
     if tabela:
-        chave = _sem_acentos(nome).lower()
+        chave = chave_entidade(nome)
         if chave in tabela:
             return tabela[chave], None
         # Correspondência parcial, para apanhar as variações de pontuação e os
@@ -655,8 +668,8 @@ def carregar_siglas(caminho: Path) -> dict[str, str]:
                 and linha[i_origem].strip().lower().split("+")[0]
                 in ORIGENS_IGNORADAS):
             continue
-        nome = _sem_acentos(linha[i_nome]).strip().lower()
-        valor = _limpar_sigla(linha[i_sigla])[:MAX_SIGLA]
+        nome = chave_entidade(linha[i_nome])
+        valor = normalizar_sigla(linha[i_sigla])
         if not nome or not valor:
             continue
         if not tem_cabecalho and nome in COLUNAS_NOME:
@@ -708,7 +721,8 @@ def gravar_siglas(caminho: Path, decisoes: dict[str, str]) -> Path:
 
     O ficheiro é criado se não existir e nunca é substituído: as linhas que já
     lá estão ficam, e uma entidade que já lá esteja passa a ter a sigla nova.
-    Escreve-se no formato sem cabeçalho que o `carregar_siglas()` lê.
+    Uma sigla que não sobrevive à normalização é um erro (ValueError), e nada
+    é escrito. Escreve-se no formato sem cabeçalho que o `carregar_siglas()` lê.
     """
     import csv
     caminho = Path(caminho)
@@ -716,17 +730,20 @@ def gravar_siglas(caminho: Path, decisoes: dict[str, str]) -> Path:
     if caminho.exists():
         with open(caminho, encoding="utf-8-sig", newline="") as f:
             linhas = [l for l in csv.reader(f, delimiter=";") if l and l[0].strip()]
-    decisoes = {n.strip(): _limpar_sigla(s)[:MAX_SIGLA] for n, s in decisoes.items()
-                if n.strip() and _limpar_sigla(s)}
-    por_chave = {_sem_acentos(n).lower(): n for n in decisoes}
+    inuteis = [n for n, s in decisoes.items() if n.strip() and not normalizar_sigla(s)]
+    if inuteis:
+        # nunca descartar em silêncio uma decisão (revisão do PR #96)
+        raise ValueError("sigla sem letras nem algarismos para: " + "; ".join(inuteis))
+    decisoes = {n.strip(): normalizar_sigla(s) for n, s in decisoes.items() if n.strip()}
+    por_chave = {chave_entidade(n): n for n in decisoes}
     vistas = set()
     for linha in linhas:
-        chave = _sem_acentos(linha[0]).strip().lower()
+        chave = chave_entidade(linha[0])
         if chave in por_chave and len(linha) >= 2:
             linha[1] = decisoes[por_chave[chave]]
             vistas.add(chave)
     linhas += [[n, s] for n, s in decisoes.items()
-               if _sem_acentos(n).lower() not in vistas]
+               if chave_entidade(n) not in vistas]
     caminho.parent.mkdir(parents=True, exist_ok=True)
     with open(caminho, "w", encoding="utf-8", newline="") as f:
         csv.writer(f, delimiter=";", lineterminator="\n").writerows(linhas)

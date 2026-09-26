@@ -202,7 +202,11 @@ cada documento mostra a sigla sugerida de cada outorgante, que se aceita ou corr
 outros avisos. Todos os documentos começam desmarcados: confirma-se cada um marcando-o,
 depois de rever as siglas e os avisos, e «Gravar e nomear» sem nenhum marcado não grava
 nada. Uma sigla apagada não volta à sugestão: enquanto um documento marcado tiver uma
-sigla vazia, nada é gravado e a janela diz qual é. Os documentos confirmados são nomeados
+sigla vazia, ou só com pontuação, nada é gravado e a janela diz qual é. No nome e no
+`siglas.csv` só entram letras e algarismos, sem acentos, até 20 caracteres; se isso mudar a
+sigla escrita («E.M.M.» fica `EMM`), a janela mostra-o e pergunta antes de gravar. O
+`siglas.csv` guarda uma sigla por entidade, por isso a mesma entidade em vários documentos
+tem uma só caixa: corrigi-la num documento corrige-a nos outros. Os documentos confirmados são nomeados
 logo a seguir, offline e só eles;
 as siglas confirmadas ficam gravadas no `siglas.csv` da raiz do projeto (criado se não
 existir, e nunca substituído: as linhas que lá estão ficam) e não voltam a ser

@@ -389,3 +389,14 @@ def test_tabela_de_siglas_da_equipa_ganha_e_nao_se_repete(tmp_path):
     tabela = tabela_de_siglas([outro, equipa], equipa=equipa)
     assert tabela == {"entidade x": "EQUIPA", "entidade y": "Y"}
     assert tabela_de_siglas([outro], equipa=tmp_path / "nao_existe.csv")["entidade x"] == "OUTRO"
+
+
+def test_gravar_siglas_recusa_sigla_sem_letras_nem_algarismos(tmp_path):
+    """Revisão do PR #96: uma decisão nunca é descartada em silêncio."""
+    import pytest
+    from cct.nomeacao import gravar_siglas
+    csv = tmp_path / "siglas.csv"
+    gravar_siglas(csv, {"Entidade X": "EX"})
+    with pytest.raises(ValueError, match="sem letras nem algarismos para: Entidade Y"):
+        gravar_siglas(csv, {"Entidade X": "NOVA", "Entidade Y": "!!!"})
+    assert csv.read_text(encoding="utf-8") == "Entidade X;EX\n"

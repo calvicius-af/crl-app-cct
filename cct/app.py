@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from typing import NamedTuple
 
 try:
     import tkinter as tk
@@ -28,39 +29,69 @@ RESULTADOS = RAIZ / "results"
 FIM_DA_CORRIDA = object()
 
 
+class Decisoes(NamedTuple):
+    siglas: dict[str, str]     # a gravar no siglas.csv, {outorgante: sigla}
+    chaves: list[str]          # os documentos a nomear
+    motivos: list[str]         # o que impede gravar; com algum, nada se grava
+    ajustes: list[str]         # siglas que a normalização muda, a mostrar antes
+
+
 def decisoes_confirmadas(lista: list[dict], marcados: set[str],
-                         valores: dict[tuple[str, str], str]
-                         ) -> tuple[dict[str, str], list[str], list[str]]:
+                         valores: dict[tuple[str, str], str]) -> Decisoes:
     """O que a janela de confirmação grava e que documentos manda nomear (#38).
 
     `lista` vem de `nomeacao.pendentes`; `marcados` são as chaves dos
     documentos que a pessoa confirmou, um a um; `valores[(chave, outorgante)]`
     é a sigla escrita na janela (a sugerida, ou a corrigida). Um outorgante
-    sem valor (sem campo) fica com a sugerida; um campo esvaziado nunca é
-    trocado pela sugestão (revisão do PR #96): impede a confirmação e diz
-    porquê. Devolve as siglas a gravar no siglas.csv, `{outorgante: sigla}`,
-    as chaves a nomear e os motivos que impedem gravar — com algum motivo,
-    não se grava nada.
+    sem valor (sem campo) fica com a sugerida.
+
+    As regras (revisões do PR #96) garantem que o nome sai com a sigla que a
+    pessoa confirmou, ou que nada se grava e se diz porquê:
+    - a sigla vale depois da mesma normalização da gravação e do nome
+      (`nomeacao.normalizar_sigla`): vazia, ou só com pontuação, impede;
+      mudada pela normalização («E.M.M.» → «EMM»), vai em `ajustes`;
+    - o siglas.csv guarda uma sigla por entidade: a mesma entidade com siglas
+      diferentes em dois documentos marcados impede.
     """
+    from cct.nomeacao import chave_entidade, normalizar_sigla
+
     siglas: dict[str, str] = {}
     chaves = []
-    motivos = []
+    motivos: list[str] = []
+    ajustes: list[str] = []
+    por_entidade: dict[str, dict[str, list[str]]] = {}   # entidade → sigla → docs
+    nomes: dict[str, str] = {}
     for p in lista:
         if p["chave"] not in marcados:
             continue
-        escritas = {nome: (valores[(p["chave"], nome)] if (p["chave"], nome) in valores
-                           else sugerida).strip()
-                    for nome, sugerida in p["siglas"]}
-        vazias = [nome for nome, sigla in escritas.items() if not sigla]
-        if vazias:
-            motivos += [f"{p['doc_id'] or p['chave']}: sigla vazia para «{nome}»"
-                        for nome in vazias]
-            continue
-        siglas.update(escritas)
-        chaves.append(p["chave"])
+        doc = p["doc_id"] or p["chave"]
+        valido = True
+        for nome, sugerida in p["siglas"]:
+            escrita = valores.get((p["chave"], nome), sugerida).strip()
+            sigla = normalizar_sigla(escrita)
+            if not sigla:
+                motivos.append(f"{doc}: sigla vazia para «{nome}»" if not escrita else
+                               f"{doc}: «{escrita}» não tem letras nem algarismos "
+                               f"(sigla de «{nome}»)")
+                valido = False
+                continue
+            if sigla != escrita and f"«{escrita}» fica {sigla}" not in ajustes:
+                ajustes.append(f"«{escrita}» fica {sigla}")
+            entidade = chave_entidade(nome)
+            nomes.setdefault(entidade, nome)
+            por_entidade.setdefault(entidade, {}).setdefault(sigla, []).append(doc)
+            siglas[nome] = sigla
+        if valido:
+            chaves.append(p["chave"])
+    for entidade, por_sigla in por_entidade.items():
+        if len(por_sigla) > 1:
+            detalhe = "; ".join(f"{sigla} em {', '.join(docs)}"
+                                for sigla, docs in por_sigla.items())
+            motivos.append(f"«{nomes[entidade]}» tem siglas diferentes ({detalhe}): "
+                           "a entidade tem uma só sigla, escrever a mesma em todos")
     if motivos:
-        return {}, [], motivos
-    return siglas, chaves, []
+        return Decisoes({}, [], motivos, [])
+    return Decisoes(siglas, chaves, [], ajustes)
 
 
 class AppCCT(_JANELA):
@@ -299,7 +330,8 @@ class AppCCT(_JANELA):
         ser perguntadas; a seguir corre só a nomeação dos documentos
         confirmados (offline, sem descarregar nada).
         """
-        from cct.nomeacao import SIGLAS_EQUIPA, gravar_siglas, pendentes, tabela_de_siglas
+        from cct.nomeacao import (SIGLAS_EQUIPA, chave_entidade, gravar_siglas, pendentes,
+                                  tabela_de_siglas)
         from cct.recolha import REGISTO_OMISSAO, Registo
 
         registo = Registo.carregar(REGISTO_OMISSAO)
@@ -315,7 +347,9 @@ class AppCCT(_JANELA):
             "Estas siglas foram adivinhadas a partir do nome do outorgante. "
             "Confirmar cada documento, corrigindo a sigla se for preciso. As "
             "siglas confirmadas ficam gravadas e não voltam a ser perguntadas. "
-            "Só se gravam os documentos marcados, um a um, depois de revistos; "
+            "Só se gravam os documentos marcados, um a um, depois de revistos. "
+            "A mesma entidade tem uma só sigla: corrigi-la num documento corrige-a "
+            "nos outros; "
             "com vários outorgantes do mesmo lado, o nome usa sempre o primeiro."
         )).pack(fill="x")
         # os botões antes da lista: o `pack` dá o espaço por ordem, e uma lista
@@ -333,6 +367,7 @@ class AppCCT(_JANELA):
 
         marcas: dict[str, tk.BooleanVar] = {}
         campos: dict[tuple[str, str], tk.StringVar] = {}
+        partilhados: dict[str, tk.StringVar] = {}
         for p in lista:
             # desmarcado: cada documento confirma-se de propósito, depois de rever
             # as siglas e os avisos, e nunca em lote (revisão do PR #96)
@@ -344,7 +379,12 @@ class AppCCT(_JANELA):
             for nome, sugerida in p["siglas"]:
                 linha = ttk.Frame(corpo)
                 linha.pack(anchor="w", padx=24, fill="x")
-                campos[(p["chave"], nome)] = tk.StringVar(value=sugerida)
+                # a mesma entidade noutro documento partilha a caixa: uma
+                # correção vale para todos, como no siglas.csv (revisão do PR #96)
+                entidade = chave_entidade(nome)
+                if entidade not in partilhados:
+                    partilhados[entidade] = tk.StringVar(value=sugerida)
+                campos[(p["chave"], nome)] = partilhados[entidade]
                 ttk.Entry(linha, width=18,
                           textvariable=campos[(p["chave"], nome)]).pack(side="left")
                 ttk.Label(linha, text=nome[:90]).pack(side="left", padx=6)
@@ -353,13 +393,18 @@ class AppCCT(_JANELA):
                           wraplength=720).pack(anchor="w", padx=24)
 
         def gravar():
-            siglas, chaves, motivos = decisoes_confirmadas(
+            siglas, chaves, motivos, ajustes = decisoes_confirmadas(
                 lista, {c for c, v in marcas.items() if v.get()},
                 {k: v.get() for k, v in campos.items()})
             if motivos:
                 messagebox.showwarning(
-                    "Siglas", "Nada foi gravado. Escrever a sigla ou desmarcar o "
+                    "Siglas", "Nada foi gravado. Corrigir a sigla ou desmarcar o "
                     "documento:\n\n" + "\n".join(motivos), parent=janela)
+                return
+            if ajustes and not messagebox.askyesno(
+                    "Siglas", "No nome e no siglas.csv só entram letras e algarismos, "
+                    "sem acentos:\n\n" + "\n".join(ajustes) + "\n\nGravar assim?",
+                    parent=janela):
                 return
             if not chaves:
                 messagebox.showinfo("Siglas", "Nenhum documento confirmado.", parent=janela)

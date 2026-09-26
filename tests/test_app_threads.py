@@ -101,10 +101,10 @@ PENDENTES = [
 
 
 def test_decisoes_gravam_so_os_documentos_confirmados(app_mod):
-    siglas, chaves, motivos = app_mod.decisoes_confirmadas(
+    siglas, chaves, motivos, ajustes = app_mod.decisoes_confirmadas(
         PENDENTES, {"a", "b"},
         {("b", "Empresa Metropolitana de Estacionamento da Maia, EM"): " EMEM "})
-    assert chaves == ["a", "b"] and motivos == []
+    assert chaves == ["a", "b"] and motivos == ajustes == []
     assert siglas == {"Sindicato Nacional dos Motoristas": "Motoristas",
                       "Empresa Metropolitana de Estacionamento da Maia, EM": "EMEM"}
 
@@ -113,10 +113,54 @@ def test_decisoes_gravam_so_os_documentos_confirmados(app_mod):
 def test_sigla_apagada_impede_a_confirmacao_e_diz_porque(app_mod, apagada):
     """Revisão do PR #96: um campo esvaziado ("") não volta à sugestão; nada
     se grava, nem os outros documentos marcados, e o motivo é dito."""
-    siglas, chaves, motivos = app_mod.decisoes_confirmadas(
+    siglas, chaves, motivos, _ = app_mod.decisoes_confirmadas(
         PENDENTES, {"a", "c"}, {("a", "Sindicato Nacional dos Motoristas"): apagada})
     assert (siglas, chaves) == ({}, [])
     assert motivos == ["D1: sigla vazia para «Sindicato Nacional dos Motoristas»"]
+
+
+def test_sigla_so_com_pontuacao_impede_a_confirmacao(app_mod):
+    """Revisão do PR #96: «!!!» passava na janela e desaparecia na gravação,
+    e o documento era nomeado com a sigla adivinhada."""
+    siglas, chaves, motivos, _ = app_mod.decisoes_confirmadas(
+        PENDENTES, {"a"}, {("a", "Sindicato Nacional dos Motoristas"): " !!! "})
+    assert (siglas, chaves) == ({}, [])
+    assert motivos == ["D1: «!!!» não tem letras nem algarismos "
+                       "(sigla de «Sindicato Nacional dos Motoristas»)"]
+
+
+def test_sigla_normalizada_como_no_nome_e_mostrada_antes(app_mod):
+    siglas, chaves, motivos, ajustes = app_mod.decisoes_confirmadas(
+        PENDENTES, {"a"}, {("a", "Sindicato Nacional dos Motoristas"): "S.N.Mó."})
+    assert chaves == ["a"] and motivos == []
+    assert siglas == {"Sindicato Nacional dos Motoristas": "SNMo"}
+    assert ajustes == ["«S.N.Mó.» fica SNMo"]
+
+
+MESMA_ENTIDADE = [
+    {"chave": k, "doc_id": d, "titulo": "", "outros_avisos": [],
+     "siglas": [(nome, "EmpresaMetropolitana")]}
+    for k, d, nome in (("x", "D1", "Empresa Metropolitana"),
+                       ("y", "D2", "Empresa Metropolitana."),
+                       ("z", "D3", "EMPRESA METROPOLITANA"))]
+
+
+def test_a_mesma_entidade_com_siglas_diferentes_impede_a_confirmacao(app_mod):
+    """Revisão do PR #96: EMM num documento e a sugerida no outro davam as duas
+    chaves confirmadas e só uma sigla gravada; o primeiro saía com um nome
+    diferente do confirmado. A entidade compara-se como no siglas.csv."""
+    siglas, chaves, motivos, _ = app_mod.decisoes_confirmadas(
+        MESMA_ENTIDADE, {"x", "z"}, {("x", "Empresa Metropolitana"): "EMM"})
+    assert (siglas, chaves) == ({}, [])
+    assert motivos == ["«Empresa Metropolitana» tem siglas diferentes "
+                       "(EMM em D1; EmpresaMetropolitana em D3): a entidade tem uma só "
+                       "sigla, escrever a mesma em todos"]
+    # a mesma sigla em todos: confirma, uma linha no siglas.csv por entidade
+    siglas, chaves, motivos, _ = app_mod.decisoes_confirmadas(
+        MESMA_ENTIDADE, {"x", "z"}, {("x", "Empresa Metropolitana"): "EMM",
+                                     ("z", "EMPRESA METROPOLITANA"): "emm".upper()})
+    assert chaves == ["x", "z"] and motivos == []
+    assert set(siglas.values()) == {"EMM"}
 
 
 class _Var:
@@ -157,6 +201,9 @@ def test_janela_das_siglas_comeca_desmarcada_e_exige_cada_confirmacao(app, app_m
     monkeypatch.setattr(tk.messagebox, "showinfo", lambda *a, **k: avisos.append(a[1]))
     monkeypatch.setattr(tk.messagebox, "showwarning", lambda *a, **k: avisos.append(a[1]),
                         raising=False)
+    respostas = []
+    monkeypatch.setattr(tk.messagebox, "askyesno",
+                        lambda *a, **k: avisos.append(a[1]) or respostas.pop(0), raising=False)
     monkeypatch.setattr(recolha.Registo, "carregar", classmethod(lambda cls, *_a: None))
     monkeypatch.setattr(nomeacao, "tabela_de_siglas", lambda *_a: {})
     monkeypatch.setattr(nomeacao, "pendentes", lambda *_a: PENDENTES)
@@ -180,10 +227,38 @@ def test_janela_das_siglas_comeca_desmarcada_e_exige_cada_confirmacao(app, app_m
     gravar()
     assert "sigla vazia" in avisos[-1] and gravadas == lancados == []
 
-    campos[0].set("SNM")
+    campos[0].set("!!!")                       # só pontuação
+    gravar()
+    assert "não tem letras nem algarismos" in avisos[-1] and gravadas == lancados == []
+
+    campos[0].set("S.N.M.")                    # a normalização muda: pergunta antes
+    respostas.append(False)
+    gravar()
+    assert "«S.N.M.» fica SNM" in avisos[-1] and gravadas == lancados == []
+    respostas.append(True)
     gravar()
     assert gravadas == [{"Sindicato Nacional dos Motoristas": "SNM"}]
     assert lancados == [["cct.nomeacao", "--aplicar", "--confirmar", "a"]]
+
+
+def test_janela_partilha_a_caixa_da_mesma_entidade(app, app_mod, monkeypatch):
+    """Revisão do PR #96: uma correção num documento vale para os outros da
+    mesma entidade, como no siglas.csv, que guarda uma sigla por entidade."""
+    from cct import nomeacao, recolha
+    tk = sys.modules["tkinter"]
+    _Widget.criados = []
+    for nome in ("Toplevel", "Canvas"):
+        monkeypatch.setattr(tk, nome, _Widget, raising=False)
+    for nome in ("Frame", "Label", "Scrollbar", "Checkbutton", "Entry", "Button"):
+        monkeypatch.setattr(tk.ttk, nome, _Widget, raising=False)
+    monkeypatch.setattr(tk, "BooleanVar", _Var, raising=False)
+    monkeypatch.setattr(tk, "StringVar", _Var, raising=False)
+    monkeypatch.setattr(recolha.Registo, "carregar", classmethod(lambda cls, *_a: None))
+    monkeypatch.setattr(nomeacao, "tabela_de_siglas", lambda *_a: {})
+    monkeypatch.setattr(nomeacao, "pendentes", lambda *_a: MESMA_ENTIDADE)
+    app._confirmar_siglas()
+    campos = [w.opcoes["textvariable"] for w in _Widget.criados if "textvariable" in w.opcoes]
+    assert len(campos) == 3 and campos[0] is campos[1] is campos[2]
 
 
 def test_a_acao_do_fim_corre_na_thread_principal(app, app_mod):
