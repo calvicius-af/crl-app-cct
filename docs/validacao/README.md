@@ -29,6 +29,7 @@ Há duas formas de medir, e são complementares:
 | Avisos de 2025 | Os sete tipos de aviso da corrida de 2025, o TINITA (#42) e as grelhas (#84): causa, regra e medida antes/depois | [avisos-2025-2026-09-25.md](avisos-2025-2026-09-25.md) |
 | Desempenho | Baseline dos dois extratores sobre o corpus de regressão: tempo por página, arranque, memória, e o orçamento proposto (#26) | [desempenho-2026-09-26.md](desempenho-2026-09-26.md) |
 | Docling isolado | Modelos com manifesto e SHA-256, extração offline sem rede, limites de tamanho, páginas e tempo (#25) | [docling-isolado-2026-09-26.md](docling-isolado-2026-09-26.md) |
+| Boletins completos de 2021 | Última corrida na app: 48 boletins tratados como convenções, avisos de extração e evidência das corridas anteriores substituída | [analise-corrida-bte2021-2026-09-27.md](analise-corrida-bte2021-2026-09-27.md) |
 
 A validação visual do QDPX Docling final no MaxQDA continua pendente na
 [ISSUE-0003](../../issues/0003-qdpx-perde-ganhos-do-docling.md). Testes automáticos e

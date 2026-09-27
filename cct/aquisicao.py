@@ -11,6 +11,7 @@ import argparse
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from . import ambito as mod_ambito
@@ -46,6 +47,9 @@ def main(argv=None):
                                      "âmbito conhecido (só com --esquema rnc)")
     p.add_argument("--familias", default=",".join(FAMILIAS_POR_OMISSAO))
     p.add_argument("--confirmar-rede", action="store_true")
+    p.add_argument("--refazer-descarga", action="store_true",
+                   help="repete a descarga dos PDFs válidos do índice; exige "
+                        "--confirmar-rede --aplicar nesta corrida")
     p.add_argument("--aplicar", action="store_true")
     p.add_argument("--aceitar-heuristicas", action="store_true",
                    help="escreve mesmo os documentos com sigla derivada por "
@@ -54,6 +58,8 @@ def main(argv=None):
     p.add_argument("--limite", type=int)
     p.add_argument("--relatorio", default=str(RAIZ / "results" / "aquisicao"))
     args = p.parse_args(argv)
+    if args.refazer_descarga and not (args.confirmar_rede and args.aplicar):
+        p.error("--refazer-descarga exige --confirmar-rede --aplicar")
 
     indices = _indices(Path(args.indices))
     if not indices:
@@ -66,7 +72,8 @@ def main(argv=None):
 
     print(f"Índices: {', '.join(i.name for i in indices)}")
     r1 = recolha.recolher(indices, Path(args.interim), registo, rede=rede,
-                          familias=familias, pausa=args.pausa, limite=args.limite)
+                          familias=familias, pausa=args.pausa, limite=args.limite,
+                          refazer=args.refazer_descarga)
     texto1 = recolha.texto_resumo(r1, rede=rede)
     print(texto1)
 
@@ -83,7 +90,8 @@ def main(argv=None):
 
     pasta = Path(args.relatorio)
     pasta.mkdir(parents=True, exist_ok=True)
-    destino_rel = pasta / f"relatorio_{time.strftime('%Y%m%d_%H%M%S')}.txt"
+    selo = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    destino_rel = pasta / f"relatorio_{selo}.txt"
     destino_rel.write_text(
         "\n".join([f"Aquisição do BTE — {time.strftime('%Y-%m-%d %H:%M:%S')}",
                    f"Índices: {', '.join(i.name for i in indices)}",
@@ -106,8 +114,9 @@ def main(argv=None):
                "nomeados": r2["por_estado"].get("nomeado", 0),
                "por_confirmar": r2["por_estado"].get("por_confirmar", 0)},
         problemas=problemas, comando=comando)
-    caminho_manifesto = pasta / "manifest.json"
+    caminho_manifesto = pasta / f"manifest_{selo}.json"
     escrever_manifesto(caminho_manifesto, manifesto)
+    escrever_manifesto(pasta / "manifest.json", manifesto)  # último, compatibilidade
     print(f"→ {caminho_manifesto}")
 
     if not rede or not args.aplicar:
