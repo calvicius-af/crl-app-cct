@@ -397,7 +397,7 @@ def _escrever_atomico(destino: Path, dados: bytes) -> None:
 
 
 def descarregar_item(item: dict, destino_raiz: Path, registo: Registo, *,
-                     abridor=None) -> dict:
+                     abridor=None, refazer: bool = False) -> dict:
     """Descarrega um documento, se ainda não estiver cá. Devolve a entrada do registo.
 
     Estados possíveis: `ja_existente`, `inalterado`, `descarregado`, `falhado`.
@@ -413,7 +413,7 @@ def descarregar_item(item: dict, destino_raiz: Path, registo: Registo, *,
         # camada de validação a montante.
         raise ValueError(f"caminho de destino fora de {destino_raiz}: {caminho}")
 
-    if descarga.get("sha256") and caminho.exists():
+    if not refazer and descarga.get("sha256") and caminho.exists():
         if sha256_ficheiro(caminho) == descarga["sha256"]:
             return registo.actualizar(item, descarga={**descarga,
                                                       "estado": "ja_existente"})
@@ -423,7 +423,7 @@ def descarregar_item(item: dict, destino_raiz: Path, registo: Registo, *,
         cabecalhos["If-None-Match"] = descarga["etag"]
     if descarga.get("last_modified"):
         cabecalhos["If-Modified-Since"] = descarga["last_modified"]
-    if not caminho.exists() or (descarga.get("sha256") and
+    if refazer or not caminho.exists() or (descarga.get("sha256") and
                                sha256_ficheiro(caminho) != descarga["sha256"]):
         # Falta a cópia neste destino, ou está diferente. Um 304 baseado no
         # ETag anterior não provaria que esta cópia local está correta.
@@ -446,6 +446,21 @@ def descarregar_item(item: dict, destino_raiz: Path, registo: Registo, *,
             if not resposta.corpo.startswith(b"%PDF"):
                 erro = "a resposta não é um PDF"
                 break
+            # Um prefixo %PDF e um SHA-256 só provam que recebemos sempre os
+            # mesmos bytes, não que o PDF esteja completo. Um download cortado
+            # podia ser registado como válido e impedir novas tentativas.
+            try:
+                import pypdfium2 as pdfium
+                pdf = pdfium.PdfDocument(resposta.corpo)
+                try:
+                    len(pdf)
+                finally:
+                    pdf.close()
+            except pdfium.PdfiumError as exc:
+                erro = f"PDF inválido ou incompleto: {exc}"
+                if tentativa < TENTATIVAS:
+                    time.sleep(min(2 ** tentativa, 8))
+                continue
             _escrever_atomico(caminho, resposta.corpo)
             cab = {k.lower(): v for k, v in resposta.cabecalhos.items()}
             return registo.actualizar(item, descarga={
@@ -474,7 +489,7 @@ INTERVALO_PERSISTENCIA = 20   # guardar o registo a cada N pedidos de rede,
 def recolher(indices: list[Path], destino: Path, registo: Registo, *,
              rede: bool = False, familias: tuple[str, ...] = FAMILIAS_POR_OMISSAO,
              abridor=None, pausa: float = 1.0,
-             limite: int | None = None) -> dict:
+             limite: int | None = None, refazer: bool = False) -> dict:
     """Percorre os índices e descarrega o que ainda não está cá.
 
     Com `rede=False` (omissão) não é aberta nenhuma ligação: os documentos em
@@ -484,6 +499,8 @@ def recolher(indices: list[Path], destino: Path, registo: Registo, *,
     sempre no fim, mesmo em caso de excepção — uma corrida interrompida a
     meio (rede, Ctrl-C, suspensão) não obriga a redescarregar tudo.
     """
+    if refazer and not rede:
+        raise ValueError("refazer a descarga exige autorização de rede")
     abridor = abridor or abridor_urllib
     resumo: dict[str, Any] = {"indices": [], "por_estado": {}, "tipos_desconhecidos": {},
               "problemas": [], "documentos": 0}
@@ -523,7 +540,7 @@ def recolher(indices: list[Path], destino: Path, registo: Registo, *,
                 anterior = (registo.get(item["chave"]) or {}).get("descarga") or {}
                 caminho_atual = (destino / str(item["ano"]) /
                                  str(item["num_bte"]) / item["ficheiro"])
-                if (anterior.get("sha256") and caminho_atual.is_file() and
+                if (not refazer and anterior.get("sha256") and caminho_atual.is_file() and
                         sha256_ficheiro(caminho_atual) == anterior["sha256"]):
                     registo.actualizar(item, descarga={**anterior,
                                                        "caminho": str(caminho_atual),
@@ -546,7 +563,8 @@ def recolher(indices: list[Path], destino: Path, registo: Registo, *,
                 if pedidos and pausa:
                     time.sleep(pausa)
                 pedidos += 1
-                entrada = descarregar_item(item, destino, registo, abridor=abridor)
+                entrada = descarregar_item(item, destino, registo, abridor=abridor,
+                                           refazer=refazer)
                 estado = entrada["descarga"]["estado"]
                 contar(estado)
                 if estado == "falhado":
@@ -592,6 +610,9 @@ def main(argv=None):
                    help="famílias a descarregar (convencao,extensao,aviso,adesao)")
     p.add_argument("--confirmar-rede", action="store_true",
                    help="autoriza os pedidos de rede nesta corrida")
+    p.add_argument("--refazer-descarga", action="store_true",
+                   help="volta a pedir todos os PDFs do índice, mesmo os válidos; "
+                        "exige --confirmar-rede")
     p.add_argument("--pausa", type=float, default=1.0,
                    help="segundos entre pedidos (por civilidade com o servidor)")
     p.add_argument("--limite", type=int, help="máximo de descargas nesta corrida")
@@ -608,10 +629,13 @@ def main(argv=None):
                          "(ver docs/dados/README.md)")
 
     rede = args.confirmar_rede or os.environ.get("CCT_RECOLHA_REDE") == "1"
+    if args.refazer_descarga and not args.confirmar_rede:
+        p.error("--refazer-descarga exige --confirmar-rede nesta corrida")
     registo = Registo.carregar(Path(args.registo))
     resumo = recolher(indices, Path(args.destino), registo, rede=rede,
                       familias=tuple(f.strip() for f in args.familias.split(",") if f.strip()),
-                      pausa=args.pausa, limite=args.limite)
+                      pausa=args.pausa, limite=args.limite,
+                      refazer=args.refazer_descarga)
     print(texto_resumo(resumo, rede=rede))
     if not rede and resumo["por_estado"].get("por_descarregar"):
         print("\nPara descarregar mesmo: repetir com --confirmar-rede")

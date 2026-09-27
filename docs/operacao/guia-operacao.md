@@ -113,6 +113,27 @@ não sigla confirmada: os 11 avisos de nomeação continuaram no relatório.
 nova descarga. Não voltar a aplicar siglas diferentes sobre estes nomes sem
 seguir o procedimento de correção da secção 5.2.
 
+**Para repetir a descarga:** apagar apenas o PDF da pasta final
+`data/raw/bte/` não força pedidos de rede; se o PDF original continuar em
+`data/interim/recolha/`, a aquisição reutiliza-o e pode repor a cópia
+nomeada. Se é necessário pedir **novamente ao servidor** todos os PDFs do
+índice, na app escolher «Descarregar de novo…» e confirmar. Em CLI:
+
+```powershell
+.\.venv\Scripts\python.exe -m cct.aquisicao --indices data\raw\indices --confirmar-rede --aplicar --refazer-descarga
+```
+
+No macOS, usar `.venv/bin/python` e separadores `/`. A opção faz pedidos
+para todos os documentos abrangidos pelos índices, ainda que os ficheiros
+intermédios estejam íntegros. Selecionar apenas o índice pretendido para
+evitar repetir anos inteiros. Conservar o registo e uma cópia de segurança
+dos PDFs; se o servidor devolver conteúdo diferente para o mesmo documento,
+a cópia final já nomeada fica protegida e o relatório indica o conflito.
+Cada aquisição guarda um par `relatorio_<selo>.txt` e
+`manifest_<selo>.json`; `manifest.json` na mesma pasta é o último.
+Um PDF incompleto recebido da rede é rejeitado antes de entrar no registo
+como descarga válida; a cópia anterior não é substituída.
+
 Se a rede institucional não permitir a descarga, usar os PDFs obtidos por via
 institucional e registar a origem e a correspondência com o índice antes de
 qualquer cópia ou renomeação. Não colocar um PDF diretamente na pasta final
@@ -179,6 +200,21 @@ NÃO serve de base — o pipeline avisa se detetar isso.
 ---
 
 ## 4. Correr o pipeline
+
+**Uma corrida, uma pasta de evidência.** A primeira utilização de `--out`
+escreve nessa pasta. Se já contiver um manifesto ou artefactos de uma
+corrida, a seguinte escreve numa subpasta com ano e instante UTC. «Abrir
+resultados» na app abre a pasta escolhida, onde se encontram as subpastas;
+o log indica o caminho efetivo. Não apagar `manifest.json`, `relatorio.txt`
+ou `diagnostico.md` de uma corrida anterior para repetir o ensaio. Os
+relatórios de 2025/2022 anteriores a esta correção só podem ser recuperados
+se houver cópia ou histórico local.
+
+Um PDF `bte1_2021.pdf` representa um **número completo do boletim**, com
+várias convenções. Não é uma convenção individual. O pipeline temático
+recusa esse formato para impedir contagens e avisos enganadores; obter os
+PDFs individuais antes de correr o tema. Ver
+[análise da corrida de 2021](../validacao/analise-corrida-bte2021-2026-09-27.md).
 
 ### Opção A — App gráfica (recomendado)
 Duplo clique em `scripts/AppCCT.command` (Mac) ou `scripts/AppCCT.bat` (Windows),

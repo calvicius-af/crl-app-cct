@@ -61,11 +61,14 @@ https://bte.dgcp.mtsss.gov.pt/completos/<ano>/bte<n>_<ano>.pdf
 O endereço antigo (`bte.gep.msess.gov.pt/completos/…`) continua a funcionar, mas responde
 com um redirecionamento para o anfitrião acima.
 
-Há dois formatos em uso, e o pipeline lida com ambos:
+Há dois formatos de PDF em uso. O localizador consulta boletins completos;
+o pipeline temático exige convenções individuais:
 
 - **Números completos** (`bte_2021/`): um PDF por edição do boletim, com dezenas de
   instrumentos. Serve para os testes e para o `cct/localizador.py`, que encontra as
-  páginas de uma convenção dentro do número.
+  páginas de uma convenção dentro do número. `cct.pipeline_tema` recusa
+  estes ficheiros como entrada temática: cada edição não equivale a uma
+  convenção. Ver [análise de 2021](../validacao/analise-corrida-bte2021-2026-09-27.md).
 - **Convenções individuais** (`bte_2022/`, `bte_2025/`): um PDF por instrumento, já
   recortado. É o formato normal de operação.
 
@@ -151,9 +154,10 @@ O que acontece, em duas fases ([SPEC-0001](../../specs/0001-recolha-e-nomeacao-d
 
 1. **Recolha** (`cct/recolha.py`) — descarrega os PDFs para
    `data/interim/recolha/<ano>/<nº do BTE>/`, com o **nome de origem** (`00260057.pdf`).
-   Nada é descarregado duas vezes: o registo guarda o `sha256`, o `ETag` e o
-   `Last-Modified` de cada documento, e a segunda corrida sobre o mesmo índice não faz
-  um único pedido de rede.
+   Por omissão, um PDF íntegro não é descarregado duas vezes: o registo
+   guarda o `sha256`, o `ETag` e o `Last-Modified`. `--refazer-descarga`
+   com autorização de rede repete deliberadamente os pedidos sem apagar o
+   registo; ver [guia de operação](../operacao/guia-operacao.md#21-encher-a-pasta-automaticamente-recolha-do-bte).
    Se o destino mudar, a existência da cópia antiga não substitui a verificação
    do PDF no destino atual; o registo conserva a proveniência da corrida.
 2. **Nomeação** (`cct/nomeacao.py`) — copia cada PDF para

@@ -38,6 +38,32 @@ def test_pasta_de_versoes_inexistente_para_a_entrada(tmp_path, monkeypatch):
     assert not (out / "projeto.qdpx").exists(), "falha antes de extrair o que quer que seja"
 
 
+def test_corridas_repetidas_preservam_relatorios_e_manifestos(tmp_path, monkeypatch):
+    pasta, codebook = _pasta(tmp_path)
+    out = tmp_path / "corrida"
+    _correr(monkeypatch, "--pdfs", pasta, "--codebook", codebook, "--out", out)
+    anteriores = {nome: (out / nome).read_bytes() for nome in
+                  ("relatorio.txt", "diagnostico.md", "manifest.json")}
+    _correr(monkeypatch, "--pdfs", pasta, "--codebook", codebook, "--out", out)
+    assert all((out / nome).read_bytes() == dados for nome, dados in anteriores.items())
+    novas = list(out.glob("corrida_*/manifest.json"))
+    assert len(novas) == 1
+    assert (novas[0].parent / "relatorio.txt").exists()
+    assert (novas[0].parent / "diagnostico.md").exists()
+
+
+def test_numero_completo_nao_e_contado_como_convencao(tmp_path, monkeypatch):
+    pasta = tmp_path / "bte_2021"
+    pasta.mkdir()
+    escrever_pdf(pasta / "bte1_2021.pdf", [pagina_bte(1, ["Cláusula 1.ª - Férias"])])
+    codebook = tmp_path / "cb.yaml"
+    codebook.write_text("tema: ensaio\ncodigos: []\n", encoding="utf-8")
+    out = tmp_path / "corrida"
+    with pytest.raises(SystemExit, match="números completos do BTE"):
+        _correr(monkeypatch, "--pdfs", pasta, "--codebook", codebook, "--out", out)
+    assert not out.exists()
+
+
 def test_falha_na_diacronia_nao_custa_o_documento(tmp_path, monkeypatch):
     pasta, codebook = _pasta(tmp_path)
     versoes = tmp_path / "versoes"
