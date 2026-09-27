@@ -134,6 +134,15 @@ Cada aquisição guarda um par `relatorio_<selo>.txt` e
 Um PDF incompleto recebido da rede é rejeitado antes de entrar no registo
 como descarga válida; a cópia anterior não é substituída.
 
+Numa instalação **anterior a esta opção**, guardar uma cópia do registo e
+dos PDFs e mover os ficheiros de origem correspondentes de
+`data/interim/recolha/<ano>/<número>/` para uma pasta de segurança fora
+do destino da recolha. Repetir a aquisição com rede autorizada: a falta
+da cópia intermédia obriga a novo pedido. Não apagar o registo nem alterar
+os nomes finais à mão. Conferir hashes, avisos e conflitos antes de usar
+as novas cópias; este procedimento manual deve ficar registado com o
+índice, os ficheiros movidos e o resultado.
+
 Se a rede institucional não permitir a descarga, usar os PDFs obtidos por via
 institucional e registar a origem e a correspondência com o índice antes de
 qualquer cópia ou renomeação. Não colocar um PDF diretamente na pasta final
