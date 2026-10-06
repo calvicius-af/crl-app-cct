@@ -11,6 +11,6 @@
 pytest==9.1.1
 pip-audit==2.10.1
 # Análise estática (issue #27): lint, tipos e os stubs que o mypy exige.
-ruff==0.15.8
+ruff==0.16.10
 mypy==2.4.0
 types-PyYAML==6.0.12.20260906
