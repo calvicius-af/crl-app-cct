@@ -9,10 +9,12 @@ Uso mínimo:
 """
 import argparse
 import json
+import re
 import sys
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +37,7 @@ from .proveniencia import agora_utc, construir_manifesto, escrever_manifesto
 # âmbitos processáveis do esquema RNC (ADR-0021) — APU fica de fora: a
 # aplicação recolhe-o mas ainda não o processa (docs/rnc/README.md §4.3)
 _AMBITOS_PROCESSAVEIS = ("PRI", "SPE")
+RE_NUMERO_COMPLETO = re.compile(r"(?i)^bte\d+_20\d{2}\.pdf$")
 
 # Um nome que nenhum esquema reconhece mas que traz o tipo de uma portaria ou de
 # uma adesão como campo próprio. É o caso das PE renomeadas à mão antes do
@@ -73,6 +76,32 @@ def _pdfs_da_pasta(pasta: Path) -> list[Path]:
     for ambito in _AMBITOS_PROCESSAVEIS:
         achados.extend((convencoes / ambito).glob("*.pdf"))
     return sorted(achados)
+
+
+def _pasta_corrida(base: Path, pasta_pdfs: Path) -> Path:
+    """Preserva a corrida anterior quando a mesma pasta de saída é reutilizada.
+
+    A primeira corrida mantém o caminho escolhido. As seguintes ficam em
+    subpastas da mesma pasta, visíveis no botão «Abrir resultados» da app.
+    Um manifesto `running` também conta: não se apaga uma corrida interrompida.
+    """
+    base.mkdir(parents=True, exist_ok=True)
+    if not any((base / nome).exists() for nome in
+               ("manifest.json", "relatorio.txt", "diagnostico.md",
+                "projeto.qdpx", "sugestoes_peritas.xlsx")):
+        return base
+    ano = re.search(r"(?:^|_)20\d{2}(?:$|_)", pasta_pdfs.name)
+    prefixo = ano.group().strip("_") if ano else "corrida"
+    instante = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    for n in range(1000):
+        sufixo = f"_{n}" if n else ""
+        nova = base / f"{prefixo}_{instante}{sufixo}"
+        try:
+            nova.mkdir()
+        except FileExistsError:
+            continue
+        return nova
+    raise RuntimeError(f"não foi possível reservar uma pasta de corrida em {base}")
 
 
 def _novidades_via_versoes(pasta_versoes: Path, pdf: Path, doc: dict,
@@ -362,8 +391,6 @@ def main():
             "  Corrigir o caminho ou retirar --pasta-versoes (sem ela, os "
             "consolidados ficam todos na faixa CONSOLIDADO).")
 
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
     codebook = yaml.safe_load(Path(args.codebook).read_text(encoding="utf-8"))
 
     variaveis = None
@@ -384,6 +411,17 @@ def main():
             f"Sem PDFs em {args.pdfs} (procurado direto e nas subpastas "
             f"PRI/SPE de convencoes). Confirma o caminho e a presença "
             "dos ficheiros .pdf")
+
+    completos = [f.name for f in pdfs if RE_NUMERO_COMPLETO.fullmatch(f.name)]
+    if completos:
+        raise SystemExit(
+            f"{len(completos)} PDF são números completos do BTE, com vários "
+            "instrumentos no mesmo ficheiro (ex.: " + ", ".join(completos[:3]) + ").\n"
+            "  O pipeline temático exige um PDF por convenção. Processar um "
+            "boletim inteiro como uma convenção produz contagens e avisos "
+            "enganadores (incluindo texto depois da primeira nota de depósito).\n"
+            "  Obter os PDFs individuais pelo índice do BTE e usar a pasta "
+            "das convenções; manter os boletins completos como fontes de consulta.")
 
     # Uma portaria de extensão ou um acordo de adesão não têm o articulado que a
     # codificação temática pressupõe. Se um deles entrar aqui, não dá erro: dá
@@ -407,6 +445,10 @@ def main():
             "(1_fontes/irct/convencoes/PRI).\n"
             "  Uma família com «?» vem de um nome fora dos esquemas conhecidos:\n"
             "  voltar a nomeá-lo com python -m cct.nomeacao (ADR-0022).")
+
+    out = _pasta_corrida(Path(args.out), Path(args.pdfs))
+    if out != Path(args.out):
+        print(f"Pasta de resultados já usada; nova corrida em {out}")
 
     entradas = [*pdfs, Path(args.codebook)]
     for opcional in (args.variaveis, args.master, args.metricas):
@@ -490,7 +532,7 @@ def main():
     (out / "diagnostico.md").write_text(diagnostico(
         medidas, manifesto_inicial | {"summary": resumo},
         "\n".join(relatorio),
-        {"Última aquisição": ultima_aquisicao(out.parent / "aquisicao")}),
+        {"Última aquisição": ultima_aquisicao(Path(args.out).parent / "aquisicao")}),
         encoding="utf-8", newline="\n")
     manifesto = construir_manifesto(
         raiz=raiz,

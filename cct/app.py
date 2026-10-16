@@ -98,7 +98,7 @@ class AppCCT(_JANELA):
     def __init__(self):
         super().__init__()
         self.title("Pipeline CCT → MaxQDA")
-        self.geometry("760x640")
+        self.geometry("900x640")
         self.fila = queue.Queue()
         self.em_curso = False
         self._construir()
@@ -168,6 +168,8 @@ class AppCCT(_JANELA):
         self.b_correr.pack(side="left")
         ttk.Button(botoes, text="Recolher do BTE…",
                    command=self._recolher).pack(side="left", padx=8)
+        ttk.Button(botoes, text="Descarregar de novo…",
+                   command=lambda: self._recolher(refazer=True)).pack(side="left")
         ttk.Button(botoes, text="Confirmar siglas…",
                    command=self._confirmar_siglas).pack(side="left")
         ttk.Button(botoes, text="Comparar versões (pasta)…",
@@ -200,7 +202,8 @@ class AppCCT(_JANELA):
         metricas = sorted((RESULTADOS / "metricas").glob("baseline_*/metricas.json"))
         if metricas:
             self.v_metricas.set(str(metricas[-1]))
-        if (DADOS / "textos_consolidados").is_dir():
+        if any(p.is_dir() and any(p.glob("*.pdf"))
+               for p in (DADOS / "textos_consolidados").glob("*")):
             self.v_versoes.set(str(DADOS / "textos_consolidados"))
         self.v_out.set(str(RESULTADOS / "corrida"))
 
@@ -295,8 +298,8 @@ class AppCCT(_JANELA):
             args += ["--semantica"]
         self._lancar(args)
 
-    def _recolher(self):
-        """Recolha do BTE + nomeação. É a única ação que liga à internet."""
+    def _recolher(self, refazer: bool = False):
+        """Recolha do BTE + nomeação, com repetição explícita quando pedida."""
         indices = Path(self.v_indices.get() or (DADOS / "indices"))
         if not indices.exists() or not list(indices.glob("*.xlsx")):
             messagebox.showwarning(
@@ -305,18 +308,30 @@ class AppCCT(_JANELA):
                 "A recolha lê a lista de documentos dos índices que a DGERT "
                 "fornece por número do BTE.")
             return
-        autorizar = messagebox.askyesno(
-            "Ligar à internet?",
-            "A recolha vai descarregar os documentos listados nos índices a "
-            "partir de bte.dgcp.mtsss.gov.pt.\n\n"
-            "É a única parte da aplicação que usa a rede, e só descarrega "
-            "documentos públicos do Boletim do Trabalho e Emprego.\n\n"
-            "Sim — descarregar e renomear.\n"
-            "Não — apenas simular e mostrar o que seria feito.")
+        if refazer:
+            autorizar = messagebox.askyesno(
+                "Repetir a descarga?",
+                "Todos os PDFs abrangidos pelos índices selecionados serão pedidos "
+                "de novo ao BTE, mesmo que a cópia local esteja válida. "
+                "O registo e os nomes atribuídos são preservados. Se o conteúdo "
+                "remoto tiver mudado, a cópia já nomeada não será substituída "
+                "sem revisão.\n\nAutorizar esta descarga completa?")
+            if not autorizar:
+                return
+        else:
+            autorizar = messagebox.askyesno(
+                "Ligar à internet?",
+                "A recolha vai descarregar os documentos listados nos índices a "
+                "partir de bte.dgcp.mtsss.gov.pt.\n\n"
+                "Só os documentos públicos em falta serão pedidos.\n\n"
+                "Sim — descarregar e renomear.\n"
+                "Não — apenas simular e mostrar o que seria feito.")
         args = ["cct.aquisicao", "--indices", str(indices),
                 "--destino", str(DADOS / "bte")]
         if autorizar:
             args += ["--confirmar-rede", "--aplicar"]
+        if refazer:
+            args += ["--refazer-descarga"]
         # no fim, as siglas que ficaram por confirmar (#38)
         self._lancar(args, depois=lambda: self._confirmar_siglas(aplicar=autorizar,
                                                                  so_se_houver=True))

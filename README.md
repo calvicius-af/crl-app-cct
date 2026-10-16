@@ -140,6 +140,12 @@ O guia de operação completo, com o que fazer quando algo corre mal, está em
 [docs/operacao/guia-operacao.md](docs/operacao/guia-operacao.md). Os ensaios e
 critérios de aprovação por ambiente estão no
 [plano da primeira release](docs/validacao/plano-primeira-release.md).
+Cada corrida temática conserva a sua evidência: se `--out` já tiver resultados,
+a nova execução cria uma subpasta com ano e instante UTC. Os PDF que são
+números completos do BTE (`bte1_2021.pdf`) não são entradas temáticas:
+é necessário um PDF por convenção. A recolha pode ser repetida por decisão
+explícita com `--confirmar-rede --aplicar --refazer-descarga`; ver a
+[análise da corrida de 2021](docs/validacao/analise-corrida-bte2021-2026-09-27.md).
 
 ## Estrutura do repositório
 

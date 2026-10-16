@@ -6,7 +6,7 @@ import pytest
 
 from cct import aquisicao, recolha
 
-from .test_recolha import AbridorFalso, escrever_indice
+from .test_recolha import AbridorFalso, PDF_FALSO, escrever_indice
 
 
 def _argumentos(pasta: Path) -> list[str]:
@@ -84,6 +84,34 @@ def test_corrida_completa_produz_a_pasta_do_pipeline_com_aceitar_heuristicas(
     assert "Rede: autorizada" in relatorio
 
 
+def test_refazer_descarga_nao_substitui_pdf_ja_nomeado_se_fonte_mudou(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(recolha, "abridor_urllib", AbridorFalso())
+    args = _argumentos(tmp_path) + ["--confirmar-rede", "--aplicar",
+                                   "--aceitar-heuristicas"]
+    assert aquisicao.main(args) == 0
+    final = next((tmp_path / "bte" / "bte_2026").rglob("*.pdf"))
+    conteudo_inicial = final.read_bytes()
+    monkeypatch.setattr(recolha, "abridor_urllib",
+                        AbridorFalso(corpo=PDF_FALSO + b"\n% conteudo remoto alterado\n"))
+    assert aquisicao.main(args + ["--refazer-descarga"]) == 1
+    assert final.read_bytes() == conteudo_inicial
+    registo = recolha.Registo.carregar(tmp_path / "registo.jsonl")
+    assert any(e.get("nomeacao", {}).get("estado") == "conflito"
+               for e in registo.entradas.values())
+
+
+def test_refazer_descarga_exige_autorizacao_explicita(tmp_path, monkeypatch, capsys):
+    def recusar(url, cabecalhos=None):
+        raise AssertionError("pedido de rede sem autorização")
+
+    monkeypatch.setattr(recolha, "abridor_urllib", recusar)
+    with pytest.raises(SystemExit) as exc:
+        aquisicao.main(_argumentos(tmp_path) + ["--refazer-descarga"])
+    assert exc.value.code == 2
+    assert "--confirmar-rede --aplicar" in capsys.readouterr().err
+
+
 def test_corrida_produz_manifest_json(tmp_path, monkeypatch):
     """Ver PR #35, achado nº8: cada corrida de aquisição tem de produzir um
     manifest.json, como ADR-0014 exige de qualquer corrida do pipeline."""
@@ -102,6 +130,21 @@ def test_corrida_produz_manifest_json(tmp_path, monkeypatch):
     # entradas (índices) e saídas (relatório, registo) hasheadas para auditoria
     assert manifesto["inputs"]
     assert manifesto["outputs"]
+
+
+def test_aquisicoes_repetidas_preservam_relatorio_e_manifesto(tmp_path, monkeypatch):
+    monkeypatch.setattr(recolha, "abridor_urllib", AbridorFalso())
+    args = _argumentos(tmp_path)
+    aquisicao.main(args)
+    pasta = tmp_path / "relatorios"
+    primeiro = next(pasta.glob("relatorio_*.txt"))
+    primeiro_manifesto = pasta / primeiro.name.replace("relatorio_", "manifest_").replace(
+        ".txt", ".json")
+    dados = primeiro.read_bytes(), primeiro_manifesto.read_bytes()
+    aquisicao.main(args)
+    assert len(list(pasta.glob("relatorio_*.txt"))) == 2
+    assert len(list(pasta.glob("manifest_*.json"))) == 2
+    assert (primeiro.read_bytes(), primeiro_manifesto.read_bytes()) == dados
 
 
 def test_pipeline_tema_encontra_os_pdfs_que_a_aquisicao_escreveu(

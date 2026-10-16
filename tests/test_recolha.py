@@ -7,6 +7,7 @@ O índice de ensaio é o do **BTE n.º 31 de 2026** — cabeçalho e linhas reai
 reconstruídos com openpyxl para não versionar binários no repositório.
 """
 import os
+from tempfile import TemporaryDirectory
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ import pytest
 from cct import recolha
 from cct.recolha import (ErroRede, Registo, _nome_seguro, descarregar_item,
                          familia, ler_indice, recolher, validar_url)
+from tests.pdf_sintetico import escrever_pdf, pagina_bte
 
 CABECALHO = [
     "ANO", "ID:", "TITULO DO DOCUMENTO:", "TIPO DE DOCUMENTO:",
@@ -72,7 +74,10 @@ LINHAS = [
      "ST", "50001", None, "01900191.pdf"),
 ]
 
-PDF_FALSO = b"%PDF-1.4\n% ficheiro de ensaio\n"
+with TemporaryDirectory() as _pasta_pdf:
+    PDF_FALSO = escrever_pdf(Path(_pasta_pdf) / "ensaio.pdf", [
+        pagina_bte(1, ["Cláusula 1.ª - Âmbito", "Texto do ensaio."])
+    ]).read_bytes()
 
 
 def escrever_indice(pasta: Path, nome: str = "BTE31_2026.xlsx") -> Path:
@@ -288,6 +293,49 @@ def test_ficheiro_apagado_e_descarregado_de_novo_por_inteiro(ambiente):
                       rede=True, abridor=abridor, pausa=0)
     assert resumo["por_estado"]["descarregado"] == 1
     assert "If-None-Match" not in abridor.pedidos[0][1]   # pede a cópia inteira
+
+
+def test_refazer_descarga_pede_pdf_valido_sem_apagar_registo(tmp_path):
+    indice = escrever_indice(tmp_path)
+    registo = Registo(tmp_path / "registo.jsonl")
+    destino = tmp_path / "recolha"
+    primeira = AbridorFalso()
+    recolher([indice], destino, registo, rede=True, abridor=primeira, pausa=0)
+    chaves = set(registo.entradas)
+    segunda = AbridorFalso()
+    resumo = recolher([indice], destino, registo, rede=True, refazer=True,
+                      abridor=segunda, pausa=0)
+    assert resumo["por_estado"]["descarregado"] == 6
+    assert resumo["pedidos_de_rede"] == 6
+    assert len(segunda.pedidos) == 6
+    assert all(not headers for _url, headers in segunda.pedidos)
+    assert set(registo.entradas) == chaves
+
+
+def test_refazer_descarga_sem_autorizacao_nao_altera_registo(tmp_path):
+    indice = escrever_indice(tmp_path)
+    registo = Registo(tmp_path / "registo.jsonl")
+    with pytest.raises(ValueError, match="autorização de rede"):
+        recolher([indice], tmp_path / "recolha", registo, refazer=True,
+                 abridor=recusa_rede)
+    assert not registo.caminho.exists()
+
+
+def test_pdf_cortado_na_rede_nao_substitui_copia_valida(tmp_path, monkeypatch):
+    monkeypatch.setattr(recolha.time, "sleep", lambda _segundos: None)
+    indice = escrever_indice(tmp_path)
+    registo = Registo(tmp_path / "registo.jsonl")
+    destino = tmp_path / "recolha"
+    recolher([indice], destino, registo, rede=True, abridor=AbridorFalso(), pausa=0)
+    alvo = destino / "2026" / "31" / "00260057.pdf"
+    antigo = alvo.read_bytes()
+    cortado = AbridorFalso(corpo=PDF_FALSO[:len(PDF_FALSO) // 2])
+    resumo = recolher([indice], destino, registo, rede=True, refazer=True,
+                      abridor=cortado, pausa=0)
+    assert resumo["por_estado"]["falhado"] == 6
+    assert len(cortado.pedidos) == 6 * recolha.TENTATIVAS
+    assert "PDF inválido ou incompleto" in resumo["problemas"][0]
+    assert alvo.read_bytes() == antigo
 
 
 def test_resposta_que_nao_e_pdf_falha_sem_escrever(ambiente):
