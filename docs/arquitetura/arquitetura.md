@@ -2,10 +2,11 @@
 
 ## Visão geral
 
-Aplicação local em Python, organizada como um pipeline de fases que
-comunicam **apenas por ficheiros** (inspecionáveis e reexecutáveis).
-A interface gráfica é uma casca fina: invoca os mesmos comandos da linha
-de comandos e não contém lógica própria.
+Aplicação local em Python. Os comandos granulares podem guardar artefactos
+intermédios por documento; `cct.pipeline_tema` encadeia as fases em memória
+por PDF e escreve os resultados e o manifesto no destino da corrida.
+A interface gráfica lança os módulos da CLI e também gere a confirmação
+humana de siglas por documento, persistida em `siglas.csv` local.
 
 ```
                        ┌─────────────────────────────┐
@@ -55,7 +56,7 @@ de comandos e não contém lógica própria.
         │ (REFI-QDA, árvore│ │ peritas.xlsx    │ │ (problemas por │
         │  de códigos c/   │ │ (segmentos c/   │ │  documento)    │
         │  GUIDs estáveis) │ │  contexto)      │ │                │
-        │ cct/qdpx.py      │ │ cct/export_xlsx │ │                │
+        │ cct/qdpx.py      │ │ export_xlsx.py   │ │                │
         └──────────────────┘ └─────────────────┘ └────────────────┘
                                       │
                              manifest.json
@@ -72,17 +73,20 @@ de comandos e não contém lógica própria.
 ```
 
 ## Princípios de desenho
-1. **Fases desacopladas por ficheiros** — cada passo pode ser corrido,
-   inspecionado e repetido isoladamente; a UI e a CLI partilham 100% da
-   lógica (a UI lança os módulos em subprocesso).
+1. **Entradas e saídas verificáveis** — os comandos granulares suportam
+   inspeção por fase; a corrida temática processa em memória por documento
+   e emite saídas, relatório, diagnóstico e manifesto. A UI lança módulos
+   em subprocesso e usa a lógica de confirmação de `cct.nomeacao`.
 2. **Configuração é dados, não código** — os temas de codificação são YAML;
    a equipa de análise mantém-nos sem intervenção informática.
 3. **Contratos validados** — doc.json e anotacoes.json têm JSON Schema;
    a propriedade "zero perda de texto" é verificada por teste.
-4. **Qualidade medida, não presumida** — o harness compara sempre com o
-   amostra de referência humana; a faixa AUTO só existe onde a precisão medida ≥ 0.85.
-5. **Offline por omissão** — o LLM opcional só aceita loopback. O Docling pode
-   descarregar modelos na primeira execução e deve ser pré-provisionado em redes fechadas.
+4. **Qualidade medida e revista** — o harness compara com a amostra de
+   referência humana; a interpretação das métricas históricas aguarda revisão
+   do gabarito (GitHub #10), inclusive para decisões sobre AUTO.
+5. **Offline por omissão** — o LLM opcional só aceita loopback. A aquisição
+   exige autorização de rede, e o Docling pode descarregar modelos na primeira
+   execução; provisionar modelos antes de usar em redes fechadas.
 
 ## Módulos (`cct/`)
 | Módulo | Responsabilidade |
@@ -106,6 +110,9 @@ de comandos e não contém lógica própria.
 | aquisicao.py | encadeia recolha + nomeação numa corrida |
 | pipeline_tema.py, comparar.py | orquestradores CLI |
 | app.py, doctor.py | interface gráfica e verificação de ambiente |
+| corpus.py, desempenho.py | regressão em PDF reais e medições por extrator |
+| completude.py, modelos_docling.py | diagnóstico da corrida e gestão de modelos verificados |
+| limites.py, subprocesso.py | limites de PDFs e isolamento de conversões Docling |
 
 O QDPX pode inserir linhas em branco para legibilidade. Os offsets são remapeados e o
 contrato é de equivalência semântica: removendo exatamente as inserções calculadas pelo

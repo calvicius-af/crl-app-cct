@@ -1,5 +1,10 @@
 # Teste em Windows: correções do gate de instalação de 2026-09-17
 
+**Registo histórico de um branch e pacote de setembro de 2026.** Para a
+primeira release, preparar um pacote novo e seguir o
+[plano atual de validação](plano-primeira-release.md). Os caminhos, dimensões
+e commits abaixo descrevem apenas aquele ensaio.
+
 **Data:** 2026-09-19
 **Branch:** `fix/instalacao-windows-gate-2026-09-17` (commit `c736440`)
 **Issues cobertos:** 0009 (caminho UNC), 0010 (doctor/interpretador), 0012 (CI), 0013 (proveniência), 0007 remanescente

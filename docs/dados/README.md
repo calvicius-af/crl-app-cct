@@ -26,7 +26,7 @@ data/
 │   │   │   └── acordos_adesao/              fora do glob do pipeline
 │   │   └── bte2_2025.pdf         número completo usado pelos testes de extração
 │   ├── maxqda/                   exports do MaxQDA (ver abaixo)
-│   └── textos_consolidados/      21 pastas, uma por convenção, com as versões anteriores
+│   └── textos_consolidados/      versões anteriores, uma pasta por convenção
 ├── reference/                    referências humanas preserváveis
 │   └── maxqda/tema-4.08/         projectos MQDA e exports QDPX de trabalho
 ├── interim/                      resultados intermédios reproduzíveis (texto extraído, caches)
@@ -91,14 +91,15 @@ Produzidos pela equipa do CRL a partir do projeto MaxQDA. Não são públicos.
 |---|---|---|
 | `VariaveisDocumento2025.xlsx` | MaxQDA → Variáveis de documento → Exportar | Metadados de cada convenção: subtipo (revisão parcial, consolidado…), setor, CAE. Determina como o extrator interpreta o documento. **Nota:** o MaxQDA trunca os nomes das variáveis a 30 caracteres — o cruzamento é feito por prefixo |
 | `MAXQDA_RNC_…Lista de Códigos.qdc` | MaxQDA → Livro de códigos → Exportar (.qdc) | Os 1393 códigos oficiais do CRL, com nomes, cores e descrições (definição, critérios, base legal). O QDPX gerado reutiliza-os, para que os projetos sejam compatíveis entre si |
-| `4_08_ParaClaudeAppCCT.xlsx` | MaxQDA → Segmentos codificados → Exportar | **Amostra de referência** do tema 4.8: 788 segmentos codificados manualmente por peritas em 89 convenções de 2025, com 19 códigos hierárquicos. É a base contra a qual toda a qualidade é medida |
+| `4_08_ParaClaudeAppCCT.xlsx` | MaxQDA → Segmentos codificados → Exportar | Amostra histórica do tema 4.8: 788 segmentos em 89 convenções de 2025, com 19 códigos hierárquicos. A interpretação das métricas está suspensa até à revisão do gabarito (GitHub #10) |
 
-Sem estes ficheiros o pipeline corre na mesma, com menos metadados; sem a amostra de referência, não é
-possível calibrar a faixa `AUTO` nem medir precisão e cobertura.
+Sem estes ficheiros o pipeline corre na mesma, com menos metadados; sem uma
+amostra revista não se deve tomar a calibração da faixa `AUTO` nem a medição
+de precisão e cobertura como aprovação atual.
 
 ## Textos consolidados (`data/raw/textos_consolidados/`)
 
-Uma pasta por convenção (21 no total), cada uma com o PDF de 2025 e as versões anteriores
+Uma pasta por convenção (21 no conjunto histórico descrito), cada uma com o PDF de 2025 e as versões anteriores
 que existirem, mais os documentos de comparação manual feitos pela equipa (`Comparei_*.docx`),
 que serviram de amostra de referência para validar o comparador automático.
 
@@ -111,10 +112,19 @@ o principal problema encontrado no lote de 44 comparações (ver
 
 ## Repor os dados numa máquina nova
 
-1. Criar a estrutura: `mkdir -p data/raw/bte data/raw/maxqda data/raw/textos_consolidados`
-2. Copiar os PDFs para `data/raw/bte/bte_<ano>/` (do arquivo do CRL, ou descarregando do BTE)
-3. Exportar do MaxQDA os três ficheiros da tabela acima para `data/raw/maxqda/`
-4. Correr `python -m cct.doctor` — diz em português o que ainda falta e onde
+1. Criar `data/raw/indices/`, `data/raw/bte/`, `data/raw/maxqda/` e
+   `data/raw/textos_consolidados/` no gestor de ficheiros (ou com o comando
+   de criação de pastas do sistema).
+2. Para uma **restauração**, copiar em conjunto o registo de recolha, os
+   índices, os PDFs originais e os PDFs nomeados, mantendo caminhos e hashes.
+   Para **nova aquisição**, colocar os índices em `data/raw/indices/` e seguir
+   o [guia §2.1](../operacao/guia-operacao.md#21-encher-a-pasta-automaticamente-recolha-do-bte).
+   PDFs obtidos por via institucional exigem correspondência e proveniência
+   no registo antes da nomeação automática; uma cópia manual na pasta final
+   não cria esse registo.
+3. Exportar do MaxQDA os ficheiros aplicáveis para `data/raw/maxqda/`.
+4. Correr o `cct.doctor` com o Python do `.venv` da plataforma e interpretar
+   separadamente as fontes opcionais ainda ausentes.
 
 ## Proteção de dados
 

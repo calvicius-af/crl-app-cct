@@ -13,7 +13,7 @@ interessam a cada tema.
 **Ver a funcionar em dois minutos:** [`examples/`](examples/README.md) tem artefactos de
 dois casos reais — texto extraído, projeto MaxQDA e instruções para obter os PDFs de origem.
 
-## O que faz, em quatro passos
+## O que faz
 
 ```
 índice do BTE  →  0. AQUISIÇÃO  descarrega os PDFs e dá-lhes o nome do esquema (opcional)
@@ -35,12 +35,13 @@ executada no CI em Linux, macOS e Windows, nas versões do Python definidas em
 (89 convenções do tema 4.8, proteção de dados) foi processado e revisto por peritas em
 cinco rondas sucessivas.
 
-Qualidade medida contra codificação humana: cobertura 0,88, precisão 0,57 — e a faixa
-`AUTO` só existe para códigos com precisão medida ≥ 0,85. Os números, e o que significam,
-estão em [docs/validacao/](docs/validacao/README.md).
+As medições históricas do tema 4.08 estão em [validação](docs/validacao/README.md).
+A interpretação dessas métricas está suspensa até à revisão do gabarito humano
+(GitHub #10); não servem, por si só, para aprovar a primeira release nem para
+dispensar a revisão da faixa `AUTO`.
 
-Por fazer: numeração de cláusulas por extenso, análise de remissões entre documentos,
-prova com um segundo tema. Ver [specs/](specs/README.md) e
+Por fazer: análise de remissões entre documentos e prova com um segundo tema.
+A numeração por extenso já tem normalização e testes. Ver [specs/](specs/README.md) e
 [issues/](issues/README.md).
 
 ## Instalação
@@ -103,7 +104,7 @@ explica os estados e o tratamento de documentos por confirmar.
 **Por linha de comandos** — a corrida completa de um tema:
 
 ```bash
-python -m cct.pipeline_tema \
+.venv/bin/python -m cct.pipeline_tema \
     --pdfs data/raw/bte/bte_2026 \
     --codebook codebooks/4_08_protecao_dados.yaml \
     --pasta-versoes data/raw/textos_consolidados \
@@ -118,10 +119,10 @@ inputs/outputs, contagens e problemas encontrados.
 anotável):
 
 ```bash
-python -m cct.nomeacao --esquema rnc --destino 1_fontes/irct \
+.venv/bin/python -m cct.nomeacao --esquema rnc --destino 1_fontes/irct \
     --siglas vocabularios/siglas_organizacoes.csv \
     --ambitos vocabularios/empregadores_ambito.csv
-python -m cct.catalogo --indices data/raw/indices \
+.venv/bin/python -m cct.catalogo --indices data/raw/indices \
     --saida 0_gestao/catalogo/catalogo_irct_2026.csv
 ```
 
@@ -131,12 +132,14 @@ A convenção completa — pastas, nomes, catálogo, vocabulários — está em
 Comparar duas versões de uma convenção:
 
 ```bash
-python -m cct.comparar --pasta data/raw/textos_consolidados/ACIP_FESAHT \
+.venv/bin/python -m cct.comparar --pasta data/raw/textos_consolidados/ACIP_FESAHT \
     --out results/benchmarks/tema-4.08/comparacoes/ACIP.xlsx
 ```
 
 O guia de operação completo, com o que fazer quando algo corre mal, está em
-[docs/operacao/guia-operacao.md](docs/operacao/guia-operacao.md).
+[docs/operacao/guia-operacao.md](docs/operacao/guia-operacao.md). Os ensaios e
+critérios de aprovação por ambiente estão no
+[plano da primeira release](docs/validacao/plano-primeira-release.md).
 
 ## Estrutura do repositório
 
@@ -184,9 +187,8 @@ porquê antes de mexer:
 
 ## Privacidade e funcionamento offline
 
-A aplicação corre inteiramente na máquina local. A instalação base não faz pedidos de
-rede em operação. Há três exceções, todas opcionais, todas desligadas por omissão e
-confinadas a um módulo:
+A aplicação corre na máquina local. A instalação base não faz pedidos de
+rede em operação. Há três integrações opcionais, desligadas por omissão:
 
 - **Docling** (extrator alternativo): pode descarregar modelos na primeira execução;
   pré-instalável para funcionamento offline em rede fechada.

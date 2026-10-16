@@ -3,7 +3,8 @@
 O projeto foi construído por fases, e nenhuma fase avançou sem passar um *gate*: um teste
 de realidade feito por pessoas, não por código. Esta pasta guarda o registo desses gates.
 
-Há duas formas de medir, e são complementares:
+Há duas formas de medir, e são complementares. Para a primeira release usar
+também o [plano de testes por ambiente](plano-primeira-release.md):
 
 1. **Testes automáticos** (`python -m pytest -q`) — verificam propriedades que
    nunca podem falhar: zero perda de texto, conformidade dos ficheiros com o JSON Schema,
@@ -40,7 +41,7 @@ extrator — quase todos os casos difíceis do código nasceram de um destes com
 (quebras de linha a meio de frase, títulos de cláusula fundidos com o capítulo, fronteiras
 de segmento).
 
-## Métricas contra a amostra de referência
+## Métricas históricas contra a amostra de referência
 
 A amostra de referência contém 788 segmentos do tema 4.8 (proteção de dados) codificados manualmente por
 peritas em 89 convenções de 2025. O `cct/harness.py` compara a codificação automática com
@@ -53,16 +54,16 @@ segmentos reais foram apanhados).
 | Com condições de contexto (`requer_algum`, `excluir`) | 0,56 | 0,82 |
 | Após mineração de variantes morfológicas nos falsos negativos | **0,57** | **0,88** |
 
-A leitura correta destes números: **cobertura alta é o que interessa**, porque o objetivo
-não é substituir a análise humana, é evitar que algo passe despercebido. A precisão baixa
-custa tempo de revisão, mas não produz erro — todas as sugestões passam por pessoas,
-exceto as da faixa `AUTO`, que só existe para códigos com precisão medida ≥ 0,85.
+Estes números registam corridas anteriores, mas a interpretação como medida de
+qualidade atual está **suspensa até à correção e revisão do gabarito humano**
+(GitHub #10). A faixa `AUTO` depende da calibração fornecida e pode dispensar
+revisão de sugestões na operação; por isso exige validação humana específica
+antes de se usar estes valores para uma decisão de release.
 
-O salto do terceiro para o segundo caso mostra o método que funcionou melhor e é
-replicável noutros temas: **ler os falsos negativos e extrair deles as variantes que o
-codebook não previa** ("registo do pessoal", "registo dos trabalhadores", "cadastro
+Historicamente, a análise de falsos negativos levou à extração de variantes que o
+codebook não previa ("registo do pessoal", "registo dos trabalhadores", "cadastro
 individual" onde o codebook só dizia "registo de pessoal"). No subcódigo 4.08.5.1 isso
-levou o F1 de 0,72 para 0,84. O procedimento está descrito em
+levou o F1 medido de 0,72 para 0,84 na amostra então usada. O procedimento está descrito em
 [../operacao/prompts-codebooks.md](../operacao/prompts-codebooks.md).
 
 ## Camada semântica: um gate que falhou primeiro

@@ -36,6 +36,10 @@ Casos difíceis vivem em `tests/fixtures/`; para verificação ponta a ponta há
 [`examples/`](examples/README.md).
 
 O mapa e a estrutura de destino da suite estão em [`tests/README.md`](tests/README.md).
+Para preparar uma release, correr ainda a
+[matriz por ambiente](docs/validacao/plano-primeira-release.md); os testes
+com `skipped` não substituem o corpus real, a instalação na estação ou a
+importação do QDPX no MaxQDA.
 
 ### Alterações ao extrator: corpus de regressão
 
