@@ -245,6 +245,21 @@ def test_acep_e_apu_e_nao_e_processavel():
     assert ambito.processavel("PRI") and ambito.processavel("SPE")
 
 
+@pytest.mark.parametrize("nome", [
+    "Freguesia de Arroios",
+    # «Freguesia da» caía em PRI por omissão, sem aviso (só «de» era regra).
+    "Freguesia da Barrosa",
+    "Freguesia dos Anjos",
+    "União das Freguesias de Real, Dume e Semelhe",
+    "Junta de Freguesia do Lumiar",
+])
+def test_freguesias_sao_apu_por_regra(nome):
+    # Com um tipo que não decide sozinho («AE»): o ACEP já daria APU sem a regra.
+    amb, origem, aviso = ambito.classificar(nome, "AE")
+    assert (amb, origem) == ("APU", "regra"), nome
+    assert aviso
+
+
 def test_o_vocabulario_ganha_a_regra():
     voc = {"empresa metropolitana de estacionamento da maia, em": "PRI"}
     assert ambito.classificar("Empresa Metropolitana de Estacionamento da Maia, EM",

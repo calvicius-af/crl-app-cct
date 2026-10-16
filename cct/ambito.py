@@ -73,7 +73,10 @@ RE_SPE = re.compile(
 # Entidades da Administração Pública em sentido estrito.
 RE_APU = re.compile(
     r"(?:\bmunicipio\b|\bcamara\s+municipal\b|\bjunta\s+de\s+freguesia\b"
-    r"|\bfreguesia\s+de\b|\bcomunidade\s+intermunicipal\b"
+    # «Freguesia de», «da», «do», «das», «dos» e «União das Freguesias de»: só
+    # «de» deixava a «Freguesia da Barrosa» em PRI, sem aviso.
+    r"|\bfreguesias?\s+d[aeo]s?\b|\buniao\s+(?:das\s+)?freguesias\b"
+    r"|\bcomunidade\s+intermunicipal\b"
     r"|\buniversidade\b|\binstituto\s+politecnico\b|\bpolitecnico\b"
     r"|\bdirecao[- ]geral\b|\bsecretaria[- ]geral\b"
     r"|\badministracao\s+regional\b|\bgoverno\s+regional\b"

@@ -37,10 +37,13 @@ packages = ["cct"]
 #         em 64 sítios não corrige nenhum defeito.
 #   E402  os scripts acrescentam a raiz ao sys.path antes de importar `cct`,
 #         para correrem sem o pacote instalado (instalação offline).
+# `select` fixa essas regras de forma explícita: o Ruff 0.16 alargou o
+# conjunto por omissão, e uma subida de versão não deve mudar o que se exige.
 [tool.ruff]
 target-version = "py311"
 
 [tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
 ignore = ["E741"]
 
 [tool.ruff.lint.per-file-ignores]
