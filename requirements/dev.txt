@@ -8,7 +8,7 @@
 #
 # pip-audit não entra em requirements.txt de propósito: é ferramenta de CI,
 # não dependência do produto.
-pytest==9.1.1
+pytest==9.2.0
 pip-audit==2.10.1
 # Análise estática (issue #27): lint, tipos e os stubs que o mypy exige.
 ruff==0.17.0
